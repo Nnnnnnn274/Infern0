@@ -35,6 +35,8 @@ extern NSString * const kSettingsRSSIDisplayCell;
 
 extern NSString * const kSettingsAxonLiteEnabled;
 
+extern NSString * const kSettingsLogUploadEnabled;
+
 extern NSString * const kSettingsActionsDidCompleteNotification;
 
 // Returns YES if the tweak whose master enable lives at `key` was successfully

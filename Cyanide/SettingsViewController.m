@@ -107,6 +107,10 @@ NSString * const kSettingsRSSIDisplayCell    = @"RSSIDisplayCell";
 
 NSString * const kSettingsAxonLiteEnabled = @"AxonLiteEnabled";
 
+NSString * const kSettingsLogUploadEnabled = @"LogUploadEnabled";
+
+static void cyanide_upload_log_if_enabled(void);
+
 extern int  escape_sbx_demo2(void);
 extern int  escape_sbx_demo2_in_session(void);
 extern int  escape_sbx_demo3(void);
@@ -2076,6 +2080,7 @@ void settings_run_actions(void)
                                                                     object:[PackageQueue sharedQueue]];
                 [[NSNotificationCenter defaultCenter] postNotificationName:kSettingsActionsDidCompleteNotification
                                                                     object:nil];
+                cyanide_upload_log_if_enabled();
             });
         }
     });
@@ -2449,7 +2454,7 @@ typedef NS_ENUM(NSInteger, RootSection) {
         case RootSectionActions:        return 4;
         case RootSectionTweakBundles:   return (NSInteger)self.tweakBundleRows.count;
         case RootSectionSystemBundles:  return (NSInteger)self.systemBundleRows.count;
-        case RootSectionAbout:          return 3;
+        case RootSectionAbout:          return 4;
         case RootSectionCount:          return 0;
     }
     return 0;
@@ -2576,11 +2581,24 @@ typedef NS_ENUM(NSInteger, RootSection) {
     } else if (row == 1) {
         cell.imageView.image = [SettingsViewController iconBadgeWithSymbol:@"doc.text.magnifyingglass" color:UIColor.systemGrayColor size:29.0];
         cell.textLabel.text = @"View Log";
-    } else {
+    } else if (row == 2) {
         cell.imageView.image = [SettingsViewController iconBadgeWithSymbol:@"square.and.arrow.up" color:UIColor.systemGreenColor size:29.0];
         cell.textLabel.text = @"Share Log";
+    } else {
+        cell.imageView.image = [SettingsViewController iconBadgeWithSymbol:@"icloud.and.arrow.up" color:UIColor.systemIndigoColor size:29.0];
+        cell.textLabel.text = @"Auto-Upload Logs";
+        cell.accessoryType = UITableViewCellAccessoryNone;
+        cell.selectionStyle = UITableViewCellSelectionStyleNone;
+        UISwitch *sw = [[UISwitch alloc] init];
+        sw.on = [[NSUserDefaults standardUserDefaults] boolForKey:kSettingsLogUploadEnabled];
+        [sw addTarget:self action:@selector(logUploadSwitchChanged:) forControlEvents:UIControlEventValueChanged];
+        cell.accessoryView = sw;
     }
     return cell;
+}
+
+- (void)logUploadSwitchChanged:(UISwitch *)sw {
+    [[NSUserDefaults standardUserDefaults] setBool:sw.isOn forKey:kSettingsLogUploadEnabled];
 }
 
 - (void)openTwitter
@@ -2623,6 +2641,57 @@ typedef NS_ENUM(NSInteger, RootSection) {
     [self.navigationController pushViewController:vc animated:YES];
 }
 
+static void cyanide_upload_log_if_enabled(void) {
+    if (![[NSUserDefaults standardUserDefaults] boolForKey:kSettingsLogUploadEnabled]) return;
+    NSString *path = log_most_recent_session_path();
+    if (!path) return;
+    NSString *rawLog = [NSString stringWithContentsOfFile:path encoding:NSUTF8StringEncoding error:nil];
+    if (!rawLog.length) return;
+
+    NSString *appVersion = [NSBundle mainBundle].infoDictionary[@"CFBundleShortVersionString"] ?: @"unknown";
+    NSString *iosVersion = [UIDevice currentDevice].systemVersion;
+
+    struct utsname sysInfo;
+    uname(&sysInfo);
+    NSString *machine = [NSString stringWithUTF8String:sysInfo.machine];
+
+    // Prepend a diagnostic header so each uploaded log is self-contained.
+    NSString *header = [NSString stringWithFormat:
+        @"=== Cyanide Diagnostic Log ===\n"
+        @"app_version : %@\n"
+        @"ios_version : %@\n"
+        @"device      : %@\n"
+        @"log_file    : %@\n"
+        @"==============================\n\n",
+        appVersion, iosVersion, machine, path.lastPathComponent];
+
+    NSDictionary *body = @{
+        @"log": [header stringByAppendingString:rawLog],
+        @"meta": @{
+            @"build":  [NSString stringWithFormat:@"cyanide-%@", appVersion],
+            @"source": @"cyanide",
+            @"ios":    iosVersion,
+            @"device": machine,
+        }
+    };
+    NSData *data = [NSJSONSerialization dataWithJSONObject:body options:0 error:nil];
+    if (!data) return;
+    NSURL *url = [NSURL URLWithString:@"https://brokenblade-weblogs.hackerboii.workers.dev/log"];
+    NSMutableURLRequest *req = [NSMutableURLRequest requestWithURL:url];
+    req.HTTPMethod = @"POST";
+    [req setValue:@"application/json" forHTTPHeaderField:@"Content-Type"];
+    req.HTTPBody = data;
+    printf("[LOG] uploading diagnostic log (%zu bytes) to R2...\n", (size_t)data.length);
+    [[[NSURLSession sharedSession] dataTaskWithRequest:req completionHandler:^(NSData *d, NSURLResponse *r, NSError *e) {
+        if (e) {
+            printf("[LOG] upload failed: %s\n", e.localizedDescription.UTF8String);
+        } else {
+            NSHTTPURLResponse *http = (NSHTTPURLResponse *)r;
+            printf("[LOG] upload ok: HTTP %ld\n", (long)http.statusCode);
+        }
+    }] resume];
+}
+
 - (void)openFeedbackEmail
 {
     NSString *logPath = log_most_recent_session_path();
@@ -2654,7 +2723,9 @@ typedef NS_ENUM(NSInteger, RootSection) {
         return;
     }
 
-    UIActivityViewController *vc = [[UIActivityViewController alloc] initWithActivityItems:@[dst]
+    NSString *logText = [NSString stringWithContentsOfURL:dst encoding:NSUTF8StringEncoding error:nil]
+                        ?: @"(empty log)";
+    UIActivityViewController *vc = [[UIActivityViewController alloc] initWithActivityItems:@[logText]
                                                                      applicationActivities:nil];
     // iPad needs a popover anchor; iPhone ignores these properties.
     if (vc.popoverPresentationController) {
@@ -2993,7 +3064,8 @@ typedef NS_ENUM(NSInteger, RootSection) {
             case RootSectionAbout:
                 if (indexPath.row == 0)      [self openTwitter];
                 else if (indexPath.row == 1) [self openViewLog];
-                else                         [self openFeedbackEmail];
+                else if (indexPath.row == 2) [self openFeedbackEmail];
+                // row 3: toggle — handled by UISwitch target, no action here
                 return;
             case RootSectionCount:
                 return;

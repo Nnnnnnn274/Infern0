@@ -53,13 +53,37 @@
 }
 
 
+- (void)showPrivacyConsentIfNeeded {
+    NSUserDefaults *ud = [NSUserDefaults standardUserDefaults];
+    if ([ud boolForKey:@"cyanide.privacy.logConsentShown"]) return;
+    UIViewController *root = self.window.rootViewController;
+    if (!root) return;
+    NSString *msg = @"Cyanide is an experimental exploit chain — the app can be unstable, SpringBoard may respawn, and tweaks may misbehave. Automatic log collection helps diagnose what went wrong.\n\nAfter each run, Cyanide can upload a diagnostic log containing: chain stage timing, error messages, device model, and iOS version. No personal data beyond this is collected.\n\nLogs go to a private Cloudflare R2 bucket owned by @zeroxjf and expire after 30 days. Toggle anytime in Settings → About.";
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Cyanide Log Collection"
+                                                                   message:msg
+                                                            preferredStyle:UIAlertControllerStyleAlert];
+    [alert addAction:[UIAlertAction actionWithTitle:@"Allow" style:UIAlertActionStyleDefault handler:^(UIAlertAction *a) {
+        [ud setBool:YES forKey:kSettingsLogUploadEnabled];
+        [ud setBool:YES forKey:@"cyanide.privacy.logConsentShown"];
+    }]];
+    [alert addAction:[UIAlertAction actionWithTitle:@"Decline" style:UIAlertActionStyleCancel handler:^(UIAlertAction *a) {
+        [ud setBool:NO forKey:kSettingsLogUploadEnabled];
+        [ud setBool:YES forKey:@"cyanide.privacy.logConsentShown"];
+    }]];
+    [root presentViewController:alert animated:YES completion:nil];
+}
+
 - (void)sceneDidBecomeActive:(UIScene *)scene {
     [self selectInitialTabIfNeeded];
     settings_application_did_become_active();
+    [self showPrivacyConsentIfNeeded];
 
-    UITabBarController *tab = (UITabBarController *)self.window.rootViewController;
-    if ([tab isKindOfClass:UITabBarController.class]) {
-        [[UpdateChecker shared] checkForUpdatesIfNeededFrom:tab];
+    // Skip the update check on first boot to avoid stacking two alerts.
+    if ([[NSUserDefaults standardUserDefaults] boolForKey:@"cyanide.privacy.logConsentShown"]) {
+        UITabBarController *tab = (UITabBarController *)self.window.rootViewController;
+        if ([tab isKindOfClass:UITabBarController.class]) {
+            [[UpdateChecker shared] checkForUpdatesIfNeededFrom:tab];
+        }
     }
 }
 
