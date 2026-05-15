@@ -1,0 +1,598 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXCopyFilesBuildPhase section */
+		AAA2989D2F7418CC000B5902 /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 6;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		AA73F7982F7BC6CB00134C31 /* ChOma.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; path = ChOma.xcodeproj; sourceTree = "<group>"; };
+		AA794BC92F828668001F0544 /* ChOma.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; path = ChOma.xcodeproj; sourceTree = "<group>"; };
+		AAA297772F72D439000B5902 /* Cyanide.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Cyanide.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		AAA2982D2F741178000B5902 /* ChOma.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; path = ChOma.xcodeproj; sourceTree = "<group>"; };
+		FBA008522FB522840080FFE2 /* ChOma.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; path = ChOma.xcodeproj; sourceTree = "<group>"; };
+		FBBF227D2FAE5E7E00AF5849 /* ChOma.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; path = ChOma.xcodeproj; sourceTree = "<group>"; };
+		FBEF02242FAC52BF005E14B9 /* ChOma.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; path = ChOma.xcodeproj; sourceTree = "<group>"; };
+		FBEF03482FAC52D5005E14B9 /* ChOma.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; path = ChOma.xcodeproj; sourceTree = "<group>"; };
+		FBFA38382FB68E0600B9F081 /* ChOma.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; path = ChOma.xcodeproj; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		AAA2978E2F72D43A000B5902 /* Exceptions for "Cyanide" folder in "Cyanide" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+				resident/output/libdsstatbaragent.arm64.thin,
+				resident/output/libdsstatbaragent.arm64e.thin,
+				resident/output/libdsstatbaragent.dylib,
+				XPF/.gitignore,
+				XPF/.gitmodules,
+				XPF/.vscode/settings.json,
+				XPF/external/ChOma/.gitignore,
+				XPF/external/ChOma/.vscode/settings.json,
+				XPF/external/ChOma/cert.p12,
+				XPF/external/ChOma/external/ios/entitlements.plist,
+				XPF/external/ChOma/external/ios/libcrypto.a,
+				XPF/external/ChOma/external/ios/libssl.a,
+				XPF/external/ChOma/include/choma,
+				XPF/external/ChOma/LICENSE,
+				XPF/external/ChOma/Makefile,
+				XPF/external/ChOma/README.md,
+				XPF/external/ChOma/src/arm64.c,
+				XPF/external/ChOma/src/Base64.c,
+				XPF/external/ChOma/src/BufferedStream.c,
+				XPF/external/ChOma/src/CodeDirectory.c,
+				XPF/external/ChOma/src/CSBlob.c,
+				XPF/external/ChOma/src/DER.c,
+				XPF/external/ChOma/src/DyldSharedCache.c,
+				XPF/external/ChOma/src/Entitlements.c,
+				XPF/external/ChOma/src/Fat.c,
+				XPF/external/ChOma/src/FileStream.c,
+				XPF/external/ChOma/src/Host.c,
+				XPF/external/ChOma/src/MachO.c,
+				XPF/external/ChOma/src/MachOLoadCommand.c,
+				XPF/external/ChOma/src/MemoryStream.c,
+				XPF/external/ChOma/src/PatchFinder_arm64.c,
+				XPF/external/ChOma/src/PatchFinder.c,
+				XPF/external/ChOma/src/Util.c,
+				XPF/external/ChOma/tests/choma_cli/main.c,
+				XPF/external/ChOma/tests/choma_sign/main.c,
+				XPF/external/ChOma/tests/ct_bypass/main.c,
+				XPF/external/ChOma/tests/dsc_extract/main.c,
+				XPF/external/ChOma/tests/dsc_tester/main.c,
+				XPF/external/ChOma/tests/dyld_patch/main.c,
+				XPF/external/ChOma/tests/dylib_insert/main.c,
+				XPF/external/ChOma/tests/fat_create/main.c,
+				XPF/external/ChOma/tests/kpf/main.c,
+				XPF/LICENSE.md,
+				XPF/Makefile,
+				XPF/output/ios/xpf_test,
+				XPF/output/macos/xpf_test,
+				XPF/src/bad_recovery.c,
+				XPF/src/cli/main.c,
+				XPF/src/common.c,
+				XPF/src/decompress.c,
+				XPF/src/decompress.LICENSE,
+				XPF/src/non_ppl.c,
+				XPF/src/ppl.c,
+				XPF/src/xpf.c,
+			);
+			target = AAA297762F72D439000B5902 /* Cyanide */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
+/* Begin PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
+		AA794C7B2F853D1A001F0544 /* Exceptions for "Cyanide" folder in "Copy Files" phase from "Cyanide" target */ = {
+			isa = PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet;
+			attributesByRelativePath = {
+				XPF/output/ios/libxpf.dylib = (CodeSignOnCopy, );
+				resident/output/libdsstatbaragent.dylib = (CodeSignOnCopy, );
+			};
+			buildPhase = AAA2989D2F7418CC000B5902 /* CopyFiles */;
+			membershipExceptions = (
+				resident/output/libdsstatbaragent.dylib,
+				XPF/output/ios/libxpf.dylib,
+			);
+		};
+/* End PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		AAA297792F72D439000B5902 /* Cyanide */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				AAA2978E2F72D43A000B5902 /* Exceptions for "Cyanide" folder in "Cyanide" target */,
+				AA794C7B2F853D1A001F0544 /* Exceptions for "Cyanide" folder in "Copy Files" phase from "Cyanide" target */,
+			);
+			path = "Cyanide";
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		AAA297742F72D439000B5902 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		AA73F7C72F7BC6CB00134C31 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		AA794BF82F828668001F0544 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		AAA2976E2F72D439000B5902 = {
+			isa = PBXGroup;
+			children = (
+				AAA297792F72D439000B5902 /* Cyanide */,
+				AAA298702F74153F000B5902 /* Frameworks */,
+				AAA297782F72D439000B5902 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		AAA297782F72D439000B5902 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				AAA297772F72D439000B5902 /* Cyanide.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		AAA298312F741178000B5902 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		AAA298702F74153F000B5902 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		FBA008852FB522840080FFE2 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		FBBF22B02FAE5E7E00AF5849 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		FBEF02552FAC52BF005E14B9 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		FBEF03792FAC52D5005E14B9 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		FBFA386B2FB68E0600B9F081 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		AAA297762F72D439000B5902 /* Cyanide */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AAA2978F2F72D43A000B5902 /* Build configuration list for PBXNativeTarget "Cyanide" */;
+			buildPhases = (
+				AAA2986F2F741423000B5902 /* ShellScript */,
+				AAA297732F72D439000B5902 /* Sources */,
+				AAA297742F72D439000B5902 /* Frameworks */,
+				AAA297752F72D439000B5902 /* Resources */,
+				AAA2989D2F7418CC000B5902 /* CopyFiles */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				AAA297792F72D439000B5902 /* Cyanide */,
+			);
+			name = "Cyanide";
+			packageProductDependencies = (
+			);
+			productName = "Cyanide";
+			productReference = AAA297772F72D439000B5902 /* Cyanide.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		AAA2976F2F72D439000B5902 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastUpgradeCheck = 2620;
+				TargetAttributes = {
+					AAA297762F72D439000B5902 = {
+						CreatedOnToolsVersion = 26.2;
+					};
+				};
+			};
+			buildConfigurationList = AAA297722F72D439000B5902 /* Build configuration list for PBXProject "Cyanide" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = AAA2976E2F72D439000B5902;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = AAA297782F72D439000B5902 /* Products */;
+			projectDirPath = "";
+			projectReferences = (
+				{
+					ProductGroup = FBEF03792FAC52D5005E14B9 /* Products */;
+					ProjectRef = FBEF03482FAC52D5005E14B9 /* ChOma.xcodeproj */;
+				},
+				{
+					ProductGroup = FBFA386B2FB68E0600B9F081 /* Products */;
+					ProjectRef = FBFA38382FB68E0600B9F081 /* ChOma.xcodeproj */;
+				},
+				{
+					ProductGroup = FBA008852FB522840080FFE2 /* Products */;
+					ProjectRef = FBA008522FB522840080FFE2 /* ChOma.xcodeproj */;
+				},
+				{
+					ProductGroup = FBEF02552FAC52BF005E14B9 /* Products */;
+					ProjectRef = FBEF02242FAC52BF005E14B9 /* ChOma.xcodeproj */;
+				},
+				{
+					ProductGroup = AA794BF82F828668001F0544 /* Products */;
+					ProjectRef = AA794BC92F828668001F0544 /* ChOma.xcodeproj */;
+				},
+				{
+					ProductGroup = AAA298312F741178000B5902 /* Products */;
+					ProjectRef = AAA2982D2F741178000B5902 /* ChOma.xcodeproj */;
+				},
+				{
+					ProductGroup = FBBF22B02FAE5E7E00AF5849 /* Products */;
+					ProjectRef = FBBF227D2FAE5E7E00AF5849 /* ChOma.xcodeproj */;
+				},
+				{
+					ProductGroup = AA73F7C72F7BC6CB00134C31 /* Products */;
+					ProjectRef = AA73F7982F7BC6CB00134C31 /* ChOma.xcodeproj */;
+				},
+			);
+			projectRoot = "";
+			targets = (
+				AAA297762F72D439000B5902 /* Cyanide */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		AAA297752F72D439000B5902 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		AAA2986F2F741423000B5902 /* ShellScript */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "make -C \"$SRCROOT/Cyanide/XPF\" output/ios/libxpf.dylib\n\nAGENT_SRC=\"$SRCROOT/resident/DSStatBarAgent.m\"\nAGENT_OUT_DIR=\"$SRCROOT/Cyanide/resident/output\"\nAGENT_ARM64=\"$AGENT_OUT_DIR/libdsstatbaragent.arm64.thin\"\nAGENT_ARM64E=\"$AGENT_OUT_DIR/libdsstatbaragent.arm64e.thin\"\nAGENT_OUT=\"$AGENT_OUT_DIR/libdsstatbaragent.dylib\"\nSDK=\"$(xcrun --sdk iphoneos --show-sdk-path)\"\nCLANG=\"$(xcrun --find clang)\"\nmkdir -p \"$AGENT_OUT_DIR\"\n\"$CLANG\" -target arm64-apple-ios17.0 -isysroot \"$SDK\" -miphoneos-version-min=17.0 -dynamiclib -fobjc-arc \"$AGENT_SRC\" -framework UIKit -framework Foundation -framework CoreFoundation -framework CoreGraphics -o \"$AGENT_ARM64\" -install_name \"@rpath/libdsstatbaragent.dylib\"\n\"$CLANG\" -target arm64e-apple-ios17.0 -isysroot \"$SDK\" -miphoneos-version-min=17.0 -dynamiclib -fobjc-arc \"$AGENT_SRC\" -framework UIKit -framework Foundation -framework CoreFoundation -framework CoreGraphics -o \"$AGENT_ARM64E\" -install_name \"@rpath/libdsstatbaragent.dylib\"\nlipo -create \"$AGENT_ARM64\" \"$AGENT_ARM64E\" -output \"$AGENT_OUT\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		AAA297732F72D439000B5902 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		AAA297902F72D43A000B5902 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_ASSET_PATHS = "";
+				DEVELOPMENT_TEAM = 839P5NK532;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(SRCROOT)/Cyanide/XPF/src",
+					"$(SRCROOT)/Cyanide/XPF/external/ChOma/include",
+				);
+				INFOPLIST_FILE = "Cyanide/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = Cyanide;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
+				INFOPLIST_KEY_UIMainStoryboardFile = Main;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/Cyanide/XPF/output/ios",
+					"$(PROJECT_DIR)/Cyanide/XPF/output/macos",
+					"$(PROJECT_DIR)/Cyanide/XPF/external/ChOma/external/ios",
+					"$(PROJECT_DIR)/Cyanide/resident/output",
+				);
+				MARKETING_VERSION = 1.0.14;
+				OTHER_CFLAGS = "";
+				PRODUCT_BUNDLE_IDENTIFIER = com.zeroxjf.cyanide;
+				PRODUCT_NAME = Cyanide;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		AAA297912F72D43A000B5902 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_ASSET_PATHS = "";
+				DEVELOPMENT_TEAM = 839P5NK532;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(SRCROOT)/Cyanide/XPF/src",
+					"$(SRCROOT)/Cyanide/XPF/external/ChOma/include",
+				);
+				INFOPLIST_FILE = "Cyanide/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = Cyanide;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
+				INFOPLIST_KEY_UIMainStoryboardFile = Main;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/Cyanide/XPF/output/ios",
+					"$(PROJECT_DIR)/Cyanide/XPF/output/macos",
+					"$(PROJECT_DIR)/Cyanide/XPF/external/ChOma/external/ios",
+					"$(PROJECT_DIR)/Cyanide/resident/output",
+				);
+				MARKETING_VERSION = 1.0.14;
+				OTHER_CFLAGS = "";
+				PRODUCT_BUNDLE_IDENTIFIER = com.zeroxjf.cyanide;
+				PRODUCT_NAME = Cyanide;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		AAA297922F72D43A000B5902 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = (
+					arm64e,
+					"$(ARCHS_STANDARD)",
+				);
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = 7LGY4NE2VM;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				OTHER_CFLAGS = "";
+				SDKROOT = iphoneos;
+			};
+			name = Debug;
+		};
+		AAA297932F72D43A000B5902 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = (
+					arm64e,
+					"$(ARCHS_STANDARD)",
+				);
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = 7LGY4NE2VM;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				OTHER_CFLAGS = "";
+				SDKROOT = iphoneos;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		AAA297722F72D439000B5902 /* Build configuration list for PBXProject "Cyanide" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AAA297922F72D43A000B5902 /* Debug */,
+				AAA297932F72D43A000B5902 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		AAA2978F2F72D43A000B5902 /* Build configuration list for PBXNativeTarget "Cyanide" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AAA297902F72D43A000B5902 /* Debug */,
+				AAA297912F72D43A000B5902 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = AAA2976F2F72D439000B5902 /* Project object */;
+}

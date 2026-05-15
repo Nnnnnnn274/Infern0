@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="24506" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES" initialViewController="iNZ-c0-y4X">
+    <device id="retina6_12" orientation="portrait" appearance="light"/>
+    <dependencies>
+        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="24504"/>
+        <capability name="Safe area layout guides" minToolsVersion="9.0"/>
+        <capability name="System colors in document resources" minToolsVersion="11.0"/>
+        <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
+    </dependencies>
+    <scenes>
+        <!--Tab Bar Controller-->
+        <scene sceneID="Edw-UF-qgs">
+            <objects>
+                <tabBarController id="iNZ-c0-y4X" customClass="MainTabBarController" sceneMemberID="viewController">
+                    <toolbarItems/>
+                    <tabBar key="tabBar" contentMode="scaleToFill" insetsLayoutMarginsFromSafeArea="NO" id="Ywt-dv-xey">
+                        <rect key="frame" x="0.0" y="0.0" width="1000" height="1000"/>
+                        <autoresizingMask key="autoresizingMask"/>
+                        <color key="backgroundColor" white="0.0" alpha="0.0" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
+                        <color key="barTintColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
+                    </tabBar>
+                    <connections>
+                        <segue destination="InsNv001" kind="relationship" relationship="viewControllers" id="InsSg001"/>
+                        <segue destination="8yM-QB-lo1" kind="relationship" relationship="viewControllers" id="gfn-Ak-FfH"/>
+                    </connections>
+                </tabBarController>
+                <placeholder placeholderIdentifier="IBFirstResponder" id="Yss-aD-8Uy" userLabel="First Responder" customClass="UIResponder" sceneMemberID="firstResponder"/>
+            </objects>
+            <point key="canvasLocation" x="7072.5190839694651" y="-558.45070422535218"/>
+        </scene>
+        <!--Settings-->
+        <scene sceneID="cy4-QU-ZIz">
+            <objects>
+                <navigationController id="8yM-QB-lo1" userLabel="Settings" sceneMemberID="viewController">
+                    <tabBarItem key="tabBarItem" title="Settings" image="gear" catalog="system" id="90p-V5-FPd">
+                        <color key="badgeColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
+                    </tabBarItem>
+                    <navigationBar key="navigationBar" contentMode="scaleToFill" barStyle="black" id="YsO-k3-Sb5">
+                        <rect key="frame" x="0.0" y="118" width="393" height="54"/>
+                        <autoresizingMask key="autoresizingMask"/>
+                    </navigationBar>
+                    <connections>
+                        <segue destination="Lfv-cA-jkS" kind="relationship" relationship="rootViewController" id="4EC-G3-p60"/>
+                    </connections>
+                </navigationController>
+                <placeholder placeholderIdentifier="IBFirstResponder" id="Vzp-KI-mlX" userLabel="First Responder" customClass="UIResponder" sceneMemberID="firstResponder"/>
+            </objects>
+            <point key="canvasLocation" x="8079" y="-391"/>
+        </scene>
+        <!--Settings-->
+        <scene sceneID="iCC-Sc-yhh">
+            <objects>
+                <tableViewController id="Lfv-cA-jkS" customClass="SettingsViewController" sceneMemberID="viewController">
+                    <tableView key="view" clipsSubviews="YES" contentMode="scaleToFill" alwaysBounceVertical="YES" dataMode="prototypes" style="insetGrouped" separatorStyle="default" rowHeight="-1" sectionHeaderHeight="-1" sectionFooterHeight="-1" id="bLF-19-mtc">
+                        <rect key="frame" x="0.0" y="0.0" width="393" height="852"/>
+                        <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+                        <color key="backgroundColor" systemColor="systemGroupedBackgroundColor"/>
+                    </tableView>
+                    <navigationItem key="navigationItem" title="Settings" id="Ofz-kh-Dfg"/>
+                </tableViewController>
+                <placeholder placeholderIdentifier="IBFirstResponder" id="1bh-fX-dfw" userLabel="First Responder" customClass="UIResponder" sceneMemberID="firstResponder"/>
+            </objects>
+            <point key="canvasLocation" x="8909" y="-404"/>
+        </scene>
+        <!--Installer-->
+        <scene sceneID="InsScNav">
+            <objects>
+                <navigationController id="InsNv001" userLabel="Installer" sceneMemberID="viewController">
+                    <tabBarItem key="tabBarItem" title="Installer" image="shippingbox.fill" catalog="system" id="InsTb001"/>
+                    <navigationBar key="navigationBar" contentMode="scaleToFill" barStyle="black" id="InsNb001">
+                        <rect key="frame" x="0.0" y="118" width="393" height="54"/>
+                        <autoresizingMask key="autoresizingMask"/>
+                    </navigationBar>
+                    <connections>
+                        <segue destination="InsTv001" kind="relationship" relationship="rootViewController" id="InsSg002"/>
+                    </connections>
+                </navigationController>
+                <placeholder placeholderIdentifier="IBFirstResponder" id="InsFr001" userLabel="First Responder" customClass="UIResponder" sceneMemberID="firstResponder"/>
+            </objects>
+            <point key="canvasLocation" x="8079" y="-750"/>
+        </scene>
+        <!--Installer-->
+        <scene sceneID="InsScTv">
+            <objects>
+                <tableViewController id="InsTv001" customClass="PackagesViewController" sceneMemberID="viewController">
+                    <tableView key="view" clipsSubviews="YES" contentMode="scaleToFill" alwaysBounceVertical="YES" dataMode="prototypes" style="insetGrouped" separatorStyle="default" rowHeight="-1" sectionHeaderHeight="-1" sectionFooterHeight="-1" id="InsTbl001">
+                        <rect key="frame" x="0.0" y="0.0" width="393" height="852"/>
+                        <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+                        <color key="backgroundColor" systemColor="systemGroupedBackgroundColor"/>
+                    </tableView>
+                    <navigationItem key="navigationItem" title="Installer" id="InsNi001"/>
+                </tableViewController>
+                <placeholder placeholderIdentifier="IBFirstResponder" id="InsFr002" userLabel="First Responder" customClass="UIResponder" sceneMemberID="firstResponder"/>
+            </objects>
+            <point key="canvasLocation" x="8909" y="-750"/>
+        </scene>
+    </scenes>
+    <resources>
+        <image name="gear" catalog="system" width="128" height="122"/>
+        <image name="shippingbox.fill" catalog="system" width="128" height="113"/>
+    </resources>
+</document>

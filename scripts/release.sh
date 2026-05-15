@@ -3,11 +3,20 @@
 # GitHub Release.
 #
 # Usage:
-#   ./scripts/release.sh                                # use working-tree state, build + push (no commit)
-#   ./scripts/release.sh "commit message"               # commit any changes, push, build, release
+#   ./scripts/release.sh                                # auto-bump patch, auto-commit, push, build, release
+#   ./scripts/release.sh "commit message"               # auto-bump patch + commit msg, push, build, release
 #   ./scripts/release.sh "commit message" "release notes"   # custom notes for the GH Release
 #   NOTES_FILE=NOTES.md ./scripts/release.sh "..."      # read notes from a file
-#   TAG=v1.2.3 ./scripts/release.sh "..."               # override tag (defaults to next vX.Y.Z tag)
+#   BUMP=minor ./scripts/release.sh "..."               # bump minor (1.0.14 -> 1.1.0)
+#   BUMP=major ./scripts/release.sh "..."               # bump major (1.0.14 -> 2.0.0)
+#   BUMP=none  ./scripts/release.sh "..."               # leave MARKETING_VERSION as-is
+#   VERSION=1.5.3 ./scripts/release.sh "..."            # set an explicit version
+#   TAG=v1.2.3 ./scripts/release.sh "..."               # override tag (defaults to v${VERSION})
+#
+# The release script owns versioning end-to-end: it edits MARKETING_VERSION in
+# the xcodeproj, commits the bump (along with any other working-tree changes),
+# pushes, builds, and tags. The compiled CFBundleShortVersionString, the IPA
+# filename, and the GitHub release tag all flow from the bumped version.
 #
 # Release notes default to the commit *subject only* (first line) — so the
 # Releases page stays terse. Pass a second arg or NOTES_FILE for a richer
@@ -31,17 +40,84 @@ fi
 MSG="${1:-}"
 NOTES_ARG="${2:-}"
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
+PBXPROJ="Cyanide.xcodeproj/project.pbxproj"
 
-# 1. Commit if there are changes and a message was provided.
-DIRTY=0
+# --- versioning -------------------------------------------------------------
+
+current_marketing_version() {
+    grep -m1 "MARKETING_VERSION" "$PBXPROJ" \
+        | sed -E 's/.*MARKETING_VERSION = ([0-9.]+);.*/\1/'
+}
+
+set_marketing_version() {
+    local new="$1"
+    # macOS sed needs the empty-string -i argument.
+    sed -i '' -E "s/MARKETING_VERSION = [0-9.]+;/MARKETING_VERSION = ${new};/g" "$PBXPROJ"
+}
+
+compute_new_version() {
+    local current="$1"
+    if [ -n "${VERSION:-}" ]; then
+        echo "$VERSION"
+        return
+    fi
+    local bump="${BUMP:-patch}"
+    if [ "$bump" = "none" ]; then
+        echo "$current"
+        return
+    fi
+    local major minor patch
+    major=$(echo "$current" | cut -d. -f1)
+    minor=$(echo "$current" | cut -d. -f2)
+    patch=$(echo "$current" | cut -d. -f3)
+    [ -z "$minor" ] && minor=0
+    [ -z "$patch" ] && patch=0
+    case "$bump" in
+        patch) patch=$((patch + 1)) ;;
+        minor) minor=$((minor + 1)); patch=0 ;;
+        major) major=$((major + 1)); minor=0; patch=0 ;;
+        *)
+            echo "error: unknown BUMP=$bump (use patch|minor|major|none)" >&2
+            exit 1
+            ;;
+    esac
+    echo "${major}.${minor}.${patch}"
+}
+
+# Snapshot dirty state *before* the bump so we can tell apart bump-only commits
+# (auto-message OK) vs. mixed commits (user-supplied message required).
+TREE_WAS_DIRTY=0
 if ! git diff-index --quiet HEAD -- || [ -n "$(git ls-files --others --exclude-standard)" ]; then
-    DIRTY=1
+    TREE_WAS_DIRTY=1
 fi
-if [ "$DIRTY" = "1" ]; then
+
+CURRENT_VERSION=$(current_marketing_version)
+if [ -z "$CURRENT_VERSION" ]; then
+    echo "error: could not parse MARKETING_VERSION from $PBXPROJ" >&2
+    exit 1
+fi
+NEW_VERSION=$(compute_new_version "$CURRENT_VERSION")
+
+BUMPED=0
+if [ "$NEW_VERSION" != "$CURRENT_VERSION" ]; then
+    echo "==> bumping MARKETING_VERSION: $CURRENT_VERSION -> $NEW_VERSION"
+    set_marketing_version "$NEW_VERSION"
+    BUMPED=1
+else
+    echo "==> MARKETING_VERSION unchanged at $CURRENT_VERSION"
+fi
+
+# 1. Commit if either the user had changes or the bump modified the pbxproj.
+if [ "$TREE_WAS_DIRTY" = "1" ] || [ "$BUMPED" = "1" ]; then
     if [ -z "$MSG" ]; then
-        echo "error: working tree has changes but no commit message was provided." >&2
-        echo "       pass a message as the first arg, or stash changes." >&2
-        exit 1
+        if [ "$TREE_WAS_DIRTY" = "0" ] && [ "$BUMPED" = "1" ]; then
+            MSG="Bump version to $NEW_VERSION"
+            echo "==> auto-commit message: $MSG"
+        else
+            echo "error: working tree has changes but no commit message was provided." >&2
+            echo "       pass a message as the first arg, or stash changes." >&2
+            exit 1
+        fi
     fi
     echo "==> committing"
     git add -A
@@ -52,40 +128,31 @@ fi
 echo "==> pushing $BRANCH"
 git push origin "$BRANCH"
 
-# 3. Build the IPA.
+# 3. Build the IPA. build.sh writes build/Cyanide-${VERSION}.ipa and
+#    refreshes a build/Cyanide.ipa symlink pointing at it.
 ./scripts/build.sh
-IPA="$PWD/build/kfun-zeroxjf.ipa"
+
+# Read the CFBundleShortVersionString that just got compiled into the app —
+# this drives both the IPA filename uploaded to the Release and the default
+# tag. Bump MARKETING_VERSION in the xcodeproj to ship a new version.
+APP_PATH="$PWD/build/DerivedData/Build/Products/Debug-iphoneos/Cyanide.app"
+VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$APP_PATH/Info.plist" 2>/dev/null || true)
+if [ -z "$VERSION" ]; then
+    echo "error: could not read CFBundleShortVersionString from $APP_PATH/Info.plist" >&2
+    exit 1
+fi
+
+IPA="$PWD/build/Cyanide-${VERSION}.ipa"
 if [ ! -f "$IPA" ]; then
     echo "error: $IPA not found after build" >&2
     exit 1
 fi
 
-next_release_tag() {
-    latest=$(git ls-remote --tags origin 'refs/tags/v[0-9]*.[0-9]*.[0-9]*' \
-        | awk '{print $2}' \
-        | sed -E 's#refs/tags/##; s#\\^\\{\\}$##' \
-        | awk -F. '/^v[0-9]+\.[0-9]+\.[0-9]+$/ { printf "%d %d %d %s\n", substr($1, 2), $2, $3, $0 }' \
-        | sort -k1,1n -k2,2n -k3,3n \
-        | tail -1 \
-        | awk '{print $4}')
-
-    if [ -z "$latest" ]; then
-        echo "v1.0.0"
-        return
-    fi
-
-    version=${latest#v}
-    major=${version%%.*}
-    rest=${version#*.}
-    minor=${rest%%.*}
-    patch=${rest#*.}
-    echo "v${major}.${minor}.$((patch + 1))"
-}
-
-# 4. Tag + release.
+# 4. Tag + release. Default tag is v${VERSION}. Override with TAG=v1.2.3 if you
+#    need an off-cycle tag.
 HASH=$(git rev-parse --short HEAD)
 HEAD_SHA=$(git rev-parse HEAD)
-TAG="${TAG:-$(next_release_tag)}"
+TAG="${TAG:-v${VERSION}}"
 SUBJECT=$(git log -1 --pretty=%s)
 
 # Release notes: explicit second arg > NOTES_FILE > NOTES env > commit subject only.
@@ -101,7 +168,7 @@ ORIGIN_URL=$(git remote get-url origin)
 REPO_SLUG=$(echo "$ORIGIN_URL" \
     | sed -E 's#^(https?://[^/]+/|git@[^:]+:)##' \
     | sed -E 's#\.git$##')
-RELEASE_TITLE="kfun-zeroxjf ${TAG}"
+RELEASE_TITLE="Cyanide ${TAG}"
 
 LOCAL_TAG_SHA=""
 if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then

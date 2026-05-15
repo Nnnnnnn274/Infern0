@@ -1,0 +1,16 @@
+//
+//  PAC.h
+//  Cyanide
+//
+//  Created by seo on 4/4/26.
+//
+
+#import <stdint.h>
+#import <mach/mach.h>
+
+uint64_t native_strip(uint64_t address);
+uint64_t pacia(uint64_t ptr, uint64_t modifier);
+uint64_t ptrauth_blend_discriminator_wrapper(uint64_t diver, uint64_t discriminator);
+uint64_t ptrauth_string_discriminator_special(const char *name);
+uint64_t find_pacia_gadget(void);
+void pac_cleanup(mach_port_t pacThread, mach_port_t exceptionPort, void *stack);

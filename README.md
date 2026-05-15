@@ -1,10 +1,12 @@
-# kfun-zeroxjf
+# Cyanide
 
-Fork of [`wh1te4ever/darksword-kexploit-fun`](https://github.com/wh1te4ever/darksword-kexploit-fun) for iOS kernel research.
+An iOS tweak runner built on top of the DarkSword kernel r/w primitive.
 
-This app wraps the native DarkSword kernel stages in an Objective-C iOS app and
-adds a few reliability fixes for repeated local testing. It does not ship the
-browser-delivered WebKit/dyld parts of the original DarkSword chain.
+Fork of [`wh1te4ever/darksword-kexploit-fun`](https://github.com/wh1te4ever/darksword-kexploit-fun)
+for iOS kernel research. This app wraps the native DarkSword kernel stages in
+an Objective-C iOS app and adds a few reliability fixes for repeated local
+testing. It does not ship the browser-delivered WebKit/dyld parts of the
+original DarkSword chain.
 
 ## Supported Targets
 
@@ -67,19 +69,19 @@ SpringBoard and related daemons to break things on other releases.
 ./scripts/build.sh
 ```
 
-The build script uses the `darksword-kexploit-fun` scheme, disables code
-signing, and writes an unsigned IPA to:
+The build script uses the `Cyanide` scheme, disables code signing, and writes
+an unsigned IPA to:
 
 ```text
-build/kfun-zeroxjf.ipa
+build/Cyanide.ipa
 ```
 
 Equivalent manual build:
 
 ```sh
 xcodebuild \
-  -project darksword-kexploit-fun.xcodeproj \
-  -scheme darksword-kexploit-fun \
+  -project Cyanide.xcodeproj \
+  -scheme Cyanide \
   -sdk iphoneos \
   -configuration Debug \
   CODE_SIGNING_ALLOWED=NO \
