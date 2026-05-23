@@ -1311,12 +1311,24 @@ int init_remote_call(const char* process, bool useMigFilterBypass) {
 
     RemoteCallState *previous = remote_call_push_state(&_state);
     int result = init_remote_call(processName, useMigFilterBypass);
+    if (result != 0) {
+        abandon_remote_call();
+    }
     remote_call_pop_state(previous);
 
     if (result != 0)
         return nil;
 
     return self;
+}
+
+- (void)dealloc
+{
+    RemoteCallState *previous = remote_call_push_state(&_state);
+    if (remote_call_has_local_state()) {
+        destroy_remote_call();
+    }
+    remote_call_pop_state(previous);
 }
 
 - (uint64_t)taskAddr

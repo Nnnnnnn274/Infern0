@@ -11,6 +11,7 @@
 
 static NSString * const kPackageCellID         = @"PackageCell";
 static NSString * const kGroupByCategoryDefault = @"installer.groupByCategory";
+static NSString * const kTipsExpandedDefault    = @"installer.tipsExpanded";
 
 @interface PackagesViewController () <UISearchResultsUpdating>
 @property (nonatomic, copy)   NSArray<Package *> *allPackagesSorted;
@@ -181,6 +182,9 @@ static NSString * const kGroupByCategoryDefault = @"installer.groupByCategory";
     CGFloat headingGap       = 10.0;    // gap after heading
     CGFloat buttonGap        = 14.0;
     CGFloat buttonHeight     = 36.0;
+    CGFloat chevronSize      = 14.0;
+
+    BOOL expanded = [[NSUserDefaults standardUserDefaults] boolForKey:kTipsExpandedDefault];
 
     NSMutableArray<UIView *> *placed = [NSMutableArray array];
     CGFloat y = cardInset;
@@ -201,44 +205,71 @@ static NSString * const kGroupByCategoryDefault = @"installer.groupByCategory";
         NSForegroundColorAttributeName: UIColor.labelColor,
     }]];
     heading.attributedText = headAS;
-    CGSize headFit = [heading sizeThatFits:CGSizeMake(contentWidth, CGFLOAT_MAX)];
-    heading.frame = CGRectMake(cardInset, y, contentWidth, headFit.height);
+    CGFloat headingWidth = contentWidth - chevronSize - 8.0;
+    CGSize headFit = [heading sizeThatFits:CGSizeMake(headingWidth, CGFLOAT_MAX)];
+    heading.frame = CGRectMake(cardInset, y, headingWidth, headFit.height);
     [placed addObject:heading];
-    y += headFit.height + headingGap;
 
-    // Tip rows
-    NSArray<NSDictionary *> *entries = [self tipsEntries];
-    for (NSDictionary *entry in entries) {
-        UIView *row = [self buildTipRowWithIcon:entry[@"icon"]
-                                          color:entry[@"color"]
-                                          title:entry[@"title"]
-                                           body:entry[@"body"]
-                                          width:contentWidth];
-        CGRect f = row.frame;
-        f.origin = CGPointMake(cardInset, y);
-        row.frame = f;
-        [placed addObject:row];
-        y += f.size.height + rowGap;
+    // Trailing chevron indicates the section is collapsible.
+    UIImageSymbolConfiguration *chevCfg =
+        [UIImageSymbolConfiguration configurationWithPointSize:13.0 weight:UIImageSymbolWeightSemibold];
+    UIImageView *chevron = [[UIImageView alloc] initWithImage:
+        [[UIImage systemImageNamed:(expanded ? @"chevron.up" : @"chevron.down") withConfiguration:chevCfg]
+            imageWithTintColor:UIColor.tertiaryLabelColor renderingMode:UIImageRenderingModeAlwaysOriginal]];
+    chevron.contentMode = UIViewContentModeCenter;
+    chevron.frame = CGRectMake(cardInset + contentWidth - chevronSize, y, chevronSize, headFit.height);
+    [placed addObject:chevron];
+
+    CGFloat headingRowHeight = headFit.height;
+    y += headingRowHeight;
+
+    if (expanded) {
+        y += headingGap;
+
+        // Tip rows
+        NSArray<NSDictionary *> *entries = [self tipsEntries];
+        for (NSDictionary *entry in entries) {
+            UIView *row = [self buildTipRowWithIcon:entry[@"icon"]
+                                              color:entry[@"color"]
+                                              title:entry[@"title"]
+                                               body:entry[@"body"]
+                                              width:contentWidth];
+            CGRect f = row.frame;
+            f.origin = CGPointMake(cardInset, y);
+            row.frame = f;
+            [placed addObject:row];
+            y += f.size.height + rowGap;
+        }
+        y -= rowGap;        // last row didn't need trailing gap
+        y += buttonGap;     // explicit gap before the button
+
+        // Contact button
+        UIButtonConfiguration *cfg = [UIButtonConfiguration tintedButtonConfiguration];
+        cfg.title = @"Contact zeroxjf";
+        cfg.image = [UIImage systemImageNamed:@"envelope.fill"];
+        cfg.imagePadding = 6.0;
+        cfg.imagePlacement = NSDirectionalRectEdgeLeading;
+        cfg.cornerStyle = UIButtonConfigurationCornerStyleMedium;
+        __weak typeof(self) weakSelf = self;
+        UIButton *contact = [UIButton buttonWithConfiguration:cfg
+                                                primaryAction:[UIAction actionWithHandler:^(UIAction *_) {
+            typeof(self) strongSelf = weakSelf;
+            if (strongSelf) cyanide_present_contact(strongSelf);
+        }]];
+        contact.frame = CGRectMake(cardInset, y, contentWidth, buttonHeight);
+        [placed addObject:contact];
+        y += buttonHeight;
     }
-    y -= rowGap;        // last row didn't need trailing gap
-    y += buttonGap;     // explicit gap before the button
 
-    // Contact button
-    UIButtonConfiguration *cfg = [UIButtonConfiguration tintedButtonConfiguration];
-    cfg.title = @"Contact zeroxjf";
-    cfg.image = [UIImage systemImageNamed:@"envelope.fill"];
-    cfg.imagePadding = 6.0;
-    cfg.imagePlacement = NSDirectionalRectEdgeLeading;
-    cfg.cornerStyle = UIButtonConfigurationCornerStyleMedium;
-    __weak typeof(self) weakSelf = self;
-    UIButton *contact = [UIButton buttonWithConfiguration:cfg
-                                            primaryAction:[UIAction actionWithHandler:^(UIAction *_) {
-        typeof(self) strongSelf = weakSelf;
-        if (strongSelf) cyanide_present_contact(strongSelf);
-    }]];
-    contact.frame = CGRectMake(cardInset, y, contentWidth, buttonHeight);
-    [placed addObject:contact];
-    y += buttonHeight + cardInset;
+    y += cardInset;     // final bottom padding inside the card
+
+    // Invisible tap target over the heading row; added last so it's on top.
+    UIButton *tap = [UIButton buttonWithType:UIButtonTypeCustom];
+    tap.backgroundColor = UIColor.clearColor;
+    CGFloat tapHeight = MAX(headingRowHeight, 44.0);
+    tap.frame = CGRectMake(cardInset, cardInset, contentWidth, tapHeight);
+    [tap addTarget:self action:@selector(toggleTipsExpanded) forControlEvents:UIControlEventTouchUpInside];
+    [placed addObject:tap];
 
     UIView *card = [[UIView alloc] initWithFrame:CGRectMake(horizontalMargin,
                                                             topPadding,
@@ -254,6 +285,13 @@ static NSString * const kGroupByCategoryDefault = @"installer.groupByCategory";
     [container addSubview:card];
 
     self.tableView.tableHeaderView = container;
+}
+
+- (void)toggleTipsExpanded
+{
+    NSUserDefaults *ud = [NSUserDefaults standardUserDefaults];
+    [ud setBool:![ud boolForKey:kTipsExpandedDefault] forKey:kTipsExpandedDefault];
+    [self installTipsHeader];
 }
 
 - (void)viewDidLayoutSubviews

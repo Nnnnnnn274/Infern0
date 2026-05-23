@@ -29,54 +29,85 @@
 #import <time.h>
 #import <unistd.h>
 
-@interface DSRespringViewController : UIViewController <WKNavigationDelegate>
+@interface DSRespringOverlayView : UIView
 @property (nonatomic, strong) WKWebView *webView;
+@property (nonatomic, assign) BOOL didLoadPayload;
 @end
 
-@implementation DSRespringViewController
+@implementation DSRespringOverlayView
 
-- (void)viewDidLoad {
-    [super viewDidLoad];
-    self.view.backgroundColor = [UIColor colorWithRed:0.043 green:0.043 blue:0.063 alpha:1.0];
-    self.title = @"Respring";
-
-    self.navigationItem.leftBarButtonItem =
-        [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemCancel
-                                                      target:self
-                                                      action:@selector(dismissSelf)];
-
-    WKWebViewConfiguration *cfg = [[WKWebViewConfiguration alloc] init];
-    cfg.allowsInlineMediaPlayback = YES;
-    self.webView = [[WKWebView alloc] initWithFrame:CGRectZero configuration:cfg];
-    self.webView.translatesAutoresizingMaskIntoConstraints = NO;
-    self.webView.navigationDelegate = self;
-    self.webView.opaque = NO;
-    self.webView.backgroundColor = self.view.backgroundColor;
-    self.webView.scrollView.backgroundColor = self.view.backgroundColor;
-    [self.view addSubview:self.webView];
-    [NSLayoutConstraint activateConstraints:@[
-        [self.webView.topAnchor      constraintEqualToAnchor:self.view.safeAreaLayoutGuide.topAnchor],
-        [self.webView.bottomAnchor   constraintEqualToAnchor:self.view.bottomAnchor],
-        [self.webView.leadingAnchor  constraintEqualToAnchor:self.view.leadingAnchor],
-        [self.webView.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
-    ]];
-
-    NSURL *url = [NSURL URLWithString:@"https://zeroxjf.github.io/lightsaber/respring.html"];
-    [self.webView loadRequest:[NSURLRequest requestWithURL:url
-                                              cachePolicy:NSURLRequestReloadIgnoringLocalAndRemoteCacheData
-                                          timeoutInterval:10]];
+- (NSString *)respringHTML {
+    // Verbatim port of Lara's respring.swift payload (by rooootdev,
+    // skidded from jailbreak.party; web approach by @neonmodder123).
+    return @"<!DOCTYPE html>\n"
+           @"<html>\n"
+           @"    <body>\n"
+           @"        <!--  big credit to @neonmodder123  -->\n"
+           @"        <iframe id=\"frame\" srcdoc=\"\" sandbox=\"allow-forms allow-modals allow-orientation-lock allow-pointer-lock allow-popups allow-presentation allow-scripts\"></iframe>\n"
+           @"        <script>\n"
+           @"            const frame = document.getElementById('frame');\n"
+           @"            const script = `\n"
+           @"                <html>\n"
+           @"                <body>\n"
+           @"                    <script>\n"
+           @"                        const container = document.createElement('div');\n"
+           @"                        container.style.cssText = 'perspective: 1px; perspective-origin: 9999999% 9999999%;';\n"
+           @"                        document.body.appendChild(container);\n"
+           @"    \n"
+           @"                        for (let i = 0; i < 500; i++) {\n"
+           @"                            let d = document.createElement('div');\n"
+           @"                            d.style.cssText = 'position: absolute; width: 100vw; height: 100vh; backdrop-filter: blur(100px); -webkit-backdrop-filter: blur(100px); transform: translate3d(100000px, 100000px, ' + i + 'px) rotateY(90deg);';\n"
+           @"                            container.appendChild(d);\n"
+           @"                        }\n"
+           @"    \n"
+           @"                        setInterval(() => {\n"
+           @"                            navigator.share({ title: 'R', text: 'R'.repeat(100000) }).catch(() => {});\n"
+           @"                            let x = new Uint8Array(1024 * 1024 * 10);\n"
+           @"                            crypto.getRandomValues(x);\n"
+           @"                        }, 0);\n"
+           @"                    <\\/script>\n"
+           @"                </body>\n"
+           @"                </html>\n"
+           @"            `;\n"
+           @"    \n"
+           @"            frame.srcdoc = script;\n"
+           @"        </script>\n"
+           @"    </body>\n"
+           @"</html>";
 }
 
-- (void)dismissSelf {
-    [self dismissViewControllerAnimated:YES completion:nil];
+- (instancetype)initWithFrame:(CGRect)frame {
+    self = [super initWithFrame:frame];
+    if (!self) return nil;
+    self.backgroundColor = [UIColor blackColor];
+    self.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    return self;
 }
 
-- (void)webView:(WKWebView *)webView didFailNavigation:(WKNavigation *)navigation withError:(NSError *)error {
-    printf("[RESPRING] navigation failed: %s\n", error.localizedDescription.UTF8String);
+- (void)didMoveToWindow {
+    [super didMoveToWindow];
+    if (self.window) [self loadRespringPayload];
 }
 
-- (void)webView:(WKWebView *)webView didFailProvisionalNavigation:(WKNavigation *)navigation withError:(NSError *)error {
-    printf("[RESPRING] provisional navigation failed: %s\n", error.localizedDescription.UTF8String);
+- (void)layoutSubviews {
+    [super layoutSubviews];
+    self.webView.frame = self.bounds;
+}
+
+- (void)loadRespringPayload {
+    if (self.didLoadPayload) return;
+    self.didLoadPayload = YES;
+    printf("[RESPRING] loading Lara-style in-app WebKit overlay\n");
+
+    // Mirrors Lara's respringview verbatim: default-init WKWebView, the
+    // throwaway WKWebpagePreferences assignment (a no-op in Lara's Swift
+    // source — kept for fidelity), then loadHTMLString.
+    WKWebView *webView = [[WKWebView alloc] initWithFrame:self.bounds];
+    webView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    [WKWebpagePreferences new].allowsContentJavaScript = YES;
+    [self addSubview:webView];
+    self.webView = webView;
+    [webView loadHTMLString:[self respringHTML] baseURL:nil];
 }
 
 @end
@@ -94,6 +125,7 @@ NSString * const kSettingsSBCHideLabels = @"SBCHideLabels";
 
 NSString * const kSettingsPowercuffEnabled = @"PowercuffEnabled";
 NSString * const kSettingsPowercuffLevel   = @"PowercuffLevel";
+static NSString * const kSettingsPowercuffNominalNoticeShown = @"cyanide.powercuff.nominalDefaultNoticeShown.v1";
 
 NSString * const kSettingsDSDisableAppLibrary = @"DSDisableAppLibrary";
 NSString * const kSettingsDSDisableIconFlyIn  = @"DSDisableIconFlyIn";
@@ -163,19 +195,16 @@ static const NSInteger kSBCDefaultDockIcons = 4;
 static const NSInteger kSBCDefaultCols = 4;
 static const NSInteger kSBCDefaultRows = 6;
 static const BOOL kSBCDefaultHideLabels = NO;
-// Conservative seed values for the NanoRegistry editor. We pick the
-// permissive iOS 26 numbers as the local seed because they're a superset of
-// iOS 18 (every iOS 18 watch still validates with min=24). The user can
-// "Load Current" or just hit Apply to drop them onto the device.
+// Conservative seed values for the NanoRegistry editor. These represent the
+// current "newer watch" baseline without changing the legacy-watch gates.
 static const NSInteger kNanoDefaultMaxPairing       = 25;
 static const NSInteger kNanoDefaultMinPairing       = 24;
 static const NSInteger kNanoDefaultMinPairingChipID = 10;
 static const NSInteger kNanoDefaultMinQuickSwitch   = 6;
-// "Pair newer watch on this iPhone" preset. Mirror the l-playground tuple
-// that has worked on-device: raise only the upper gate and leave Apple's
-// lower gates alone so we don't accidentally alter other pairing paths.
+// Pairing range used to let setup accept newer watchOS pairing generations
+// while still accepting generation-23 setup messages from the existing flow.
 static const NSInteger kNanoPresetNewerMaxPairing       = 99;
-static const NSInteger kNanoPresetNewerMinPairing       = 24;
+static const NSInteger kNanoPresetNewerMinPairing       = 23;
 static const NSInteger kNanoPresetNewerMinPairingChipID = 10;
 static const NSInteger kNanoPresetNewerMinQuickSwitch   = 6;
 static const NSInteger kNanoUIRowMin = 1;
@@ -661,7 +690,8 @@ static void settings_notify_remote_call_state_changed(void)
 
 static BOOL settings_cleanup_in_progress(void)
 {
-    return g_settings_cleanup_running != 0;
+    return g_settings_cleanup_running != 0 ||
+           g_settings_respring_cleanup_running != 0;
 }
 
 static void settings_request_all_live_loops_stop(const char *reason)
@@ -766,6 +796,28 @@ static UIViewController *settings_active_presenter(UIViewController *fallback)
     return settings_top_view_controller(candidate.rootViewController ?: fallback);
 }
 
+static UIWindow *settings_active_window(UIViewController *fallback)
+{
+    if (fallback.view.window) return fallback.view.window;
+
+    UIWindow *candidate = nil;
+    for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
+        if (![scene isKindOfClass:UIWindowScene.class]) continue;
+        UIWindowScene *ws = (UIWindowScene *)scene;
+        if (ws.activationState != UISceneActivationStateForegroundActive &&
+            ws.activationState != UISceneActivationStateForegroundInactive) {
+            continue;
+        }
+        for (UIWindow *window in ws.windows) {
+            if (window.isKeyWindow) return window;
+            if (!candidate && !window.hidden && window.rootViewController) {
+                candidate = window;
+            }
+        }
+    }
+    return candidate;
+}
+
 static void settings_present_controller(UIViewController *controller, UIViewController *fallback)
 {
     dispatch_async(dispatch_get_main_queue(), ^{
@@ -775,6 +827,20 @@ static void settings_present_controller(UIViewController *controller, UIViewCont
             return;
         }
         [presenter presentViewController:controller animated:YES completion:nil];
+    });
+}
+
+static void settings_show_respring_overlay(UIViewController *fallback)
+{
+    dispatch_async(dispatch_get_main_queue(), ^{
+        UIWindow *window = settings_active_window(fallback);
+        if (!window) {
+            printf("[RESPRING] overlay skipped: no active window\n");
+            return;
+        }
+        DSRespringOverlayView *overlay = [[DSRespringOverlayView alloc] initWithFrame:window.bounds];
+        [window addSubview:overlay];
+        [overlay loadRespringPayload];
     });
 }
 
@@ -1138,6 +1204,7 @@ void settings_destroy_springboard_remote_call_sync(void)
     @synchronized (settings_rc_lock()) {
         if (g_springboard_rc_ready) {
             axonlite_stop_in_session();
+            statbar_stop_in_session();
             rssidisplay_stop_in_session();
         }
         settings_destroy_springboard_remote_call_locked("manual/sync cleanup");
@@ -1155,6 +1222,7 @@ void settings_destroy_springboard_remote_call(void)
             BOOL hadSession = g_springboard_rc_ready != 0;
             if (g_springboard_rc_ready) {
                 axonlite_stop_in_session();
+                statbar_stop_in_session();
                 rssidisplay_stop_in_session();
             }
             settings_destroy_springboard_remote_call_locked("manual cleanup");
@@ -2420,7 +2488,7 @@ void settings_register_defaults(void)
         kSettingsSBCHideLabels: @(kSBCDefaultHideLabels),
 
         kSettingsPowercuffEnabled: @NO,
-        kSettingsPowercuffLevel:   @"heavy",
+        kSettingsPowercuffLevel:   @"nominal",
 
         kSettingsDSDisableAppLibrary: @NO,
         kSettingsDSDisableIconFlyIn:  @NO,
@@ -2532,7 +2600,7 @@ void settings_run_actions(void)
                 log_user("[PLAN] Axon Lite target: segmented notification hub refresh=15s\n");
             }
             if (runPowercuff) {
-                NSString *lvl = [d stringForKey:kSettingsPowercuffLevel] ?: @"heavy";
+                NSString *lvl = [d stringForKey:kSettingsPowercuffLevel] ?: @"nominal";
                 log_user("[PLAN] Powercuff target: thermalmonitord level=%s\n", lvl.UTF8String);
             }
             cyanide_upload_log_milestone(@"run-plan");
@@ -2586,7 +2654,7 @@ void settings_run_actions(void)
                     // not run SpringBoard tweak stop paths or clear applied
                     // package state; enabled tweaks are reapplied below.
                     settings_destroy_springboard_remote_call_locked_internal("switching to thermalmonitord", NO);
-                    NSString *lvl = [d stringForKey:kSettingsPowercuffLevel] ?: @"heavy";
+                    NSString *lvl = [d stringForKey:kSettingsPowercuffLevel] ?: @"nominal";
                     bool ok = powercuff_apply(lvl.UTF8String);
                     settings_mark_tweak_applied(kSettingsPowercuffEnabled,
                                                 ok && [d boolForKey:kSettingsPowercuffEnabled]);
@@ -2987,9 +3055,44 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
 - (void)viewDidAppear:(BOOL)animated
 {
     [super viewDidAppear:animated];
+    [self presentPowercuffNominalNoticeIfNeeded];
     if (!self.pendingManualActionsReload) return;
     self.pendingManualActionsReload = NO;
     [self reloadManualActions];
+}
+
+- (void)presentPowercuffNominalNoticeIfNeeded
+{
+    if (!self.detailMode || self.underlyingSection != SectionPowercuff) return;
+    NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
+    if ([d boolForKey:kSettingsPowercuffNominalNoticeShown]) return;
+
+    NSString *level = [d stringForKey:kSettingsPowercuffLevel] ?: @"nominal";
+    BOOL alreadyNominal = [level isEqualToString:@"nominal"];
+    NSString *message = @"Powercuff now defaults to Nominal.\n\nLight, Moderate, and Heavy intentionally underclock the CPU. That means lag or slower app launches can happen, especially on older devices. The lag means Powercuff is working, but those levels may be too slow for comfortable day-to-day use.\n\nUse Nominal for daily use, then raise it only when you want stronger throttling.";
+
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Powercuff Level"
+                                                                   message:message
+                                                            preferredStyle:UIAlertControllerStyleAlert];
+    __weak typeof(self) weakSelf = self;
+    if (!alreadyNominal) {
+        [alert addAction:[UIAlertAction actionWithTitle:@"Use Nominal"
+                                                  style:UIAlertActionStyleDefault
+                                                handler:^(UIAlertAction *_) {
+            NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+            [defaults setObject:@"nominal" forKey:kSettingsPowercuffLevel];
+            [defaults setBool:YES forKey:kSettingsPowercuffNominalNoticeShown];
+            [defaults synchronize];
+            [weakSelf.tableView reloadData];
+        }]];
+    }
+    [alert addAction:[UIAlertAction actionWithTitle:alreadyNominal ? @"OK" : @"Keep Current"
+                                             style:UIAlertActionStyleCancel
+                                           handler:^(UIAlertAction *_) {
+        [d setBool:YES forKey:kSettingsPowercuffNominalNoticeShown];
+        [d synchronize];
+    }]];
+    [self presentViewController:alert animated:YES completion:nil];
 }
 
 - (void)remoteCallStateDidChange:(NSNotification *)notification
@@ -3092,42 +3195,42 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
     return @[
         @{ @"kind": @"stepper",
            @"key": kSettingsNanoMaxPairing,
-           @"title": @"Max Allowed Pairing Version",
-           @"subtitle": @"Highest watchOS pairing version this iPhone will accept. Raise this to pair a NEWER watch on this iPhone. (Apple defaults: 24 on iOS 18, 25 on iOS 26.)",
+           @"title": @"watchOS Pairing Limit",
+           @"subtitle": @"Highest watchOS pairing generation this iPhone will accept. 99 raises the phone-side ceiling for newer watchOS releases.",
            @"min": @(kNanoUIRowMin),
            @"max": @(kNanoUIRowMax),
            @"default": @(kNanoDefaultMaxPairing) },
 
         @{ @"kind": @"stepper",
            @"key": kSettingsNanoMinPairing,
-           @"title": @"Min Required Pairing Version",
-           @"subtitle": @"Lowest version this iPhone will accept from any paired watch. Lower this only to pair OLDER watches Apple no longer lists as supported. (Apple defaults: 23 on iOS 18, 24 on iOS 26.)",
+           @"title": @"Setup Protocol Floor",
+           @"subtitle": @"Lowest pairing setup generation this iPhone will accept. Keep this at 23 so generation-23 setup messages are not rejected.",
            @"min": @(kNanoUIRowMin),
            @"max": @(kNanoUIRowMax),
            @"default": @(kNanoDefaultMinPairing) },
 
         @{ @"kind": @"stepper",
            @"key": kSettingsNanoMinPairingChipID,
-           @"title": @"Min Pairing Version (per S-chip)",
-           @"subtitle": @"Per-chip lower gate. Apple uses this to drop legacy S-chip watches (e.g. Series 3/S3) below a certain compatibility version. Stock: 10. Lower only when reviving an old watch model.",
+           @"title": @"Legacy Chip Floor",
+           @"subtitle": @"Leave this alone unless you are trying to pair an old S-chip watch, such as a Series 3.",
            @"min": @(kNanoUIRowMin),
            @"max": @(kNanoUIRowMax),
            @"default": @(kNanoDefaultMinPairingChipID) },
 
         @{ @"kind": @"stepper",
            @"key": kSettingsNanoMinQuickSwitch,
-           @"title": @"Min Quick Switch Version",
-           @"subtitle": @"Lowest version a watch can be to participate in Apple Watch quick-switch (multiple paired watches). Stock: 6. Independent from the Min Required Pairing gate.",
+           @"title": @"Multi-Watch Switching",
+           @"subtitle": @"Leave this alone unless switching between multiple older paired watches is not working.",
            @"min": @(kNanoUIRowMin),
            @"max": @(kNanoUIRowMax),
            @"default": @(kNanoDefaultMinQuickSwitch) },
 
         @{ @"kind": @"button",
-           @"title": @"Load Current Override From Device",
+           @"title": @"Load Saved Override",
            @"action": @"nano-load" },
 
         @{ @"kind": @"button",
-           @"title": @"Preset: Pair a Newer WatchOS",
+           @"title": @"Use watchOS Range 99/23/10/6",
            @"action": @"nano-preset-newer" },
 
         @{ @"kind": @"button",
@@ -3193,13 +3296,13 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
         [out addObject:@{@"title": @"WiFi (bar count)", @"value": [d boolForKey:kSettingsRSSIDisplayWifi] ? @"On" : @"Off"}];
         [out addObject:@{@"title": @"Cellular (dBm)",   @"value": [d boolForKey:kSettingsRSSIDisplayCell] ? @"On" : @"Off"}];
     } else if (section == SectionPowercuff) {
-        NSString *lvl = [d stringForKey:kSettingsPowercuffLevel] ?: @"heavy";
+        NSString *lvl = [d stringForKey:kSettingsPowercuffLevel] ?: @"nominal";
         [out addObject:@{@"title": @"Level", @"value": lvl}];
     } else if (section == SectionNanoRegistry) {
-        [out addObject:@{@"title": @"Max pairing",        @"value": [@([d integerForKey:kSettingsNanoMaxPairing])       stringValue]}];
-        [out addObject:@{@"title": @"Min pairing",        @"value": [@([d integerForKey:kSettingsNanoMinPairing])       stringValue]}];
-        [out addObject:@{@"title": @"Min (chip-ID)",      @"value": [@([d integerForKey:kSettingsNanoMinPairingChipID]) stringValue]}];
-        [out addObject:@{@"title": @"Min quick-switch",   @"value": [@([d integerForKey:kSettingsNanoMinQuickSwitch])   stringValue]}];
+        [out addObject:@{@"title": @"watchOS limit",      @"value": [@([d integerForKey:kSettingsNanoMaxPairing])       stringValue]}];
+        [out addObject:@{@"title": @"Setup floor",        @"value": [@([d integerForKey:kSettingsNanoMinPairing])       stringValue]}];
+        [out addObject:@{@"title": @"Legacy chip floor",  @"value": [@([d integerForKey:kSettingsNanoMinPairingChipID]) stringValue]}];
+        [out addObject:@{@"title": @"Multi-watch switch", @"value": [@([d integerForKey:kSettingsNanoMinQuickSwitch])   stringValue]}];
     }
     return out;
 }
@@ -3338,18 +3441,16 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
         return @"Edits launchd disabled.plist. A reboot or userspace restart is required for changes to take effect.";
     }
     if (s == SectionNanoRegistry) {
-        return @"Writes /var/mobile/Library/Preferences/com.apple.NanoRegistry.plist. "
-               @"Apple's NRPairingCompatibilityVersionInfo reads these four numbers to decide "
-               @"if a paired watch (and its watchOS version) is acceptable.\n\n"
-               @"USE CASE: pair a watch whose pairing-compatibility version is higher than this "
-               @"iPhone's iOS would normally accept (i.e. a newer watchOS on older iOS). Raise "
-               @"\"Max\". Leave the \"Min\" fields alone unless you also need to revive a much "
-               @"older watch.\n\n"
-               @"Respring or reboot after Apply so cfprefsd drops its cache. Stock defaults: "
-               @"iOS 18 = 24/23/10/6, iOS 26 = 25/24/10/6.";
+        return @"Changes the watchOS pairing range saved on this iPhone.\n\n"
+               @"Most people should tap Use watchOS Range 99/23/10/6, then Apply Pairing Override. "
+               @"These are pairing protocol generations, not Apple Watch model numbers. "
+               @"99 raises the watchOS pairing ceiling. 23 keeps the generation-23 setup protocol accepted. "
+               @"10 and 6 leave the legacy chip and multi-watch floors at their normal values.\n\n"
+               @"Apple Watch Ultra 3 cannot pair on iOS versions below 26 at this time.\n\n"
+               @"Respring or reboot after applying before you try to pair.";
     }
     if (s == SectionPowercuff) {
-        return @"Underclocks the CPU/GPU via thermalmonitord by simulating a thermal pressure level. Lasts until reboot. Heavier levels save battery at the cost of responsiveness.";
+        return @"Underclocks the CPU/GPU via thermalmonitord by simulating thermal pressure. Nominal is the daily-use default. Light, Moderate, and Heavy intentionally underclock the CPU more and can make the device feel laggy, especially on older hardware.";
     }
     if (s == SectionStatBar) {
         return @"Live overlay. When enabled, StatBar keeps a SpringBoard RemoteCall session open and refreshes once per second until toggled off.";
@@ -4021,9 +4122,9 @@ void cyanide_present_contact(UIViewController *host)
         for (UIView *v in [cell.contentView.subviews copy]) [v removeFromSuperview];
         UISegmentedControl *seg = [[UISegmentedControl alloc] initWithItems:powercuff_levels()];
         seg.translatesAutoresizingMaskIntoConstraints = NO;
-        NSString *cur = [d stringForKey:row[@"key"]] ?: @"heavy";
+        NSString *cur = [d stringForKey:row[@"key"]] ?: @"nominal";
         NSUInteger idx = [powercuff_levels() indexOfObject:cur];
-        if (idx == NSNotFound) idx = 4;
+        if (idx == NSNotFound) idx = [powercuff_levels() indexOfObject:@"nominal"];
         seg.selectedSegmentIndex = (NSInteger)idx;
         seg.enabled = supported;
         [seg addTarget:self action:@selector(powercuffSegChanged:) forControlEvents:UIControlEventValueChanged];
@@ -4261,10 +4362,7 @@ void cyanide_present_contact(UIViewController *host)
                     dispatch_async(dispatch_get_main_queue(), ^{
                         __strong typeof(weakSelf) strongSelf = weakSelf;
                         if (!strongSelf) return;
-                        DSRespringViewController *vc = [[DSRespringViewController alloc] init];
-                        UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:vc];
-                        nav.modalPresentationStyle = UIModalPresentationFullScreen;
-                        settings_present_controller(nav, strongSelf);
+                        settings_show_respring_overlay(strongSelf);
                     });
                 });
             }]];
@@ -4331,7 +4429,7 @@ void cyanide_present_contact(UIViewController *host)
                                               kNanoPresetNewerMinPairing,
                                               kNanoPresetNewerMinPairingChipID,
                                               kNanoPresetNewerMinQuickSwitch);
-            log_user("[NANO] Loaded preset for newer watchOS: max=%ld min=%ld minChip=%ld minQuick=%ld. Hit Apply to write.\n",
+            log_user("[NANO] Loaded pairing range 99/23/10/6: max=%ld min=%ld minChip=%ld minQuick=%ld. Hit Apply to write.\n",
                      (long)kNanoPresetNewerMaxPairing,
                      (long)kNanoPresetNewerMinPairing,
                      (long)kNanoPresetNewerMinPairingChipID,
@@ -4341,7 +4439,7 @@ void cyanide_present_contact(UIViewController *host)
         } else if ([action isEqualToString:@"nano-apply"]) {
             UIAlertController *ac = [UIAlertController
                 alertControllerWithTitle:@"Apply Pairing Override?"
-                                 message:@"This writes com.apple.NanoRegistry.plist with the four numbers above. Respring or reboot afterwards for cfprefsd to drop its cache."
+                                 message:@"Saves these watchOS pairing settings on this iPhone. Respring or reboot afterwards before trying to pair."
                           preferredStyle:UIAlertControllerStyleAlert];
             [ac addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
             [ac addAction:[UIAlertAction actionWithTitle:@"Apply" style:UIAlertActionStyleDefault handler:^(UIAlertAction *_) {
@@ -4365,7 +4463,7 @@ void cyanide_present_contact(UIViewController *host)
         } else if ([action isEqualToString:@"nano-clear"]) {
             UIAlertController *ac = [UIAlertController
                 alertControllerWithTitle:@"Remove Pairing Override?"
-                                 message:@"Removes only the four override keys; other NanoRegistry state is preserved. Respring or reboot afterwards."
+                                 message:@"Removes the saved Watch Pairing Override without touching the rest of your watch data. Respring or reboot afterwards."
                           preferredStyle:UIAlertControllerStyleAlert];
             [ac addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
             [ac addAction:[UIAlertAction actionWithTitle:@"Remove" style:UIAlertActionStyleDestructive handler:^(UIAlertAction *_) {

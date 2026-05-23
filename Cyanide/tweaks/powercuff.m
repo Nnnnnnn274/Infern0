@@ -20,8 +20,8 @@ static bool valid_level(const char *level) {
 bool powercuff_apply(const char *level)
 {
     if (!valid_level(level)) {
-        printf("[POWERCUFF] invalid level '%s', defaulting to heavy\n", level ? level : "(null)");
-        level = "heavy";
+        printf("[POWERCUFF] invalid level '%s', defaulting to nominal\n", level ? level : "(null)");
+        level = "nominal";
     }
     printf("[POWERCUFF] === entry === target=%s\n", level);
 

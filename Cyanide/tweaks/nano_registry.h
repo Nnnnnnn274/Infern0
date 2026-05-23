@@ -10,11 +10,9 @@
 
 #import <stdbool.h>
 
-// Defaults baked into NRPairingCompatibilityVersionInfo on iOS 18 (.5):
-// max=24, min=23, minChip=10, minQuick=6.
-// iOS 26 (.0.x) bumps min to 24 and max to 25. The "Pair Newer WatchOS"
-// preset is maximally permissive (max=999, all mins=1) so the version
-// gates are guaranteed not to be the bottleneck.
+// Pairing limits stored by NanoRegistry. The app preset uses max_pairing=99
+// to raise the watchOS pairing ceiling and min_pairing=23 to keep
+// generation-23 setup messages accepted.
 typedef struct {
     int max_pairing;            // maxPairingCompatibilityVersion
     int min_pairing;            // minPairingCompatibilityVersion

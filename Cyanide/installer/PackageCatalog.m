@@ -68,7 +68,7 @@ static const NSInteger kSecNanoRegistry = 11;
         Package *powercuff = [[Package alloc] initWithIdentifier:@"com.darksword.powercuff"
                                            name:@"Powercuff"
                                shortDescription:@"Underclock the CPU/GPU thermal pressure"
-                                longDescription:@"Drives thermalmonitord with synthetic thermal pressure to underclock the CPU and GPU. Useful for cooling-sensitive workloads or extending runtime under load. Effects persist until reboot.\n\nPick a level (nominal/light/moderate/heavy) in the Settings tab."
+                                longDescription:@"Drives thermalmonitord with synthetic thermal pressure to underclock the CPU and GPU. Useful for cooling-sensitive workloads or extending runtime under load. Effects persist until reboot.\n\nNominal is the daily-use default. Light, Moderate, and Heavy intentionally underclock the CPU more, so lag and slower app launches mean it is working as intended. Those levels can be too slow for comfortable day-to-day use, especially on older devices.\n\nPick a level in the Settings tab."
                                         version:version
                                          author:@"rpetrich"
                                        category:@"Performance"
@@ -106,8 +106,8 @@ static const NSInteger kSecNanoRegistry = 11;
 
         Package *nanoRegistry = [[Package alloc] initWithIdentifier:@"com.darksword.nanoregistry"
                                            name:@"Watch Pairing Override"
-                               shortDescription:@"Pair newer watchOS on this iOS / revive older watches"
-                                longDescription:@"Edits com.apple.NanoRegistry.plist so NRPairingCompatibilityVersionInfo accepts a watch whose pairing-compatibility version is otherwise gated by this iOS.\n\nFour numeric knobs (live in the Settings tab): the upper gate (raise to pair a newer watch) and three lower gates (lower only to revive an older watch).\n\nInstalling writes the override using the four numbers currently configured. Uninstalling removes them. A respring or reboot is required afterwards so cfprefsd drops its cached copy.\n\nApple defaults: iOS 18 uses 24/23/10/6, iOS 26 uses 25/24/10/6."
+                               shortDescription:@"Pair a newer watch or revive an older one"
+                                longDescription:@"Changes the watchOS pairing range saved on this iPhone.\n\nMost people should use watchOS Range 99/23/10/6 in Settings, then apply the override. These are pairing protocol generations, not Apple Watch model numbers. 99 raises the watchOS pairing ceiling. 23 keeps the generation-23 setup protocol accepted. 10 and 6 leave the legacy chip and multi-watch floors at their normal values.\n\nApple Watch Ultra 3 cannot pair on iOS versions below 26 at this time.\n\nRespring or reboot after installing or removing the override before trying to pair."
                                         version:version
                                          author:@"zeroxjf"
                                        category:@"Beta"
