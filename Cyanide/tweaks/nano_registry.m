@@ -906,26 +906,13 @@ bool nano_registry_probe_pairing_assets(void)
     return true;
 }
 
-// --- cfprefsd cache reset via launchd ----------------------------------------
+// --- cfprefsd cache hint -----------------------------------------------------
 //
-// Earlier attempts:
-//   1) Inject into cfprefsd and call CFPreferencesSetValue — fails because
-//      that's the *client*-side API; from inside cfprefsd it's an RPC to
-//      itself that no-ops (Synchronize returned 0 / FALSE).
-//   2) Inject into nanoregistryd (the natural CFPreferences client for this
-//      domain) and call SetValue from there — nanoregistryd is hardened
-//      enough that our EXC_GUARD/thread-hijack flow crashed it.
-//
-// What actually works: just kill cfprefsd. launchd has it under KeepAlive
-// and will respawn it. The new cfprefsd starts with an empty cache, and on
-// the very first CFPreferencesCopyValue from any process it reads our plist
-// file fresh from /var/mobile/Library/Preferences/com.apple.NanoRegistry.plist.
-// From that point our override values are in cfprefsd's cache, so any later
-// SetValue on the same domain serializes a cache that *includes* our keys
-// back to disk — they no longer get wiped.
-//
-// We need launchd to issue the kill because cfprefsd runs as root and we're
-// uid 501. init_remote_call("launchd", ...) still works after KRW recovery.
+// Keep NanoRegistry Apply as a file edit only. The old path opened a launchd
+// RemoteCall session and SIGKILLed cfprefsd, NanoRegistry, Bluetooth, and
+// proximity daemons to force a live cache refresh. That is too much work for a
+// settings toggle and can panic 26.x devices while KRW is otherwise healthy.
+// A respring/reboot is the stable boundary for making the new plist visible.
 
 // sysctl(KERN_PROC_ALL) is denied to non-privileged apps even after our
 // sandbox patch, so we walk the kernel proc list via KRW instead. The uid
@@ -1016,71 +1003,12 @@ static int nano_collect_pids_by_names(const char * const *target_names,
 
 bool nano_registry_push_to_cfprefsd(const nano_registry_values *values, bool apply)
 {
-    // values/apply are unused for the kill path — kept in the signature so the
-    // function shape doesn't change for callers.
     (void)values;
     (void)apply;
 
-    // Kill cfprefsd so its stale in-memory cache is discarded and the next
-    // read reloads our plist from disk. Also kill NanoRegistry/Bridge-side
-    // processes that may have already dispatch_once-cached
-    // +[NRPairingCompatibilityVersionInfo systemVersions], plus the BLE /
-    // proximity daemons that can keep discovery filters alive while Watch.app
-    // is already scanning. When they respawn or are relaunched, they pull the
-    // corrected values from cfprefsd on the first read.
-    static const char *targets[] = {
-        "cfprefsd",
-        "nanoregistryd",
-        "nanoregistrylaunchd",
-        "Bridge",
-        "CompanionViewService",
-        "DKPairingUIService",
-        "com.apple.Bridge.ppNotifierServ",
-        "companion_proxy",
-        "nptocompaniond",
-        "subridged",
-        "bluetoothd",
-        "bluetoothuserd",
-        "sharingd",
-        "rapportd",
-        "nearbyd",
-        "proximitycontrold",
-    };
-    pid_t pids[64] = {0};
-    int n = nano_collect_pids_by_names(targets, (int)(sizeof(targets) / sizeof(targets[0])), pids, 64);
-    if (n == 0) {
-        log_user("[NANO-PUSH] no pairing cache-holder procs found; cache cannot be reset.\n");
-        return false;
-    }
-
-    // Need launchd to issue the kills — cfprefsd runs as root, we're uid 501.
-    if (init_remote_call("launchd", false) != 0) {
-        log_user("[NANO-PUSH] init_remote_call(launchd) failed; cannot reset cfprefsd cache.\n");
-        return false;
-    }
-
-    int killed = 0;
-    for (int i = 0; i < n; i++) {
-        uint64_t ret = do_remote_call_stable(R_TIMEOUT, "kill",
-                                             (uint64_t)pids[i], (uint64_t)SIGKILL,
-                                             0, 0, 0, 0, 0, 0);
-        BOOL ok = ((int64_t)ret == 0);
-        log_user("[NANO-PUSH] launchd->kill(%d, SIGKILL) ret=%lld %s\n",
-                 pids[i], (int64_t)ret, ok ? "ok" : "FAILED");
-        if (ok) killed++;
-    }
-
-    destroy_remote_call();
-
-    if (killed > 0) {
-        log_user("[NANO-PUSH] killed %d cache-holding proc(s); launchd will respawn managed services. "
-                 "Override will be live as soon as pairing services read cfprefsd's freshly-loaded plist.\n",
-                 killed);
-        // Give launchd time to respawn before we move on.
-        usleep(500000);
-        int notifyRet = notify_post("com.apple.nanoregistry.pairingcompatibilityversion");
-        printf("[NANO-PUSH] notify_post ret=%d\n", notifyRet);
-    }
-
-    return killed > 0;
+    int notifyRet = notify_post(kNanoRegistryChangeNotification);
+    log_user("[NANO-PUSH] live daemon reset skipped for stability; notify_post ret=%d. "
+             "Respring or reboot before pairing so cfprefsd/NanoRegistry reload the plist.\n",
+             notifyRet);
+    return true;
 }

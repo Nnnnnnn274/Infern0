@@ -109,7 +109,7 @@ static NSString * const kGroupByCategoryDefault = @"installer.groupByCategory";
         @{ @"icon":  @"envelope.fill",
            @"color": UIColor.systemBlueColor,
            @"title": @"Need specific help?",
-           @"body":  @"Diagnostic logs auto-upload (with consent) so I can catch issues. Use the button below to reach me directly with your device info — tell me what you ran into." },
+           @"body":  @"Diagnostic log uploads are opt-in from Settings > About. Use the button below to reach me directly with your device info — tell me what you ran into." },
     ];
 }
 

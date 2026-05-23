@@ -17,6 +17,7 @@
 #import "DSKeepAlive.h"
 #import "TaskRop/RemoteCall.h"
 #import "kexploit/kutils.h"
+#import "kexploit/persistence.h"
 #import "installer/InstallProgressViewController.h"
 #import "installer/Package.h"
 #import "installer/PackageCatalog.h"
@@ -882,6 +883,44 @@ static BOOL settings_ensure_kexploit(void)
         printf("[SETTINGS] kexploit_opa334 failed: %d\n", res);
         return NO;
     }
+    g_kexploit_done = YES;
+    settings_notify_remote_call_state_changed();
+    return YES;
+}
+
+static BOOL settings_nano_load_override_enabled(void)
+{
+    if (!settings_device_supported()) return NO;
+    return krw_persistence_launchd_holds_krw() || krw_persistence_has_saved_recovery();
+}
+
+static BOOL settings_ensure_kexploit_recovery_only(void)
+{
+    if (!settings_device_supported()) {
+        printf("[SETTINGS] unsupported device: %s\n", settings_unsupported_message().UTF8String);
+        return NO;
+    }
+
+    if (g_kexploit_done) {
+        if (kexploit_krw_ready() && krw_persistence_launchd_holds_krw()) {
+            log_user("[KRW] Reusing parked/recovered KRW for NanoRegistry load.\n");
+            return YES;
+        }
+        log_user("[KRW] NanoRegistry load requires parked KRW recovery; live state is not eligible.\n");
+        return NO;
+    }
+
+    if (!krw_persistence_has_saved_recovery()) {
+        log_user("[KRW] NanoRegistry load disabled: no parked KRW recovery state is saved.\n");
+        return NO;
+    }
+
+    log_user("[KRW] NanoRegistry load: attempting parked recovery only; fresh spray is disabled for this button.\n");
+    if (!krw_persistence_recover()) {
+        log_user("[KRW] NanoRegistry load failed: parked KRW recovery was not available.\n");
+        return NO;
+    }
+
     g_kexploit_done = YES;
     settings_notify_remote_call_state_changed();
     return YES;
@@ -3096,18 +3135,6 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
            @"action": @"nano-apply" },
 
         @{ @"kind": @"button",
-           @"title": @"Probe Pairing Assets (No Patches)",
-           @"action": @"nano-probe" },
-
-        @{ @"kind": @"button",
-           @"title": @"Steer AWU3 Product Type (No dlopen)",
-           @"action": @"nano-steer" },
-
-        @{ @"kind": @"button",
-           @"title": @"Seed Compatibility Index (No Patches)",
-           @"action": @"nano-seed" },
-
-        @{ @"kind": @"button",
            @"title": @"Remove Override",
            @"action": @"nano-clear",
            @"destructive": @YES },
@@ -3476,8 +3503,8 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
         cell.imageView.image = [SettingsViewController iconBadgeWithSymbol:@"doc.text.magnifyingglass" color:UIColor.systemGrayColor size:29.0];
         cell.textLabel.text = @"View Log";
     } else if (row == 2) {
-        cell.imageView.image = [SettingsViewController iconBadgeWithSymbol:@"envelope.fill" color:UIColor.systemGreenColor size:29.0];
-        cell.textLabel.text = @"Contact";
+        cell.imageView.image = [SettingsViewController iconBadgeWithSymbol:@"square.and.arrow.up" color:UIColor.systemGreenColor size:29.0];
+        cell.textLabel.text = @"Share Log";
     } else {
         cell.imageView.image = [SettingsViewController iconBadgeWithSymbol:@"icloud.and.arrow.up" color:UIColor.systemIndigoColor size:29.0];
         cell.textLabel.text = @"Auto-Upload Logs";
@@ -3533,6 +3560,40 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
     ]];
 
     [self.navigationController pushViewController:vc animated:YES];
+}
+
+- (void)openShareLog
+{
+    NSString *logPath = log_most_recent_session_path();
+    if (!logPath.length) {
+        UIAlertController *ac = [UIAlertController alertControllerWithTitle:@"No Log Yet"
+                                                                     message:@"Run a chain once, then come back to share the latest diagnostic log."
+                                                              preferredStyle:UIAlertControllerStyleAlert];
+        [ac addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
+        [self presentViewController:ac animated:YES completion:nil];
+        return;
+    }
+
+    NSURL *logURL = [NSURL fileURLWithPath:logPath];
+    NSString *appVersion = settings_app_version_string();
+    NSString *iosVersion = [UIDevice currentDevice].systemVersion ?: @"unknown";
+    struct utsname info; uname(&info);
+    NSString *machine = [NSString stringWithUTF8String:info.machine] ?: @"unknown";
+    NSString *summary = [NSString stringWithFormat:@"Cyanide diagnostic log\nCyanide %@ · iOS %@ · %@",
+                         appVersion, iosVersion, machine];
+
+    UIActivityViewController *vc = [[UIActivityViewController alloc] initWithActivityItems:@[summary, logURL]
+                                                                     applicationActivities:nil];
+    UIPopoverPresentationController *popover = vc.popoverPresentationController;
+    if (popover) {
+        popover.sourceView = self.view;
+        popover.sourceRect = CGRectMake(CGRectGetMidX(self.view.bounds),
+                                        CGRectGetMidY(self.view.bounds),
+                                        1.0,
+                                        1.0);
+        popover.permittedArrowDirections = 0;
+    }
+    [self presentViewController:vc animated:YES completion:nil];
 }
 
 // Session-scoped state so uploaded snapshots from one chain run get grouped on
@@ -3902,6 +3963,11 @@ void cyanide_present_contact(UIViewController *host)
 
     if ([kind isEqualToString:@"button"]) {
         BOOL rowSupported = supported || indexPath.section == SectionOTA;
+        NSString *action = row[@"action"];
+        if (indexPath.section == SectionNanoRegistry &&
+            [action isEqualToString:@"nano-load"]) {
+            rowSupported = settings_nano_load_override_enabled();
+        }
         UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"button" forIndexPath:dequeuePath];
         cell.selectionStyle = rowSupported ? UITableViewCellSelectionStyleDefault : UITableViewCellSelectionStyleNone;
         cell.userInteractionEnabled = rowSupported;
@@ -4132,7 +4198,7 @@ void cyanide_present_contact(UIViewController *host)
             case RootSectionAbout:
                 if (indexPath.row == 0)      [self openTwitter];
                 else if (indexPath.row == 1) [self openViewLog];
-                else if (indexPath.row == 2) [self openContactEmail];
+                else if (indexPath.row == 2) [self openShareLog];
                 // row 3: toggle — handled by UISwitch target, no action here
                 return;
             case RootSectionCount:
@@ -4242,9 +4308,13 @@ void cyanide_present_contact(UIViewController *host)
         NSString *action = row[@"action"];
 
         if ([action isEqualToString:@"nano-load"]) {
+            if (!settings_nano_load_override_enabled()) {
+                log_user("[NANO] Load Current Override requires parked KRW recovery; button is disabled until recovery is available.\n");
+                return;
+            }
             dispatch_async(dispatch_get_global_queue(0, 0), ^{
-                if (!settings_ensure_kexploit()) {
-                    log_user("[NANO] Failed: kernel primitives were not acquired.\n");
+                if (!settings_ensure_kexploit_recovery_only()) {
+                    log_user("[NANO] Failed: parked KRW recovery was not acquired.\n");
                 } else {
                     settings_nano_load_from_plist_into_defaults(YES);
                 }

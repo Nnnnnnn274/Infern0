@@ -110,7 +110,7 @@ static const NSInteger kSecNanoRegistry = 11;
                                 longDescription:@"Edits com.apple.NanoRegistry.plist so NRPairingCompatibilityVersionInfo accepts a watch whose pairing-compatibility version is otherwise gated by this iOS.\n\nFour numeric knobs (live in the Settings tab): the upper gate (raise to pair a newer watch) and three lower gates (lower only to revive an older watch).\n\nInstalling writes the override using the four numbers currently configured. Uninstalling removes them. A respring or reboot is required afterwards so cfprefsd drops its cached copy.\n\nApple defaults: iOS 18 uses 24/23/10/6, iOS 26 uses 25/24/10/6."
                                         version:version
                                          author:@"zeroxjf"
-                                       category:@"System"
+                                       category:@"Beta"
                                      symbolName:@"applewatch.radiowaves.left.and.right"
                                            kind:PackageInstallKindNanoRegistry
                                      enabledKey:nil
@@ -194,11 +194,10 @@ static const NSInteger kSecNanoRegistry = 11;
                                      enabledKey:nil
                                           isNew:NO],
 
-            nanoRegistry,
-
             // Beta last so the warning sits at the bottom of the Installer.
             signal,
             axon,
+            nanoRegistry,
             // typeBanner,
         ];
     });

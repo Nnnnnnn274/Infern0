@@ -62,22 +62,24 @@
     [[UpdateChecker shared] checkForUpdatesIfNeededFrom:tab];
 }
 
-- (void)showPrivacyConsentIfNeeded {
+- (void)showLogCollectionOptInNoticeIfNeeded {
     NSUserDefaults *ud = [NSUserDefaults standardUserDefaults];
-    if ([ud boolForKey:@"cyanide.privacy.logConsentShown"]) return;
+    NSString *noticeKey = @"cyanide.privacy.logOptInDefaultNoticeShown";
+    if ([ud boolForKey:noticeKey]) return;
+
+    [ud setBool:NO forKey:kSettingsLogUploadEnabled];
+    [ud synchronize];
+
     UIViewController *root = self.window.rootViewController;
     if (!root) return;
-    NSString *msg = @"Cyanide is an experimental exploit chain — the app can be unstable, SpringBoard may respawn, and tweaks may misbehave. Automatic log collection helps diagnose what went wrong.\n\nAfter each run, Cyanide can upload a diagnostic log containing: chain stage timing, error messages, device model, and iOS version. No personal data beyond this is collected.\n\nLogs go to a private Cloudflare R2 bucket owned by @zeroxjf and expire after 30 days. Toggle anytime in Settings → About.";
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Cyanide Log Collection"
+    NSString *msg = @"Automatic log collection is now off by default. Diagnostic uploads are opt-in only.\n\nYou can turn them on anytime in Settings > About > Auto-Upload Logs. When enabled, Cyanide uploads chain stage timing, error messages, device model, and iOS version after a run. Logs go to a private Cloudflare R2 bucket owned by @zeroxjf and expire after 30 days.";
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Log Collection Is Opt-In"
                                                                    message:msg
                                                             preferredStyle:UIAlertControllerStyleAlert];
-    [alert addAction:[UIAlertAction actionWithTitle:@"Allow" style:UIAlertActionStyleDefault handler:^(UIAlertAction *a) {
-        [ud setBool:YES forKey:kSettingsLogUploadEnabled];
+    [alert addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:^(UIAlertAction *a) {
+        [ud setBool:YES forKey:noticeKey];
         [ud setBool:YES forKey:@"cyanide.privacy.logConsentShown"];
-    }]];
-    [alert addAction:[UIAlertAction actionWithTitle:@"Decline" style:UIAlertActionStyleCancel handler:^(UIAlertAction *a) {
-        [ud setBool:NO forKey:kSettingsLogUploadEnabled];
-        [ud setBool:YES forKey:@"cyanide.privacy.logConsentShown"];
+        [ud synchronize];
     }]];
     [root presentViewController:alert animated:YES completion:nil];
 }
@@ -85,11 +87,11 @@
 - (void)sceneDidBecomeActive:(UIScene *)scene {
     [self selectInitialTabIfNeeded];
     settings_application_did_become_active();
-    // Independent paths: privacy consent prompt (one-time) and update check
+    // Independent paths: log collection opt-in notice (one-time) and update check
     // (every foreground, deduped per-process by UpdateChecker.didCheckThisLaunch).
     // The two can stack on first launch — that's intentional, an available
     // update shouldn't be hidden behind a privacy preference.
-    [self showPrivacyConsentIfNeeded];
+    [self showLogCollectionOptInNoticeIfNeeded];
     [self runUpdateCheck];
 }
 
