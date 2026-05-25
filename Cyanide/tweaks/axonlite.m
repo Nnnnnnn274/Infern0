@@ -318,28 +318,6 @@ static uint64_t axn_msg1_cached(uint64_t obj, AXNSelSlot slot, const char *name,
     return r_msg(obj, sel, arg, 0, 0, 0);
 }
 
-static bool axn_read_nsstring(uint64_t str, char *out, size_t outLen)
-{
-    if (!r_is_objc_ptr(str) || !out || outLen == 0) return false;
-    memset(out, 0, outLen);
-
-    uint64_t buf = r_dlsym_call(R_TIMEOUT, "malloc", outLen, 0, 0, 0, 0, 0, 0, 0);
-    if (!buf) return false;
-    r_dlsym_call(R_TIMEOUT, "memset", buf, 0, outLen, 0, 0, 0, 0, 0);
-
-    bool copied = false;
-    if (r_responds(str, "getCString:maxLength:encoding:")) {
-        uint64_t ok = r_msg2(str, "getCString:maxLength:encoding:", buf, outLen, 4, 0);
-        if ((ok & 0xff) && remote_read(buf, out, outLen - 1)) {
-            out[outLen - 1] = '\0';
-            copied = out[0] != '\0';
-        }
-    }
-
-    r_free(buf);
-    return copied;
-}
-
 static bool axn_object_class_name(uint64_t obj, char *out, size_t outLen)
 {
     if (!r_is_objc_ptr(obj) || !out || outLen == 0) return false;
@@ -1068,7 +1046,7 @@ static bool axn_request_bundle_and_title(uint64_t req, char *bundle, size_t bund
         section = axn_ivar_value_cached(bulletin, AXNIvarSectionID, "_sectionID");
         if (!r_is_objc_ptr(section)) section = axn_try_msg0(bulletin, "sectionID");
     }
-    if (!axn_read_nsstring(section, bundle, bundleLen) || bundle[0] == '\0') return false;
+    if (!r_read_nsstring(section, bundle, bundleLen) || bundle[0] == '\0') return false;
 
     uint64_t content = axn_ivar_value_cached(req, AXNIvarContent, "_content");
     if (!r_is_objc_ptr(content)) content = axn_try_msg0(req, "content");
@@ -1080,12 +1058,12 @@ static bool axn_request_bundle_and_title(uint64_t req, char *bundle, size_t bund
     if (!r_is_objc_ptr(header)) header = axn_try_msg0(content, "title");
     if (!r_is_objc_ptr(header)) header = axn_try_msg0(content, "customHeader");
     if (!r_is_objc_ptr(header)) header = axn_try_msg0(content, "defaultHeader");
-    if (!axn_read_nsstring(header, title, titleLen) || title[0] == '\0') {
+    if (!r_read_nsstring(header, title, titleLen) || title[0] == '\0') {
         uint64_t bulletin = axn_ivar_value_cached(req, AXNIvarBulletin, "_bulletin");
         if (!r_is_objc_ptr(bulletin)) bulletin = axn_try_msg0(req, "bulletin");
         uint64_t displayName = axn_ivar_value_cached(bulletin, AXNIvarSectionDisplayName, "_sectionDisplayName");
         if (!r_is_objc_ptr(displayName)) displayName = axn_try_msg0(bulletin, "sectionDisplayName");
-        (void)axn_read_nsstring(displayName, title, titleLen);
+        (void)r_read_nsstring(displayName, title, titleLen);
     }
     if ((!title || title[0] == '\0') && bundle && title && titleLen) {
         const char *last = strrchr(bundle, '.');
@@ -1101,7 +1079,7 @@ static bool axn_request_identifier(uint64_t req, char *identifier, size_t identi
     identifier[0] = '\0';
     uint64_t value = axn_ivar_value_cached(req, AXNIvarNotificationIdentifier, "_notificationIdentifier");
     if (!r_is_objc_ptr(value)) value = axn_try_msg0(req, "notificationIdentifier");
-    return axn_read_nsstring(value, identifier, identifierLen);
+    return r_read_nsstring(value, identifier, identifierLen);
 }
 
 static uint64_t axn_lookup_cached_icon(const char *bundle)

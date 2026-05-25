@@ -9,6 +9,7 @@
 
 #import "darksword_layout.h"
 #import "remote_objc.h"
+#import "sb_walk.h"
 #import "../TaskRop/RemoteCall.h"
 #import "../LogTextView.h"
 
@@ -338,64 +339,6 @@ static int rc_refresh_list_view(uint64_t listView, uint64_t clsInv,
     return touched;
 }
 
-static int rc_collect_list_views(uint64_t root, uint64_t clsListView,
-                                 uint64_t *out, int cap)
-{
-    if (!root || !clsListView || cap <= 0) return 0;
-    uint64_t selSub  = r_sel("subviews");
-    uint64_t selCnt  = r_sel("count");
-    uint64_t selObj  = r_sel("objectAtIndex:");
-    uint64_t selKind = r_sel("isKindOfClass:");
-
-    enum { QMAX = 4096 };
-    static uint64_t q[QMAX];
-    int head = 0, tail = 0, found = 0, visited = 0;
-    q[tail++] = root;
-    while (head < tail && visited < QMAX) {
-        uint64_t v = q[head++];
-        visited++;
-        if (!v) continue;
-        if (r_msg(v, selKind, clsListView, 0, 0, 0)) {
-            if (found < cap) out[found++] = v;
-            continue;
-        }
-        uint64_t subs = r_msg(v, selSub, 0, 0, 0, 0);
-        if (!subs) continue;
-        uint64_t cn = r_msg(subs, selCnt, 0, 0, 0, 0);
-        if (cn > 256) cn = 256;
-        for (uint64_t i = 0; i < cn && tail < QMAX; i++) {
-            uint64_t c = r_msg(subs, selObj, i, 0, 0, 0);
-            if (c) q[tail++] = c;
-        }
-    }
-    return found;
-}
-
-static int rc_collect_from_windows(uint64_t clsListView,
-                                   uint64_t *out, int cap)
-{
-    uint64_t clsApp = r_class("UIApplication");
-    if (!clsApp) return 0;
-    uint64_t app = rc_safe_msg(clsApp, "sharedApplication", 0, 0, 0, 0);
-    if (!app) return 0;
-
-    int n = 0;
-    uint64_t wins = rc_safe_msg(app, "windows", 0, 0, 0, 0);
-    if (wins) {
-        uint64_t wc = r_msg(wins, r_sel("count"), 0, 0, 0, 0);
-        if (wc > 32) wc = 32;
-        for (uint64_t i = 0; i < wc && n < cap; i++) {
-            uint64_t w = r_msg(wins, r_sel("objectAtIndex:"), i, 0, 0, 0);
-            if (w) n += rc_collect_list_views(w, clsListView, out + n, cap - n);
-        }
-    }
-    if (n == 0) {
-        uint64_t kw = rc_safe_msg(app, "keyWindow", 0, 0, 0, 0);
-        if (kw) n += rc_collect_list_views(kw, clsListView, out + n, cap - n);
-    }
-    return n;
-}
-
 static uint64_t rc_icon_controller(void)
 {
     uint64_t cls = r_class("SBIconController");
@@ -488,13 +431,13 @@ bool darksword_layout_home_scale_in_session(double scale)
     uint64_t clsListView = r_class("SBIconListView");
     enum { LV_CAP = 64 };
     uint64_t lvs[LV_CAP];
-    int nlv = rc_collect_from_windows(clsListView, lvs, LV_CAP);
+    int nlv = sb_collect_views_in_windows(clsListView, lvs, LV_CAP);
     if (nlv == 0) {
         uint64_t rootFC = rc_safe_msg(mgr, "rootFolderController", 0, 0, 0, 0);
         if (!rootFC) rootFC = rc_safe_msg(mgr, "_rootFolderController", 0, 0, 0, 0);
         if (rootFC) {
             uint64_t rv = rc_safe_msg(rootFC, "view", 0, 0, 0, 0);
-            if (rv) nlv = rc_collect_list_views(rv, clsListView, lvs, LV_CAP);
+            if (rv) nlv = sb_collect_views(rv, clsListView, lvs, LV_CAP);
         }
     }
     for (int i = 0; i < nlv; i++) {
@@ -531,7 +474,7 @@ bool darksword_layout_dock_scale_in_session(double scale)
         uint64_t clsListView = r_class("SBIconListView");
         enum { LV_CAP = 64 };
         uint64_t lvs[LV_CAP];
-        int nlv = rc_collect_from_windows(clsListView, lvs, LV_CAP);
+        int nlv = sb_collect_views_in_windows(clsListView, lvs, LV_CAP);
         for (int i = 0; i < nlv; i++) {
             if (rc_safe_msg(lvs[i], "isDock", 0, 0, 0, 0)) {
                 rc_refresh_list_view(lvs[i], clsInv, &info);
@@ -582,13 +525,13 @@ static bool darksword_layout_apply_in_session_ios26(double exL, double exR, doub
 
     enum { LV_CAP = 64 };
     uint64_t lvs[LV_CAP];
-    int nlv = rc_collect_from_windows(clsListView, lvs, LV_CAP);
+    int nlv = sb_collect_views_in_windows(clsListView, lvs, LV_CAP);
     if (nlv == 0 && mgr) {
         uint64_t rootFC = rc_safe_msg(mgr, "rootFolderController", 0, 0, 0, 0);
         if (!rootFC) rootFC = rc_safe_msg(mgr, "_rootFolderController", 0, 0, 0, 0);
         if (rootFC) {
             uint64_t rv = rc_safe_msg(rootFC, "view", 0, 0, 0, 0);
-            if (rv) nlv = rc_collect_list_views(rv, clsListView, lvs, LV_CAP);
+            if (rv) nlv = sb_collect_views(rv, clsListView, lvs, LV_CAP);
         }
     }
     printf("[LAYOUT26] discovered %d SBIconListView(s)\n", nlv);

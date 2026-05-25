@@ -16,6 +16,7 @@
 #import "tweaks/darksword_layout.h"
 #import "tweaks/nano_registry.h"
 #import "tweaks/killallapps.h"
+#import "tweaks/themer.h"
 
 #import <objc/runtime.h>
 #import "DSKeepAlive.h"
@@ -26,9 +27,11 @@
 #import "installer/Package.h"
 #import "installer/PackageCatalog.h"
 #import "installer/PackageQueue.h"
+#import "docs/DocsViewController.h"
 #import "UpdateChecker.h"
 #import <WebKit/WebKit.h>
 #import <MessageUI/MessageUI.h>
+#import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
 #import <notify.h>
 #import <sys/utsname.h>
 #import <time.h>
@@ -161,11 +164,15 @@ NSString * const kSettingsAxonLiteEnabled = @"AxonLiteEnabled";
 
 NSString * const kSettingsTypeBannerEnabled = @"TypeBannerEnabled";
 
+NSString * const kSettingsThemerEnabled = @"ThemerEnabled";
+NSString * const kSettingsThemerThemeID = @"ThemerThemeID";
+NSString * const kSettingsThemerCustomThemePath = @"ThemerCustomThemePath";
+NSString * const kSettingsThemerCustomThemeName = @"ThemerCustomThemeName";
+
 // Master gate for experimental tweaks. When NO (default), packages that opt
 // into the experimental category are hidden from the Installer and the
 // Settings bundle list, and any currently-enabled experimental tweak is
-// force-disabled when this is flipped off. Only TypeBanner uses this gate
-// today.
+// force-disabled when this is flipped off.
 NSString * const kSettingsExperimentalTweaksEnabled = @"ExperimentalTweaksEnabled";
 
 // NanoRegistry pairing-compatibility editor. Numbers are the watchOS pairing
@@ -202,6 +209,10 @@ static volatile int g_axonlite_live_running = 0;
 static volatile int g_axonlite_live_stop_requested = 0;
 static volatile int g_typebanner_live_running = 0;
 static volatile int g_typebanner_live_stop_requested = 0;
+static volatile int g_themer_live_running = 0;
+static volatile int g_themer_live_stop_requested = 0;
+static volatile int g_themer_repair_running = 0;
+static volatile uint64_t g_themer_repair_generation = 0;
 static volatile int g_app_in_background = 0;
 static volatile int g_screen_awake = 1;
 static volatile int g_screen_locked = 0;
@@ -214,6 +225,8 @@ static int g_springboard_blanked_notify_token = NOTIFY_TOKEN_INVALID;
 static int g_display_status_notify_token = NOTIFY_TOKEN_INVALID;
 static int g_springboard_lockstate_notify_token = NOTIFY_TOKEN_INVALID;
 static int g_springboard_finished_startup_notify_token = NOTIFY_TOKEN_INVALID;
+static int g_springboard_app_state_notify_token = NOTIFY_TOKEN_INVALID;
+static int g_springboard_frontmost_notify_token = NOTIFY_TOKEN_INVALID;
 static const NSInteger kSBCDefaultDockIcons = 4;
 static const NSInteger kSBCDefaultCols = 4;
 static const NSInteger kSBCDefaultRows = 6;
@@ -249,6 +262,14 @@ static const useconds_t kTypeBannerLiveIntervalUS = 1000000;
 static const useconds_t kTypeBannerLiveBackgroundIntervalUS = 1000000;
 static const useconds_t kTypeBannerInitialDaemonSettleUS = 250000;
 static const NSUInteger kTypeBannerLiveMaxTicks = 28800;
+// Themer's model graft persists across recycled views, but app launch/resume
+// can clear the currently visible SBIconImageView contents without recycling
+// the view. Cached repaint is much cheaper than a full PNG/model apply.
+static const useconds_t kThemerLiveIntervalUS = 750000;
+static const useconds_t kThemerLiveBackgroundIntervalUS = 750000;
+static const NSUInteger kThemerLiveMaxTicks = 86400;
+static const useconds_t kThemerRepairInitialDelayUS = 900000;
+static const useconds_t kThemerRepairIntervalUS = 450000;
 static NSString * const kSettingsRemoteCallStateDidChangeNotification = @"SettingsRemoteCallStateDidChangeNotification";
 NSString * const kSettingsActionsDidCompleteNotification = @"SettingsActionsDidCompleteNotification";
 static NSString * const kSettingsCleanupStateDidChangeNotification = @"SettingsCleanupStateDidChangeNotification";
@@ -328,6 +349,7 @@ static NSArray<NSString *> *settings_rc_backed_tweak_keys(void)
             kSettingsDSZeroBacklightFade,
             kSettingsDSDoubleTapToLock,
             kSettingsLayoutExtrasEnabled,
+            kSettingsThemerEnabled,
         ];
     });
     return keys;
@@ -377,6 +399,9 @@ static void settings_apply_statbar_once_async(const char *reason);
 static void settings_apply_rssi_once_async(const char *reason);
 static void settings_start_rssi_live_loop(void);
 static void settings_start_typebanner_live_loop(void);
+static void settings_start_themer_live_loop(void);
+static void settings_schedule_themer_repair_burst(const char *reason);
+static void settings_schedule_themer_quiet_repair_burst(const char *reason);
 static void settings_notify_remote_call_state_changed(void);
 static void settings_request_all_live_loops_stop(const char *reason);
 
@@ -533,6 +558,57 @@ static void settings_stop_axonlite_then_forget_locked(const char *reason)
     axonlite_forget_remote_state();
 }
 
+static void settings_forget_springboard_tweak_state_locked(void)
+{
+    statbar_forget_remote_state();
+    rssidisplay_forget_remote_state();
+    axonlite_forget_remote_state();
+    typebanner_forget_remote_state();
+    killallapps_forget_remote_state();
+    themer_forget_remote_state();
+}
+
+static void settings_stop_springboard_tweaks_locked(const char *reason,
+                                                    BOOL springboardWillDie)
+{
+    if (!g_springboard_rc_ready) {
+        settings_forget_springboard_tweak_state_locked();
+        return;
+    }
+
+    @try {
+        bool tbKeepAlive = typebanner_release_mobilesms_keepalive_in_springboard_session();
+        bool tbHidden = typebanner_hide_in_springboard_session();
+        printf("[SETTINGS] %s TypeBanner cleanup keepAlive=%d hide=%d\n",
+               reason ?: "SpringBoard cleanup", tbKeepAlive, tbHidden);
+    } @catch (NSException *e) {
+        printf("[SETTINGS] %s TypeBanner cleanup exception: %s\n",
+               reason ?: "SpringBoard cleanup", e.reason.UTF8String);
+    }
+
+    bool axonStopped = springboardWillDie
+        ? axonlite_stop_in_session_fast()
+        : axonlite_stop_in_session();
+    printf("[SETTINGS] %s Axon Lite stop%s result=%d\n",
+           reason ?: "SpringBoard cleanup",
+           springboardWillDie ? " (fast)" : "",
+           axonStopped);
+
+    bool statStopped = statbar_stop_in_session();
+    printf("[SETTINGS] %s StatBar stop result=%d\n",
+           reason ?: "SpringBoard cleanup", statStopped);
+
+    bool rssiStopped = rssidisplay_stop_in_session();
+    printf("[SETTINGS] %s RSSI stop result=%d\n",
+           reason ?: "SpringBoard cleanup", rssiStopped);
+
+    bool themeStopped = themer_stop_in_session();
+    printf("[SETTINGS] %s Themer stop result=%d\n",
+           reason ?: "SpringBoard cleanup", themeStopped);
+
+    settings_forget_springboard_tweak_state_locked();
+}
+
 static void settings_handle_springboard_restart(void)
 {
     // SpringBoard just (re)started. Every pointer we cached from the previous
@@ -549,11 +625,7 @@ static void settings_handle_springboard_restart(void)
             g_springboard_rc_ready = 0;
             g_springboard_sandbox_escaped = 0;
 
-            statbar_forget_remote_state();
-            rssidisplay_forget_remote_state();
-            axonlite_forget_remote_state();
-            typebanner_forget_remote_state();
-            killallapps_forget_remote_state();
+            settings_forget_springboard_tweak_state_locked();
             if (hadSession) {
                 abandon_remote_call();
             }
@@ -577,6 +649,7 @@ static void settings_install_screen_awake_observers(void)
             (void)token;
             if (settings_refresh_screen_awake_state("springboard.hasBlankedScreen")) {
                 settings_apply_statbar_once_async("screen awake");
+                settings_schedule_themer_quiet_repair_burst("screen awake");
             }
         });
         if (status != NOTIFY_STATUS_OK) {
@@ -589,6 +662,7 @@ static void settings_install_screen_awake_observers(void)
             (void)token;
             if (settings_refresh_screen_awake_state("iokit.displayStatus")) {
                 settings_apply_statbar_once_async("screen awake");
+                settings_schedule_themer_quiet_repair_burst("display awake");
             }
         });
         if (status != NOTIFY_STATUS_OK) {
@@ -619,6 +693,32 @@ static void settings_install_screen_awake_observers(void)
             g_springboard_finished_startup_notify_token = NOTIFY_TOKEN_INVALID;
         }
 
+        status = notify_register_dispatch("com.apple.springboard.applicationStateChanged",
+                                          &g_springboard_app_state_notify_token,
+                                          dispatch_get_main_queue(), ^(int token) {
+            uint64_t state = 0;
+            (void)notify_get_state(token, &state);
+            printf("[SETTINGS] springboard application state notify state=%llu\n",
+                   (unsigned long long)state);
+            settings_schedule_themer_repair_burst("springboard app state changed");
+        });
+        if (status != NOTIFY_STATUS_OK) {
+            g_springboard_app_state_notify_token = NOTIFY_TOKEN_INVALID;
+        }
+
+        status = notify_register_dispatch("com.apple.springboard.frontmostApplicationChanged",
+                                          &g_springboard_frontmost_notify_token,
+                                          dispatch_get_main_queue(), ^(int token) {
+            uint64_t state = 0;
+            (void)notify_get_state(token, &state);
+            printf("[SETTINGS] springboard frontmost app notify state=%llu\n",
+                   (unsigned long long)state);
+            settings_schedule_themer_repair_burst("springboard frontmost changed");
+        });
+        if (status != NOTIFY_STATUS_OK) {
+            g_springboard_frontmost_notify_token = NOTIFY_TOKEN_INVALID;
+        }
+
         // If the live loop tripped its 3-failure exit during a background
         // window, the screen-wake darwin notifications won't fire (the screen
         // never blanked) and the loop stays dead. Re-arm on app foreground.
@@ -629,6 +729,7 @@ static void settings_install_screen_awake_observers(void)
             (void)note;
             (void)settings_refresh_screen_awake_state("app became active");
             settings_apply_statbar_once_async("app became active");
+            settings_schedule_themer_quiet_repair_burst("app became active");
         }];
 
         (void)settings_refresh_screen_awake_state("startup");
@@ -739,6 +840,7 @@ static void settings_request_all_live_loops_stop(const char *reason)
     g_rssi_live_stop_requested = 1;
     g_axonlite_live_stop_requested = 1;
     g_typebanner_live_stop_requested = 1;
+    g_themer_live_stop_requested = 1;
     if (reason) {
         printf("[SETTINGS] requested all live RemoteCall loops stop: %s\n", reason);
     }
@@ -749,7 +851,8 @@ static void settings_wait_live_loops_stopped_for_switch(const char *reason)
     uint64_t startUS = settings_now_us();
     BOOL logged = NO;
     while (g_statbar_live_running || g_rssi_live_running ||
-           g_axonlite_live_running || g_typebanner_live_running) {
+           g_axonlite_live_running || g_typebanner_live_running ||
+           g_themer_live_running || g_themer_repair_running) {
         uint64_t nowUS = settings_now_us();
         uint64_t elapsedUS = (startUS != 0 && nowUS >= startUS) ? nowUS - startUS : 0;
         if (!logged) {
@@ -758,16 +861,18 @@ static void settings_wait_live_loops_stopped_for_switch(const char *reason)
             logged = YES;
         }
         if (elapsedUS >= 2000000ULL) {
-            printf("[SETTINGS] live loop stop wait timed out%s%s stat=%d rssi=%d axon=%d type=%d\n",
+            printf("[SETTINGS] live loop stop wait timed out%s%s stat=%d rssi=%d axon=%d type=%d themer=%d\n",
                    reason ? ": " : "", reason ?: "",
                    g_statbar_live_running, g_rssi_live_running,
-                   g_axonlite_live_running, g_typebanner_live_running);
+                   g_axonlite_live_running, g_typebanner_live_running,
+                   g_themer_live_running || g_themer_repair_running);
             break;
         }
         usleep(50000);
     }
     if (logged && !g_statbar_live_running && !g_rssi_live_running &&
-        !g_axonlite_live_running && !g_typebanner_live_running) {
+        !g_axonlite_live_running && !g_typebanner_live_running &&
+        !g_themer_live_running && !g_themer_repair_running) {
         printf("[SETTINGS] live RemoteCall loops stopped%s%s\n",
                reason ? ": " : "", reason ?: "");
     }
@@ -1080,14 +1185,9 @@ static void settings_prepare_for_respring_sync(void)
 
     @synchronized (settings_rc_lock()) {
         if (g_springboard_rc_ready) {
-            // SB is about to be killed by the respring — skip the
-            // restore/release loops since they're all wasted RC traffic.
-            bool axonStopped = axonlite_stop_in_session_fast();
-            printf("[SETTINGS] pre-respring Axon Lite stop (fast) result=%d\n", axonStopped);
-            bool stopped = statbar_stop_in_session();
-            printf("[SETTINGS] pre-respring StatBar stop result=%d\n", stopped);
-            bool rssiStopped = rssidisplay_stop_in_session();
-            printf("[SETTINGS] pre-respring RSSI stop result=%d\n", rssiStopped);
+            // SB is about to be killed by the respring, so cleanup uses the
+            // fast variant for tweaks where full remote restoration is wasted.
+            settings_stop_springboard_tweaks_locked("pre-respring cleanup", YES);
             settings_destroy_springboard_remote_call_locked("pre-respring cleanup");
         }
     }
@@ -1118,13 +1218,10 @@ static void settings_terminal_kexploit_cleanup_sync_internal(const char *reason)
 
     @synchronized (settings_rc_lock()) {
         if (g_springboard_rc_ready) {
-            bool axonStopped = axonlite_stop_in_session();
-            printf("[SETTINGS] terminal cleanup Axon Lite stop result=%d\n", axonStopped);
-            bool stopped = statbar_stop_in_session();
-            printf("[SETTINGS] terminal cleanup StatBar stop result=%d\n", stopped);
-            bool rssiStopped = rssidisplay_stop_in_session();
-            printf("[SETTINGS] terminal cleanup RSSI stop result=%d\n", rssiStopped);
+            settings_stop_springboard_tweaks_locked("terminal cleanup", NO);
             settings_destroy_springboard_remote_call_locked(reason ?: "terminal KRW cleanup");
+        } else {
+            settings_forget_springboard_tweak_state_locked();
         }
     }
 
@@ -1244,9 +1341,7 @@ void settings_destroy_springboard_remote_call_sync(void)
     settings_wait_live_loops_stopped_for_switch("remote call sync cleanup");
     @synchronized (settings_rc_lock()) {
         if (g_springboard_rc_ready) {
-            axonlite_stop_in_session();
-            statbar_stop_in_session();
-            rssidisplay_stop_in_session();
+            settings_stop_springboard_tweaks_locked("remote call sync cleanup", NO);
         }
         settings_destroy_springboard_remote_call_locked("manual/sync cleanup");
     }
@@ -1262,9 +1357,7 @@ void settings_destroy_springboard_remote_call(void)
         @synchronized (settings_rc_lock()) {
             BOOL hadSession = g_springboard_rc_ready != 0;
             if (g_springboard_rc_ready) {
-                axonlite_stop_in_session();
-                statbar_stop_in_session();
-                rssidisplay_stop_in_session();
+                settings_stop_springboard_tweaks_locked("remote call cleanup", NO);
             }
             settings_destroy_springboard_remote_call_locked("manual cleanup");
             log_user(hadSession ? "[OK] SpringBoard session disconnected.\n" :
@@ -1316,6 +1409,150 @@ static bool settings_apply_layout_extras_from_defaults_locked(NSUserDefaults *d)
     double homeScale = (hsPct > 0) ? (double)hsPct / 100.0 : 1.0;
     double dockScale = (dkPct > 0) ? (double)dkPct / 100.0 : 1.0;
     return darksword_layout_apply_in_session(exL, exR, exT, exB, dockExH, homeScale, dockScale);
+}
+
+static NSString * const kThemerThemeNone = @"";
+static NSString * const kThemerThemeBuiltinIOS6 = @"builtin-ios6";
+static NSString * const kThemerThemeCustom = @"custom";
+
+static NSString *settings_themer_builtin_ios6_path(void)
+{
+    return [[NSBundle mainBundle].bundlePath
+        stringByAppendingPathComponent:@"Themes-iOS6.plist"];
+}
+
+static NSString *settings_themer_documents_theme_root(void)
+{
+    NSArray<NSString *> *docs = NSSearchPathForDirectoriesInDomains(
+        NSDocumentDirectory, NSUserDomainMask, YES);
+    if (docs.count == 0) return nil;
+    return [docs.firstObject stringByAppendingPathComponent:@"Themes"];
+}
+
+static NSString *settings_themer_imported_theme_dir(void)
+{
+    NSString *root = settings_themer_documents_theme_root();
+    return root ? [root stringByAppendingPathComponent:@"Imported"] : nil;
+}
+
+static NSString *settings_themer_imported_plist_path(void)
+{
+    NSString *root = settings_themer_documents_theme_root();
+    return root ? [root stringByAppendingPathComponent:@"Imported.plist"] : nil;
+}
+
+static NSString *settings_themer_selected_theme_id(void)
+{
+    return [[NSUserDefaults standardUserDefaults] stringForKey:kSettingsThemerThemeID] ?: kThemerThemeNone;
+}
+
+BOOL settings_themer_has_selected_theme(void)
+{
+    NSString *theme = settings_themer_selected_theme_id();
+    if ([theme isEqualToString:kThemerThemeBuiltinIOS6]) {
+        return [[NSFileManager defaultManager] fileExistsAtPath:settings_themer_builtin_ios6_path()];
+    }
+    if ([theme isEqualToString:kThemerThemeCustom]) {
+        NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
+        NSString *path = [d stringForKey:kSettingsThemerCustomThemePath];
+        BOOL isDir = NO;
+        return path.length > 0 &&
+               [[NSFileManager defaultManager] fileExistsAtPath:path isDirectory:&isDir];
+    }
+    return NO;
+}
+
+NSString *settings_themer_selected_theme_display_name(void)
+{
+    NSString *theme = settings_themer_selected_theme_id();
+    if ([theme isEqualToString:kThemerThemeBuiltinIOS6]) return @"iOS 6 Theme";
+    if ([theme isEqualToString:kThemerThemeCustom]) {
+        NSString *name = [[NSUserDefaults standardUserDefaults]
+            stringForKey:kSettingsThemerCustomThemeName];
+        return name.length > 0 ? name : @"Imported Theme";
+    }
+    return @"None";
+}
+
+static NSDictionary<NSString *, NSData *> *settings_themer_load_plist_theme(NSString *plistPath)
+{
+    NSError *err = nil;
+    NSData *raw = [NSData dataWithContentsOfFile:plistPath options:0 error:&err];
+    if (!raw) {
+        printf("[THEMER] resolve: failed to read plist err=%s\n",
+               err.localizedDescription.UTF8String ?: "?");
+        return nil;
+    }
+    id parsed = [NSPropertyListSerialization
+        propertyListWithData:raw
+                     options:NSPropertyListImmutable
+                      format:NULL
+                       error:&err];
+    if (![parsed isKindOfClass:[NSDictionary class]]) {
+        printf("[THEMER] resolve: plist parse failed err=%s\n",
+               err.localizedDescription.UTF8String ?: "?");
+        return nil;
+    }
+    NSDictionary *dict = (NSDictionary *)parsed;
+    NSMutableDictionary<NSString *, NSData *> *out = [NSMutableDictionary dictionary];
+    for (id key in dict) {
+        id value = dict[key];
+        if (![key isKindOfClass:NSString.class] ||
+            ![value isKindOfClass:NSData.class] ||
+            [(NSData *)value length] == 0) {
+            continue;
+        }
+        out[key] = value;
+    }
+    printf("[THEMER] resolve: loaded plist theme entries=%lu size=%lu path=%s\n",
+           (unsigned long)out.count,
+           (unsigned long)raw.length,
+           plistPath.UTF8String);
+    return out;
+}
+
+// Per-bundle icon swap. A theme must be selected explicitly: either the bundled
+// iOS 6 plist, or an imported folder/plist in Documents/Themes/.
+static bool settings_apply_themer_from_defaults_locked(NSUserDefaults *d)
+{
+    if (![d boolForKey:kSettingsThemerEnabled]) {
+        printf("[THEMER] resolve: toggle off, skipping\n");
+        return false;
+    }
+
+    NSString *theme = settings_themer_selected_theme_id();
+    if (![theme isEqualToString:kThemerThemeBuiltinIOS6] &&
+        ![theme isEqualToString:kThemerThemeCustom]) {
+        printf("[THEMER] resolve: no selected theme; install/apply blocked\n");
+        log_user("[THEMER] Pick a theme in Settings > Cyanide Themer before running.\n");
+        return false;
+    }
+
+    if ([theme isEqualToString:kThemerThemeBuiltinIOS6]) {
+        NSString *plistPath = settings_themer_builtin_ios6_path();
+        if (![[NSFileManager defaultManager] fileExistsAtPath:plistPath]) {
+            printf("[THEMER] resolve: bundled plist missing at %s\n",
+                   plistPath.UTF8String);
+            return false;
+        }
+        NSDictionary *dict = settings_themer_load_plist_theme(plistPath);
+        return dict.count > 0 ? themer_apply_data_in_session(dict) : false;
+    }
+
+    NSString *path = [d stringForKey:kSettingsThemerCustomThemePath];
+    BOOL isDir = NO;
+    if (path.length == 0 ||
+        ![[NSFileManager defaultManager] fileExistsAtPath:path isDirectory:&isDir]) {
+        printf("[THEMER] resolve: selected custom theme missing path=%s\n",
+               path.UTF8String ?: "");
+        return false;
+    }
+    if (isDir) {
+        printf("[THEMER] resolve: using imported folder %s\n", path.UTF8String);
+        return themer_apply_in_session(path.fileSystemRepresentation);
+    }
+    NSDictionary *dict = settings_themer_load_plist_theme(path);
+    return dict.count > 0 ? themer_apply_data_in_session(dict) : false;
 }
 
 static void settings_reset_sbc_defaults(void)
@@ -2229,6 +2466,188 @@ static void settings_start_typebanner_live_loop(void)
     });
 }
 
+static void settings_start_themer_live_loop(void)
+{
+    if (!settings_device_supported()) return;
+    if (settings_cleanup_in_progress()) return;
+
+    NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
+    if (![d boolForKey:kSettingsThemerEnabled]) return;
+    if (!g_springboard_rc_ready) return;
+
+    // Continuous repaint fights SpringBoard's icon animations and visibly
+    // flashes icons. The model graft/IconServices paths do the persistence
+    // work; avoid background repaint traffic.
+    printf("[SETTINGS] Themer live loop skipped; model/cache persistence active\n");
+    return;
+
+    if (__sync_lock_test_and_set(&g_themer_live_running, 1)) {
+        static volatile int loggedAlready = 0;
+        if (__sync_bool_compare_and_swap(&loggedAlready, 0, 1)) {
+            printf("[SETTINGS] Themer live loop already running\n");
+        }
+        return;
+    }
+
+    if (settings_cleanup_in_progress()) {
+        __sync_lock_release(&g_themer_live_running);
+        return;
+    }
+
+    g_themer_live_stop_requested = 0;
+    dispatch_async(dispatch_get_global_queue(0, 0), ^{
+        NSUInteger tick = 0;
+        NSUInteger failures = 0;
+
+        printf("[SETTINGS] Themer cached repaint loop started interval=%uus background=%uus max=%lu\n",
+               kThemerLiveIntervalUS,
+               kThemerLiveBackgroundIntervalUS,
+               (unsigned long)kThemerLiveMaxTicks);
+
+        @try {
+            // Start with a sleep so we don't pile a tick on top of the
+            // initial Run apply that just completed.
+            settings_live_loop_sleep_interruptible(0,
+                                                   settings_live_interval(kThemerLiveIntervalUS,
+                                                                          kThemerLiveBackgroundIntervalUS),
+                                                   &g_themer_live_stop_requested);
+            while ([d boolForKey:kSettingsThemerEnabled] &&
+                   !settings_cleanup_in_progress() &&
+                   !g_themer_live_stop_requested &&
+                   tick < kThemerLiveMaxTicks) {
+                useconds_t intervalUS = settings_live_interval(kThemerLiveIntervalUS,
+                                                               kThemerLiveBackgroundIntervalUS);
+                bool ok = false;
+
+                @synchronized (settings_rc_lock()) {
+                    if (g_themer_live_stop_requested) break;
+                    if (!g_springboard_rc_ready) {
+                        printf("[SETTINGS] Themer loop has no SpringBoard RemoteCall session\n");
+                        failures++;
+                        break;
+                    }
+                    if (!g_kexploit_done || g_settings_actions_running) {
+                        // Wait for actions to finish before next tick.
+                        ok = true;
+                    } else {
+                        ok = themer_repaint_cached_views_in_session();
+                    }
+                }
+
+                if (tick == 0) {
+                    printf("[SETTINGS] Themer cached repaint first tick result=%d\n", ok);
+                }
+                failures = ok ? 0 : failures + 1;
+
+                tick++;
+                if (![d boolForKey:kSettingsThemerEnabled] ||
+                    g_themer_live_stop_requested ||
+                    tick >= kThemerLiveMaxTicks) break;
+
+                intervalUS = settings_live_interval(kThemerLiveIntervalUS,
+                                                    kThemerLiveBackgroundIntervalUS);
+                settings_live_loop_sleep_interruptible(0, intervalUS,
+                                                       &g_themer_live_stop_requested);
+            }
+        } @finally {
+            printf("[SETTINGS] Themer cached repaint loop exited ticks=%lu enabled=%d failures=%lu stop=%d\n",
+                   (unsigned long)tick,
+                   [d boolForKey:kSettingsThemerEnabled],
+                   (unsigned long)failures,
+                   g_themer_live_stop_requested);
+            __sync_lock_release(&g_themer_live_running);
+        }
+    });
+}
+
+static void settings_schedule_themer_repair_burst_internal(const char *reason, BOOL force)
+{
+    // Repainting visible icon views during unlock/app transitions causes the
+    // user-visible native->themed flip. Keep this disabled now that the model
+    // graft and icon-cache seed paths carry normal persistence.
+    static volatile int loggedDisabled = 0;
+    if (__sync_bool_compare_and_swap(&loggedDisabled, 0, 1)) {
+        printf("[SETTINGS] Themer automatic repair bursts disabled%s%s force=%d\n",
+               reason ? ": " : "", reason ?: "", force);
+    }
+    return;
+
+    if (!settings_device_supported()) return;
+    if (settings_cleanup_in_progress()) return;
+
+    NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
+    if (![d boolForKey:kSettingsThemerEnabled]) return;
+    if (!g_springboard_rc_ready) return;
+
+    __sync_add_and_fetch(&g_themer_repair_generation, 1);
+    if (__sync_lock_test_and_set(&g_themer_repair_running, 1)) return;
+
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+        uint64_t seenGeneration = g_themer_repair_generation;
+        NSUInteger tick = 0;
+        NSUInteger quietTicks = 0;
+
+        printf("[SETTINGS] Themer %srepair burst started%s%s\n",
+               force ? "" : "quiet ",
+               reason ? ": " : "", reason ?: "");
+
+        @try {
+            while ([d boolForKey:kSettingsThemerEnabled] &&
+                   !settings_cleanup_in_progress() &&
+                   !g_themer_live_stop_requested &&
+                   tick < 1) {
+                settings_live_loop_sleep_interruptible(0,
+                                                       tick == 0
+                                                           ? kThemerRepairInitialDelayUS
+                                                           : kThemerRepairIntervalUS,
+                                                       &g_themer_live_stop_requested);
+                if (g_themer_live_stop_requested) break;
+
+                bool ok = false;
+                @synchronized (settings_rc_lock()) {
+                    if (!g_springboard_rc_ready || !g_kexploit_done ||
+                        g_settings_actions_running) {
+                        ok = true;
+                    } else {
+                        ok = force
+                            ? themer_force_repaint_cached_views_in_session()
+                            : themer_repaint_cached_views_in_session();
+                    }
+                }
+
+                tick++;
+                uint64_t currentGeneration = g_themer_repair_generation;
+                if (currentGeneration != seenGeneration) {
+                    seenGeneration = currentGeneration;
+                    quietTicks = 0;
+                } else {
+                    quietTicks++;
+                    if (quietTicks >= 2) break;
+                }
+
+                if (tick == 1) {
+                    printf("[SETTINGS] Themer repair burst first repaint=%d\n", ok);
+                }
+            }
+        } @finally {
+            printf("[SETTINGS] Themer %srepair burst exited ticks=%lu\n",
+                   force ? "" : "quiet ",
+                   (unsigned long)tick);
+            __sync_lock_release(&g_themer_repair_running);
+        }
+    });
+}
+
+static void settings_schedule_themer_repair_burst(const char *reason)
+{
+    settings_schedule_themer_repair_burst_internal(reason, YES);
+}
+
+static void settings_schedule_themer_quiet_repair_burst(const char *reason)
+{
+    settings_schedule_themer_repair_burst_internal(reason, NO);
+}
+
 static void settings_apply_axonlite_once_async(const char *reason)
 {
     if (!settings_device_supported()) return;
@@ -2283,6 +2702,7 @@ void settings_application_did_enter_background(void)
         ([d boolForKey:kSettingsAxonLiteEnabled]    && g_springboard_rc_ready) ||
         (settings_rssi_install_allowed() && [d boolForKey:kSettingsRSSIDisplayEnabled] && g_springboard_rc_ready) ||
         ([d boolForKey:kSettingsStatBarEnabled]     && g_springboard_rc_ready) ||
+        ([d boolForKey:kSettingsThemerEnabled]      && g_springboard_rc_ready) ||
         [d boolForKey:kSettingsTypeBannerEnabled];
     if (anyLiveLoopNeeded) {
         if ([d boolForKey:kSettingsKeepAlive]) {
@@ -2317,6 +2737,7 @@ void settings_application_will_enter_foreground(void)
     settings_apply_statbar_once_async("will enter foreground");
     settings_apply_rssi_once_async("will enter foreground");
     settings_apply_axonlite_once_async("will enter foreground");
+    settings_start_themer_live_loop();
     if ([[NSUserDefaults standardUserDefaults] boolForKey:kSettingsTypeBannerEnabled]) {
         settings_start_typebanner_live_loop();
     }
@@ -2330,6 +2751,7 @@ void settings_application_did_become_active(void)
     settings_apply_statbar_once_async("became active");
     settings_apply_rssi_once_async("became active");
     settings_apply_axonlite_once_async("became active");
+    settings_start_themer_live_loop();
     if ([[NSUserDefaults standardUserDefaults] boolForKey:kSettingsTypeBannerEnabled]) {
         settings_start_typebanner_live_loop();
     }
@@ -2387,6 +2809,7 @@ static BOOL settings_key_affects_package_state(NSString *key)
            [key isEqualToString:kSettingsRSSIDisplayEnabled] ||
            [key isEqualToString:kSettingsAxonLiteEnabled] ||
            [key isEqualToString:kSettingsTypeBannerEnabled] ||
+           [key isEqualToString:kSettingsThemerEnabled] ||
            settings_key_is_dark_tweak(key);
 }
 
@@ -2650,6 +3073,11 @@ void settings_register_defaults(void)
 
         kSettingsTypeBannerEnabled: @NO,
 
+        kSettingsThemerEnabled: @NO,
+        kSettingsThemerThemeID: kThemerThemeNone,
+        kSettingsThemerCustomThemePath: @"",
+        kSettingsThemerCustomThemeName: @"",
+
         kSettingsExperimentalTweaksEnabled: @NO,
 
         kSettingsNanoMaxPairing:       @(kNanoDefaultMaxPairing),
@@ -2663,6 +3091,16 @@ void settings_register_defaults(void)
     if (![defaults boolForKey:kSettingsExperimentalTweaksEnabled] &&
         [defaults boolForKey:kSettingsRSSIDisplayEnabled]) {
         [defaults setBool:NO forKey:kSettingsRSSIDisplayEnabled];
+        [defaults synchronize];
+    }
+    if (![defaults boolForKey:kSettingsExperimentalTweaksEnabled] &&
+        [defaults boolForKey:kSettingsThemerEnabled]) {
+        [defaults setBool:NO forKey:kSettingsThemerEnabled];
+        [defaults synchronize];
+    }
+    if ([defaults boolForKey:kSettingsThemerEnabled] &&
+        !settings_themer_has_selected_theme()) {
+        [defaults setBool:NO forKey:kSettingsThemerEnabled];
         [defaults synchronize];
     }
     settings_install_screen_awake_observers();
@@ -2910,6 +3348,20 @@ void settings_run_actions(void)
                         cyanide_upload_log_milestone(ok ? @"layout-extras-applied" : @"layout-extras-warning");
                     }
 
+                    if ([d boolForKey:kSettingsThemerEnabled]) {
+                        settings_progress(&step, total, "Applying Cyanide Themer");
+                        bool ok = settings_apply_themer_from_defaults_locked(d);
+                        settings_mark_tweak_applied(kSettingsThemerEnabled, ok);
+                        printf("[SETTINGS] Themer result=%d\n", ok);
+                        log_user("%s Cyanide Themer %s.\n",
+                                 ok ? "[OK]" : "[WARN]",
+                                 ok ? "applied" : "did not apply cleanly");
+                        cyanide_upload_log_milestone(ok ? @"themer-applied" : @"themer-warning");
+                        if (ok) {
+                            settings_start_themer_live_loop();
+                        }
+                    }
+
                     if (runStatBar) {
                         settings_progress(&step, total, "Starting StatBar overlay and 1s feed");
                         bool ok = statbar_apply_in_session([d boolForKey:kSettingsStatBarCelsius],
@@ -3036,6 +3488,7 @@ typedef NS_ENUM(NSInteger, SettingsSection) {
     SectionDarkSwordTweaks,
     SectionLayoutExtras,
     SectionNanoRegistry,
+    SectionThemer,
     SectionCount,
 };
 
@@ -3045,6 +3498,7 @@ typedef NS_ENUM(NSInteger, RootSection) {
     RootSectionTweakBundles,
     RootSectionSystemBundles,
     RootSectionAppIcon,
+    RootSectionDocs,
     RootSectionAbout,
     RootSectionExperimental,
     RootSectionWarning,
@@ -3097,7 +3551,7 @@ static NSString *settings_pretty_date_for_iso(NSString *iso)
     return date ? [out stringFromDate:date] : iso;
 }
 
-@interface SettingsViewController ()
+@interface SettingsViewController () <UIDocumentPickerDelegate>
 @property (nonatomic, strong) UISegmentedControl *powercuffSegmented;
 @property (nonatomic, assign) BOOL pendingManualActionsReload;
 @property (nonatomic, assign) BOOL detailMode;
@@ -3124,6 +3578,237 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
     dispatch_once(&once, ^{ d = [[_CyanideMailDelegate alloc] init]; });
     return d;
 }
+
+@interface ThemerFormatGuideViewController : UITableViewController
+@end
+
+@implementation ThemerFormatGuideViewController
+
+- (void)viewDidLoad
+{
+    [super viewDidLoad];
+    self.title = @"Theme Format";
+    self.tableView.rowHeight = UITableViewAutomaticDimension;
+    self.tableView.estimatedRowHeight = 72.0;
+}
+
+- (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView
+{
+    return 3;
+}
+
+- (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section
+{
+    return section == 2 ? 3 : 1;
+}
+
+- (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section
+{
+    switch (section) {
+        case 0: return @"Folder Theme";
+        case 1: return @"Plist Theme";
+        case 2: return @"Files";
+        default: return nil;
+    }
+}
+
+- (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section
+{
+    if (section == 0) {
+        return @"Only icons with matching bundle IDs change. Missing apps keep their stock icon.";
+    }
+    if (section == 1) {
+        return @"Use a binary plist when you want one portable file instead of a folder of PNGs.";
+    }
+    return nil;
+}
+
+- (UITableViewCell *)tableView:(UITableView *)tableView
+         cellForRowAtIndexPath:(NSIndexPath *)indexPath
+{
+    UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"guide"];
+    if (!cell) {
+        cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleSubtitle
+                                      reuseIdentifier:@"guide"];
+        cell.detailTextLabel.numberOfLines = 0;
+    }
+    cell.accessoryType = UITableViewCellAccessoryNone;
+    cell.textLabel.textColor = UIColor.labelColor;
+    cell.detailTextLabel.textColor = UIColor.secondaryLabelColor;
+
+    if (indexPath.section == 0) {
+        cell.selectionStyle = UITableViewCellSelectionStyleNone;
+        cell.textLabel.text = @"PNG Files";
+        cell.detailTextLabel.text =
+            @"Make a folder containing PNG files named by app bundle ID:\n"
+             "com.apple.mobilesafari.png\n"
+             "com.apple.MobileSMS.png\n"
+             "com.apple.mobiletimer.png";
+    } else if (indexPath.section == 1) {
+        cell.selectionStyle = UITableViewCellSelectionStyleNone;
+        cell.textLabel.text = @"Bundle ID → PNG Data";
+        cell.detailTextLabel.text =
+            @"Make a dictionary plist. Each key is a bundle ID. Each value is raw PNG data. "
+             "Cyanide imports the plist and copies it into Documents/Themes.";
+    } else {
+        cell.selectionStyle = UITableViewCellSelectionStyleDefault;
+        if (indexPath.row == 0) {
+            cell.textLabel.text = @"Share Sample Theme Plist";
+            cell.detailTextLabel.text = @"Exports a small binary plist template with example bundle IDs.";
+        } else if (indexPath.row == 1) {
+            cell.textLabel.text = @"Share iOS 6 Theme Plist";
+            cell.detailTextLabel.text = @"Exports the iOS 6 Theme plist. Icons by zagnut531/iOS-6-Icons.";
+        } else {
+            cell.textLabel.text = @"Share App Info.plist";
+            cell.detailTextLabel.text = @"Exports Cyanide's bundled Info.plist for reference.";
+        }
+        cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+    }
+    return cell;
+}
+
+- (NSData *)sampleIconPNGWithText:(NSString *)text color:(UIColor *)color
+{
+    CGSize size = CGSizeMake(120.0, 120.0);
+    UIGraphicsImageRendererFormat *format = [UIGraphicsImageRendererFormat defaultFormat];
+    format.scale = 1.0;
+    format.opaque = NO;
+    UIGraphicsImageRenderer *renderer = [[UIGraphicsImageRenderer alloc] initWithSize:size
+                                                                               format:format];
+    UIImage *image = [renderer imageWithActions:^(UIGraphicsImageRendererContext *ctx) {
+        CGRect rect = CGRectMake(0.0, 0.0, size.width, size.height);
+        [[UIBezierPath bezierPathWithRoundedRect:rect cornerRadius:27.0] addClip];
+        [color setFill];
+        UIRectFill(rect);
+
+        NSDictionary *attrs = @{
+            NSFontAttributeName: [UIFont systemFontOfSize:48.0 weight:UIFontWeightBold],
+            NSForegroundColorAttributeName: UIColor.whiteColor,
+        };
+        CGSize textSize = [text sizeWithAttributes:attrs];
+        CGRect textRect = CGRectMake((size.width - textSize.width) / 2.0,
+                                     (size.height - textSize.height) / 2.0,
+                                     textSize.width,
+                                     textSize.height);
+        [text drawInRect:textRect withAttributes:attrs];
+    }];
+    return UIImagePNGRepresentation(image);
+}
+
+- (NSURL *)writeSamplePlist:(NSError **)error
+{
+    NSData *safari = [self sampleIconPNGWithText:@"S"
+                                           color:[UIColor colorWithRed:0.05 green:0.45 blue:0.95 alpha:1.0]];
+    NSData *sms = [self sampleIconPNGWithText:@"M"
+                                        color:[UIColor colorWithRed:0.10 green:0.65 blue:0.25 alpha:1.0]];
+    NSDictionary *plist = @{
+        @"com.apple.mobilesafari": safari ?: [NSData data],
+        @"com.apple.MobileSMS": sms ?: [NSData data],
+    };
+    NSData *data = [NSPropertyListSerialization dataWithPropertyList:plist
+                                                              format:NSPropertyListBinaryFormat_v1_0
+                                                             options:0
+                                                               error:error];
+    if (!data) return nil;
+
+    NSURL *url = [NSURL fileURLWithPath:
+        [NSTemporaryDirectory() stringByAppendingPathComponent:@"CyanideThemeTemplate.plist"]];
+    if (![data writeToURL:url options:NSDataWritingAtomic error:error]) return nil;
+    return url;
+}
+
+- (NSURL *)copyBuiltInIOS6Plist:(NSError **)error
+{
+    NSString *src = [[NSBundle mainBundle] pathForResource:@"Themes-iOS6" ofType:@"plist"];
+    if (!src) {
+        if (error) {
+            *error = [NSError errorWithDomain:@"CyanideThemerGuide"
+                                         code:1
+                                     userInfo:@{NSLocalizedDescriptionKey: @"Bundled iOS 6 plist was not found."}];
+        }
+        return nil;
+    }
+
+    NSURL *dst = [NSURL fileURLWithPath:
+        [NSTemporaryDirectory() stringByAppendingPathComponent:@"Cyanide-iOS6-Theme.plist"]];
+    NSFileManager *fm = NSFileManager.defaultManager;
+    if ([fm fileExistsAtPath:dst.path]) {
+        [fm removeItemAtURL:dst error:nil];
+    }
+    if (![fm copyItemAtURL:[NSURL fileURLWithPath:src] toURL:dst error:error]) return nil;
+    return dst;
+}
+
+- (NSURL *)copyAppInfoPlist:(NSError **)error
+{
+    NSString *src = [[NSBundle mainBundle] pathForResource:@"Info" ofType:@"plist"];
+    if (!src) {
+        if (error) {
+            *error = [NSError errorWithDomain:@"CyanideThemerGuide"
+                                         code:2
+                                     userInfo:@{NSLocalizedDescriptionKey: @"Bundled Info.plist was not found."}];
+        }
+        return nil;
+    }
+
+    NSURL *dst = [NSURL fileURLWithPath:
+        [NSTemporaryDirectory() stringByAppendingPathComponent:@"Cyanide-Info.plist"]];
+    NSFileManager *fm = NSFileManager.defaultManager;
+    if ([fm fileExistsAtPath:dst.path]) {
+        [fm removeItemAtURL:dst error:nil];
+    }
+    if (![fm copyItemAtURL:[NSURL fileURLWithPath:src] toURL:dst error:error]) return nil;
+    return dst;
+}
+
+- (void)dismissGuide
+{
+    [self dismissViewControllerAnimated:YES completion:nil];
+}
+
+- (void)shareURL:(NSURL *)url sourceView:(UIView *)sourceView
+{
+    UIActivityViewController *vc = [[UIActivityViewController alloc] initWithActivityItems:@[url]
+                                                                     applicationActivities:nil];
+    UIView *anchor = sourceView ?: self.view;
+    vc.popoverPresentationController.sourceView = anchor;
+    vc.popoverPresentationController.sourceRect = anchor.bounds;
+    [self presentViewController:vc animated:YES completion:nil];
+}
+
+- (void)showExportError:(NSError *)error
+{
+    UIAlertController *ac = [UIAlertController alertControllerWithTitle:@"Export Failed"
+                                                                message:error.localizedDescription ?: @"Could not write the plist."
+                                                         preferredStyle:UIAlertControllerStyleAlert];
+    [ac addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
+    [self presentViewController:ac animated:YES completion:nil];
+}
+
+- (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath
+{
+    [tableView deselectRowAtIndexPath:indexPath animated:YES];
+    if (indexPath.section != 2) return;
+
+    NSError *error = nil;
+    NSURL *url = nil;
+    if (indexPath.row == 0) {
+        url = [self writeSamplePlist:&error];
+    } else if (indexPath.row == 1) {
+        url = [self copyBuiltInIOS6Plist:&error];
+    } else {
+        url = [self copyAppInfoPlist:&error];
+    }
+    if (!url) {
+        [self showExportError:error];
+        return;
+    }
+
+    UITableViewCell *cell = [tableView cellForRowAtIndexPath:indexPath];
+    [self shareURL:url sourceView:cell.contentView ?: tableView];
+}
+
+@end
 
 @implementation SettingsViewController
 
@@ -3500,6 +4185,37 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
     ];
 }
 
+- (NSArray<NSDictionary *> *)themerRows
+{
+    BOOL hasSelection = settings_themer_has_selected_theme();
+    NSString *selected = settings_themer_selected_theme_display_name();
+    NSMutableArray<NSDictionary *> *rows = [NSMutableArray arrayWithArray:@[
+        @{ @"kind": @"info",
+           @"title": @"Selected Theme",
+           @"subtitle": hasSelection ? selected : @"None selected. Pick a theme before running Cyanide Themer." },
+
+        @{ @"kind": @"button",
+           @"title": [selected isEqualToString:@"iOS 6 Theme"]
+                ? @"iOS 6 Theme ✓" : @"Use iOS 6 Theme",
+           @"action": @"themer-select-ios6" },
+
+        @{ @"kind": @"button",
+           @"title": @"Import Custom Theme…",
+           @"action": @"themer-import" },
+
+        @{ @"kind": @"button",
+           @"title": @"Theme Format Guide",
+           @"action": @"themer-guide" },
+    ]];
+    if (hasSelection) {
+        [rows addObject:@{ @"kind": @"button",
+                           @"title": @"Clear Selected Theme",
+                           @"action": @"themer-clear",
+                           @"destructive": @YES }];
+    }
+    return rows;
+}
+
 + (NSArray<NSDictionary<NSString *, NSString *> *> *)settingsSummaryForSection:(NSInteger)section
 {
     NSUserDefaults *d = NSUserDefaults.standardUserDefaults;
@@ -3535,6 +4251,8 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
         [out addObject:@{@"title": @"Setup floor",        @"value": [@([d integerForKey:kSettingsNanoMinPairing])       stringValue]}];
         [out addObject:@{@"title": @"Legacy chip floor",  @"value": [@([d integerForKey:kSettingsNanoMinPairingChipID]) stringValue]}];
         [out addObject:@{@"title": @"Multi-watch switch", @"value": [@([d integerForKey:kSettingsNanoMinQuickSwitch])   stringValue]}];
+    } else if (section == SectionThemer) {
+        [out addObject:@{@"title": @"Theme", @"value": settings_themer_selected_theme_display_name()}];
     }
     return out;
 }
@@ -3548,6 +4266,7 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
         case SectionLayoutExtras: return self.layoutExtrasRows;
         case SectionOTA:       return self.otaRows;
         case SectionNanoRegistry: return self.nanoRegistryRows;
+        case SectionThemer:  return self.themerRows;
         case SectionPowercuff: return self.powercuffRows;
         case SectionStatBar:   return self.statbarRows;
         case SectionRSSI:      return self.rssiRows;
@@ -3572,6 +4291,7 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
         @{ @"title": @"Signal Display",     @"icon": @"antenna.radiowaves.left.and.right",   @"color": [UIColor systemBlueColor],   @"section": @(SectionRSSI), @"experimental": @YES },
         @{ @"title": @"Axon Lite",          @"icon": @"bell.badge.fill",                     @"color": [UIColor systemRedColor],    @"section": @(SectionAxonLite) },
         @{ @"title": @"TypeBanner",         @"icon": @"ellipsis.bubble.fill",                @"color": [UIColor systemTealColor],   @"section": @(SectionTypeBanner), @"experimental": @YES },
+        @{ @"title": @"Cyanide Themer",     @"icon": @"paintpalette.fill",                   @"color": [UIColor systemPinkColor],   @"section": @(SectionThemer), @"experimental": @YES },
         @{ @"title": @"Powercuff",          @"icon": @"bolt.slash.fill",                     @"color": [UIColor systemOrangeColor], @"section": @(SectionPowercuff) },
         @{ @"title": @"SpringBoard Tweaks", @"icon": @"apps.iphone",                         @"color": [UIColor systemIndigoColor], @"section": @(SectionDarkSwordTweaks) },
         @{ @"title": @"Home Layout Extras", @"icon": @"square.dashed.inset.filled",          @"color": [UIColor systemPurpleColor], @"section": @(SectionLayoutExtras) },
@@ -3641,6 +4361,7 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
         case RootSectionTweakBundles:   return (NSInteger)self.tweakBundleRows.count;
         case RootSectionSystemBundles:  return (NSInteger)self.systemBundleRows.count;
         case RootSectionAppIcon:        return 2;
+        case RootSectionDocs:           return 1;
         case RootSectionAbout:          return 4;
         case RootSectionExperimental:   return 1;
         case RootSectionWarning:        return 1;
@@ -3658,6 +4379,7 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
         case RootSectionTweakBundles:   return self.tweakBundleRows.count   > 0 ? @"Tweaks" : nil;
         case RootSectionSystemBundles:  return self.systemBundleRows.count  > 0 ? @"System" : nil;
         case RootSectionAppIcon:        return @"App Icon";
+        case RootSectionDocs:           return @"Docs";
         case RootSectionAbout:          return @"About";
         case RootSectionExperimental:   return @"Experimental";
         default:                        return nil;
@@ -3723,6 +4445,10 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
     }
     if (s == SectionTypeBanner) {
         return @"Partial TypeMillennium port. Detection runs against imagent using original-thread RemoteCall probes, while SpringBoard renders a prewarmed banner window.";
+    }
+    if (s == SectionThemer) {
+        return @"Pick a theme before running Cyanide Themer.\n\n"
+               @"Custom themes can be a folder of PNG files named by bundle ID, such as com.apple.mobilesafari.png, or a binary plist mapping bundle IDs to PNG data. Import copies the theme into Cyanide's Documents/Themes folder. Theme Format Guide includes examples and plist exports.";
     }
     return nil;
 }
@@ -3843,6 +4569,23 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
     if (url) [[UIApplication sharedApplication] openURL:url options:@{} completionHandler:nil];
 }
 
+- (UITableViewCell *)buildDocsCellInTableView:(UITableView *)tableView
+{
+    UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"docs"];
+    if (!cell) {
+        cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:@"docs"];
+    }
+    cell.imageView.image = [SettingsViewController iconBadgeWithSymbol:@"book.closed.fill" color:UIColor.systemPurpleColor size:29.0];
+    cell.textLabel.font = [UIFont systemFontOfSize:17.0];
+    cell.textLabel.textColor = UIColor.labelColor;
+    cell.textLabel.text = @"Tweak SDK";
+    cell.detailTextLabel.textColor = UIColor.secondaryLabelColor;
+    cell.detailTextLabel.text = @"How to write Cyanide tweaks";
+    cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+    cell.selectionStyle = UITableViewCellSelectionStyleDefault;
+    return cell;
+}
+
 - (UITableViewCell *)buildAboutCellAtRow:(NSInteger)row tableView:(UITableView *)tableView
 {
     UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"about"];
@@ -3881,6 +4624,172 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
 
 - (void)logUploadSwitchChanged:(UISwitch *)sw {
     [[NSUserDefaults standardUserDefaults] setBool:sw.isOn forKey:kSettingsLogUploadEnabled];
+}
+
+- (void)reloadThemerSectionAndQueue
+{
+    settings_mark_tweak_applied(kSettingsThemerEnabled, NO);
+    settings_notify_package_queue_changed_async();
+    if (self.detailMode && self.underlyingSection == SectionThemer) {
+        [self.tableView reloadSections:[NSIndexSet indexSetWithIndex:0]
+                      withRowAnimation:UITableViewRowAnimationAutomatic];
+    } else {
+        [self.tableView reloadData];
+    }
+}
+
+- (void)selectBuiltInIOS6Theme
+{
+    NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
+    [d setObject:kThemerThemeBuiltinIOS6 forKey:kSettingsThemerThemeID];
+    [d synchronize];
+    log_user("[THEMER] Selected iOS 6 Theme.\n");
+    [self reloadThemerSectionAndQueue];
+}
+
+- (void)clearSelectedTheme
+{
+    NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
+    [d setObject:kThemerThemeNone forKey:kSettingsThemerThemeID];
+    [d setObject:@"" forKey:kSettingsThemerCustomThemePath];
+    [d setObject:@"" forKey:kSettingsThemerCustomThemeName];
+    if ([d boolForKey:kSettingsThemerEnabled]) {
+        [d setBool:NO forKey:kSettingsThemerEnabled];
+        g_themer_live_stop_requested = 1;
+    }
+    [d synchronize];
+    log_user("[THEMER] Cleared selected theme; Cyanide Themer is no longer queued.\n");
+    [self reloadThemerSectionAndQueue];
+}
+
+- (void)presentThemerFormatGuide
+{
+    ThemerFormatGuideViewController *vc =
+        [[ThemerFormatGuideViewController alloc] initWithStyle:UITableViewStyleInsetGrouped];
+    if (self.navigationController) {
+        [self.navigationController pushViewController:vc animated:YES];
+        return;
+    }
+
+    UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:vc];
+    vc.navigationItem.leftBarButtonItem =
+        [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemDone
+                                                      target:vc
+                                                      action:@selector(dismissGuide)];
+    [self presentViewController:nav animated:YES completion:nil];
+}
+
+- (void)presentThemerImporter
+{
+    UIDocumentPickerViewController *picker =
+        [[UIDocumentPickerViewController alloc] initForOpeningContentTypes:@[UTTypeFolder, UTTypePropertyList]
+                                                                    asCopy:YES];
+    picker.delegate = self;
+    picker.allowsMultipleSelection = NO;
+    [self presentViewController:picker animated:YES completion:nil];
+}
+
+- (BOOL)importThemerFolderAtURL:(NSURL *)url error:(NSError **)error
+{
+    NSFileManager *fm = [NSFileManager defaultManager];
+    NSString *target = settings_themer_imported_theme_dir();
+    NSString *root = settings_themer_documents_theme_root();
+    if (!target || !root) return NO;
+
+    [fm createDirectoryAtPath:root withIntermediateDirectories:YES attributes:nil error:error];
+    if (error && *error) return NO;
+
+    NSArray<NSURL *> *files = [fm contentsOfDirectoryAtURL:url
+                                includingPropertiesForKeys:nil
+                                                   options:0
+                                                     error:error];
+    if (!files) return NO;
+
+    NSMutableArray<NSURL *> *pngs = [NSMutableArray array];
+    for (NSURL *file in files) {
+        if ([file.pathExtension.lowercaseString isEqualToString:@"png"]) {
+            [pngs addObject:file];
+        }
+    }
+    if (pngs.count == 0) return NO;
+
+    [fm removeItemAtPath:target error:nil];
+    [fm createDirectoryAtPath:target withIntermediateDirectories:YES attributes:nil error:error];
+    if (error && *error) return NO;
+    [fm removeItemAtPath:settings_themer_imported_plist_path() error:nil];
+
+    for (NSURL *png in pngs) {
+        NSString *dst = [target stringByAppendingPathComponent:png.lastPathComponent];
+        if (![fm copyItemAtURL:png toURL:[NSURL fileURLWithPath:dst] error:error]) {
+            return NO;
+        }
+    }
+
+    NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
+    [d setObject:kThemerThemeCustom forKey:kSettingsThemerThemeID];
+    [d setObject:target forKey:kSettingsThemerCustomThemePath];
+    [d setObject:url.lastPathComponent.length ? url.lastPathComponent : @"Imported Theme"
+          forKey:kSettingsThemerCustomThemeName];
+    [d synchronize];
+    log_user("[THEMER] Imported custom folder theme: %lu PNG file(s).\n",
+             (unsigned long)pngs.count);
+    return YES;
+}
+
+- (BOOL)importThemerPlistAtURL:(NSURL *)url error:(NSError **)error
+{
+    NSDictionary *dict = settings_themer_load_plist_theme(url.path);
+    if (dict.count == 0) return NO;
+
+    NSFileManager *fm = [NSFileManager defaultManager];
+    NSString *root = settings_themer_documents_theme_root();
+    NSString *target = settings_themer_imported_plist_path();
+    if (!root || !target) return NO;
+    [fm createDirectoryAtPath:root withIntermediateDirectories:YES attributes:nil error:error];
+    if (error && *error) return NO;
+    [fm removeItemAtPath:target error:nil];
+    [fm removeItemAtPath:settings_themer_imported_theme_dir() error:nil];
+    if (![fm copyItemAtURL:url toURL:[NSURL fileURLWithPath:target] error:error]) {
+        return NO;
+    }
+
+    NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
+    [d setObject:kThemerThemeCustom forKey:kSettingsThemerThemeID];
+    [d setObject:target forKey:kSettingsThemerCustomThemePath];
+    [d setObject:url.lastPathComponent.length ? url.lastPathComponent : @"Imported Theme"
+          forKey:kSettingsThemerCustomThemeName];
+    [d synchronize];
+    log_user("[THEMER] Imported custom plist theme: %lu icon entries.\n",
+             (unsigned long)dict.count);
+    return YES;
+}
+
+- (void)documentPicker:(UIDocumentPickerViewController *)controller
+didPickDocumentsAtURLs:(NSArray<NSURL *> *)urls
+{
+    (void)controller;
+    NSURL *url = urls.firstObject;
+    if (!url) return;
+
+    BOOL scoped = [url startAccessingSecurityScopedResource];
+    NSError *err = nil;
+    BOOL isDir = NO;
+    [[NSFileManager defaultManager] fileExistsAtPath:url.path isDirectory:&isDir];
+    BOOL ok = isDir ? [self importThemerFolderAtURL:url error:&err]
+                    : [self importThemerPlistAtURL:url error:&err];
+    if (scoped) [url stopAccessingSecurityScopedResource];
+
+    if (!ok) {
+        NSString *msg = err.localizedDescription ?: @"Choose a folder of bundleID.png files or a binary plist mapping bundle IDs to PNG data.";
+        UIAlertController *ac = [UIAlertController alertControllerWithTitle:@"Theme Import Failed"
+                                                                     message:msg
+                                                              preferredStyle:UIAlertControllerStyleAlert];
+        [ac addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
+        [self presentViewController:ac animated:YES completion:nil];
+        return;
+    }
+
+    [self reloadThemerSectionAndQueue];
 }
 
 // "Classic" alternate icon is registered in Info.plist with CFBundleIconFiles
@@ -4097,6 +5006,12 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
         settings_mark_tweak_applied(kSettingsRSSIDisplayEnabled, NO);
         settings_notify_package_queue_changed_async();
         settings_schedule_live_apply_for_key(kSettingsRSSIDisplayEnabled);
+    }
+    if ([d boolForKey:kSettingsThemerEnabled]) {
+        [d setBool:NO forKey:kSettingsThemerEnabled];
+        g_themer_live_stop_requested = 1;
+        settings_mark_tweak_applied(kSettingsThemerEnabled, NO);
+        settings_notify_package_queue_changed_async();
     }
 
     [self reloadAfterExperimentalChange];
@@ -4417,6 +5332,8 @@ void cyanide_present_contact(UIViewController *host)
                 return [self buildBundleCellWithRow:self.systemBundleRows[indexPath.row] tableView:tableView];
             case RootSectionAppIcon:
                 return [self buildAppIconCellAtRow:indexPath.row tableView:tableView];
+            case RootSectionDocs:
+                return [self buildDocsCellInTableView:tableView];
             case RootSectionAbout:
                 return [self buildAboutCellAtRow:indexPath.row tableView:tableView];
             case RootSectionExperimental:
@@ -4568,8 +5485,29 @@ void cyanide_present_contact(UIViewController *host)
     NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
     BOOL supported = settings_device_supported();
 
+    if ([kind isEqualToString:@"info"]) {
+        UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"info"];
+        if (!cell) {
+            cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:@"info"];
+            cell.detailTextLabel.numberOfLines = 0;
+        }
+        cell.selectionStyle = UITableViewCellSelectionStyleNone;
+        cell.userInteractionEnabled = NO;
+        cell.accessoryView = nil;
+        cell.accessoryType = UITableViewCellAccessoryNone;
+        cell.textLabel.text = row[@"title"];
+        cell.textLabel.textColor = UIColor.labelColor;
+        cell.textLabel.font = [UIFont systemFontOfSize:16.0 weight:UIFontWeightSemibold];
+        cell.detailTextLabel.text = row[@"subtitle"];
+        cell.detailTextLabel.textColor = UIColor.secondaryLabelColor;
+        cell.detailTextLabel.font = [UIFont systemFontOfSize:13.0];
+        return cell;
+    }
+
     if ([kind isEqualToString:@"button"]) {
-        BOOL rowSupported = supported || indexPath.section == SectionOTA;
+        BOOL rowSupported = supported ||
+                            indexPath.section == SectionOTA ||
+                            indexPath.section == SectionThemer;
         NSString *action = row[@"action"];
         if (indexPath.section == SectionNanoRegistry &&
             [action isEqualToString:@"nano-load"]) {
@@ -4897,6 +5835,12 @@ void cyanide_present_contact(UIViewController *host)
             case RootSectionAppIcon:
                 [self selectAppIconAtRow:indexPath.row inTableView:tableView];
                 return;
+            case RootSectionDocs: {
+                [tableView deselectRowAtIndexPath:indexPath animated:YES];
+                DocsViewController *docs = [[DocsViewController alloc] initWithStyle:UITableViewStyleInsetGrouped];
+                [self.navigationController pushViewController:docs animated:YES];
+                return;
+            }
             case RootSectionAbout:
                 if (indexPath.row == 0)      [self openTwitter];
                 else if (indexPath.row == 1) [self openViewLog];
@@ -4922,7 +5866,8 @@ void cyanide_present_contact(UIViewController *host)
 
     if (!settings_device_supported() &&
         indexPath.section != SectionWarning &&
-        indexPath.section != SectionOTA) {
+        indexPath.section != SectionOTA &&
+        indexPath.section != SectionThemer) {
         printf("[SETTINGS] tap blocked: %s\n", settings_unsupported_message().UTF8String);
         return;
     }
@@ -5233,6 +6178,22 @@ void cyanide_present_contact(UIViewController *host)
                     });
                 }
             });
+        }
+        return;
+    }
+
+    if (indexPath.section == SectionThemer) {
+        NSDictionary *row = [self rowsForSection:indexPath.section][indexPath.row];
+        if (![row[@"kind"] isEqualToString:@"button"]) return;
+        NSString *action = row[@"action"];
+        if ([action isEqualToString:@"themer-select-ios6"]) {
+            [self selectBuiltInIOS6Theme];
+        } else if ([action isEqualToString:@"themer-import"]) {
+            [self presentThemerImporter];
+        } else if ([action isEqualToString:@"themer-guide"]) {
+            [self presentThemerFormatGuide];
+        } else if ([action isEqualToString:@"themer-clear"]) {
+            [self clearSelectedTheme];
         }
         return;
     }

@@ -57,6 +57,11 @@ uint64_t r_dlsym_call(int timeout, const char *fnName,
                       uint64_t a0, uint64_t a1, uint64_t a2, uint64_t a3,
                       uint64_t a4, uint64_t a5, uint64_t a6, uint64_t a7);
 
+// Copies the UTF-8 bytes of a remote NSString into a local C buffer (NUL
+// terminated, truncated to outLen-1). Returns true only if at least one
+// byte was copied.
+bool     r_read_nsstring(uint64_t str, char *out, size_t outLen);
+
 #ifdef __OBJC__
 uint64_t r_session_alloc_str(RemoteCallSession *session, const char *s);
 void     r_session_free(RemoteCallSession *session, uint64_t ptr);

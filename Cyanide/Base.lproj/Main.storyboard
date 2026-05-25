@@ -21,7 +21,7 @@
                     </tabBar>
                     <connections>
                         <segue destination="InsNv001" kind="relationship" relationship="viewControllers" id="InsSg001"/>
-                        <segue destination="DocNv001" kind="relationship" relationship="viewControllers" id="DocSg001"/>
+                        <segue destination="LogNv001" kind="relationship" relationship="viewControllers" id="LogSg001"/>
                         <segue destination="8yM-QB-lo1" kind="relationship" relationship="viewControllers" id="gfn-Ak-FfH"/>
                     </connections>
                 </tabBarController>
@@ -95,42 +95,43 @@
             </objects>
             <point key="canvasLocation" x="8909" y="-750"/>
         </scene>
-        <!--Docs-->
-        <scene sceneID="DocScNav">
+        <!--Log-->
+        <scene sceneID="LogScNav">
             <objects>
-                <navigationController id="DocNv001" userLabel="Docs" sceneMemberID="viewController">
-                    <tabBarItem key="tabBarItem" title="Docs" image="book.closed" catalog="system" id="DocTb001"/>
-                    <navigationBar key="navigationBar" contentMode="scaleToFill" barStyle="black" id="DocNb001">
+                <navigationController id="LogNv001" userLabel="Log" sceneMemberID="viewController">
+                    <tabBarItem key="tabBarItem" title="Log" image="terminal" catalog="system" id="LogTb001"/>
+                    <navigationBar key="navigationBar" contentMode="scaleToFill" barStyle="black" id="LogNb001">
                         <rect key="frame" x="0.0" y="118" width="393" height="54"/>
                         <autoresizingMask key="autoresizingMask"/>
                     </navigationBar>
                     <connections>
-                        <segue destination="DocTv001" kind="relationship" relationship="rootViewController" id="DocSg002"/>
+                        <segue destination="LogVc001" kind="relationship" relationship="rootViewController" id="LogSg002"/>
                     </connections>
                 </navigationController>
-                <placeholder placeholderIdentifier="IBFirstResponder" id="DocFr001" userLabel="First Responder" customClass="UIResponder" sceneMemberID="firstResponder"/>
+                <placeholder placeholderIdentifier="IBFirstResponder" id="LogFr001" userLabel="First Responder" customClass="UIResponder" sceneMemberID="firstResponder"/>
             </objects>
-            <point key="canvasLocation" x="8079" y="-570"/>
+            <point key="canvasLocation" x="8079" y="-220"/>
         </scene>
-        <!--Docs-->
-        <scene sceneID="DocScTv">
+        <!--Log-->
+        <scene sceneID="LogScVc">
             <objects>
-                <tableViewController id="DocTv001" customClass="DocsViewController" sceneMemberID="viewController">
-                    <tableView key="view" clipsSubviews="YES" contentMode="scaleToFill" alwaysBounceVertical="YES" dataMode="prototypes" style="insetGrouped" separatorStyle="default" rowHeight="-1" sectionHeaderHeight="-1" sectionFooterHeight="-1" id="DocTbl001">
+                <viewController id="LogVc001" customClass="LogViewController" sceneMemberID="viewController">
+                    <view key="view" contentMode="scaleToFill" id="LogVw001">
                         <rect key="frame" x="0.0" y="0.0" width="393" height="852"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
-                        <color key="backgroundColor" systemColor="systemGroupedBackgroundColor"/>
-                    </tableView>
-                    <navigationItem key="navigationItem" title="Docs" id="DocNi001"/>
-                </tableViewController>
-                <placeholder placeholderIdentifier="IBFirstResponder" id="DocFr002" userLabel="First Responder" customClass="UIResponder" sceneMemberID="firstResponder"/>
+                        <color key="backgroundColor" red="0.02" green="0.05" blue="0.06" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+                        <viewLayoutGuide key="safeArea" id="LogSa001"/>
+                    </view>
+                    <navigationItem key="navigationItem" title="Log" id="LogNi001"/>
+                </viewController>
+                <placeholder placeholderIdentifier="IBFirstResponder" id="LogFr002" userLabel="First Responder" customClass="UIResponder" sceneMemberID="firstResponder"/>
             </objects>
-            <point key="canvasLocation" x="8909" y="-570"/>
+            <point key="canvasLocation" x="8909" y="-220"/>
         </scene>
     </scenes>
     <resources>
-        <image name="book.closed" catalog="system" width="128" height="100"/>
         <image name="gear" catalog="system" width="128" height="122"/>
         <image name="shippingbox.fill" catalog="system" width="128" height="113"/>
+        <image name="terminal" catalog="system" width="128" height="106"/>
     </resources>
 </document>

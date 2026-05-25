@@ -17,6 +17,7 @@ static const NSInteger kSecRSSI         = 6;
 static const NSInteger kSecPowercuff    = 9;
 static const NSInteger kSecLayoutExtras = 11;
 static const NSInteger kSecNanoRegistry = 12;
+static const NSInteger kSecThemer       = 13;
 
 + (NSArray<Package *> *)allPackages
 {
@@ -105,7 +106,7 @@ static const NSInteger kSecNanoRegistry = 12;
                                            kind:PackageInstallKindToggle
                                      enabledKey:kSettingsAxonLiteEnabled
                                           isNew:YES];
-        axon.unstableWarning = @"Heavily buggy work-in-progress. Expect SpringBoard crashes, dropped notifications, layout glitches, and breakage between Cyanide builds. Don't rely on it for anything important.";
+        axon.unstableWarning = @"⚠️ Experimental: work-in-progress. Expect SpringBoard crashes, dropped notifications, layout glitches, and breakage between Cyanide builds. Don't rely on it for anything important.";
 
         Package *typeBanner = [[Package alloc] initWithIdentifier:@"com.darksword.typebanner"
                                            name:@"TypeBanner"
@@ -120,6 +121,21 @@ static const NSInteger kSecNanoRegistry = 12;
                                           isNew:YES];
         typeBanner.experimental = YES;
         typeBanner.unstableWarning = @"⚠️ Experimental: extremely unstable and risky. Polls MobileSMS over RemoteCall every ~1.5s, opens SpringBoard sessions on state change, and is known to crash SpringBoard. Detection only fires while Messages.app is running. Battery cost is non-trivial.";
+
+        Package *themer = [[Package alloc] initWithIdentifier:@"com.darksword.themer"
+                                           name:@"Cyanide Themer"
+                               shortDescription:@"Per-bundle icon theme engine"
+                                longDescription:@"Replaces stock app icons by walking SpringBoard's SBIconView hierarchy and swapping each icon's image with a PNG matched on the app's bundle identifier.\n\nPick a theme in Settings > Cyanide Themer. Cyanide ships with iOS 6 Theme, using icons from zagnut531/iOS-6-Icons: https://github.com/zagnut531/iOS-6-Icons. You can also import a custom folder of <bundleID>.png files or a binary plist mapping bundle IDs to PNG data.\n\nApplied at Run; not persisted across respring. The current build also seeds SpringBoard's icon cache and rounds imported PNGs before upload so icons survive common home-screen relayouts more cleanly."
+                                        version:version
+                                         author:@"zeroxjf"
+                                       category:@"Experimental"
+                                     symbolName:@"paintpalette.fill"
+                                          kind:PackageInstallKindToggle
+                                     enabledKey:kSettingsThemerEnabled
+                                          isNew:YES];
+        themer.experimental = YES;
+        themer.settingsSection = kSecThemer;
+        themer.unstableWarning = @"⚠️ Experimental: icon theming is still in development. Pick a theme in Settings > Cyanide Themer; RemoteCall-backed changes may need re-applying after a respring or SpringBoard restart.";
 
         Package *layoutExtras = [[Package alloc] initWithIdentifier:@"com.darksword.layoutextras"
                                            name:@"Home Layout Extras"
@@ -230,6 +246,7 @@ static const NSInteger kSecNanoRegistry = 12;
             axon,
             nanoRegistry,
             typeBanner,
+            themer,
         ];
     });
     return list;

@@ -41,7 +41,7 @@
     UITabBarController *tab = (UITabBarController *)self.window.rootViewController;
     if (![tab isKindOfClass:UITabBarController.class] || tab.viewControllers.count == 0) return;
     self.didSelectInitialTab = YES;
-    tab.selectedIndex = 0; // Installer tab (no Log tab anymore)
+    tab.selectedIndex = 0; // Installer tab
 }
 
 

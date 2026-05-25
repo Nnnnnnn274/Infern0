@@ -25,6 +25,13 @@ static NSString * const kTipsExpandedDefault    = @"installer.tipsExpanded";
 
 @implementation PackagesViewController
 
+- (BOOL)packageNeedsThemeBeforeInstall:(Package *)pkg
+{
+    return [pkg.identifier isEqualToString:@"com.darksword.themer"] &&
+           !pkg.isInstalled &&
+           !settings_themer_has_selected_theme();
+}
+
 - (void)viewDidLoad
 {
     [super viewDidLoad];
@@ -563,7 +570,7 @@ static NSString * const kTipsExpandedDefault    = @"installer.tipsExpanded";
                         textColor:[UIColor systemGreenColor]];
     }
     if (pkg.isInstallDisabled) {
-        return [self pillWithText:@"BUGGY"
+        return [self pillWithText:@"DISABLED"
                        background:[[UIColor systemRedColor] colorWithAlphaComponent:0.16]
                         textColor:[UIColor systemRedColor]];
     }
@@ -684,6 +691,10 @@ static NSString * const kTipsExpandedDefault    = @"installer.tipsExpanded";
         title  = @"Uninstall";
         color  = [UIColor systemRedColor];
         symbol = @"trash";
+    } else if ([self packageNeedsThemeBeforeInstall:pkg]) {
+        title  = @"Select Theme";
+        color  = self.view.tintColor;
+        symbol = @"paintpalette";
     } else {
         title  = @"Queue";
         color  = self.view.tintColor;
@@ -700,6 +711,11 @@ static NSString * const kTipsExpandedDefault    = @"installer.tipsExpanded";
             [self presentConfigureAlertForPackage:pkg];
             return;
         }
+        if (isInstall && [self packageNeedsThemeBeforeInstall:pkg]) {
+            done(YES);
+            [self presentThemeRequiredAlertForPackage:pkg];
+            return;
+        }
         [q toggleForPackage:pkg];
         done(YES);
     }];
@@ -709,6 +725,47 @@ static NSString * const kTipsExpandedDefault    = @"installer.tipsExpanded";
     UISwipeActionsConfiguration *cfg = [UISwipeActionsConfiguration configurationWithActions:@[action]];
     cfg.performsFirstActionWithFullSwipe = YES;
     return cfg;
+}
+
+- (void)presentThemeRequiredAlertForPackage:(Package *)pkg
+{
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Select a Theme"
+                                                                   message:@"Cyanide Themer needs a selected theme before it can be queued. Choose iOS 6 Theme or import a custom theme first."
+                                                            preferredStyle:UIAlertControllerStyleAlert];
+    [alert addAction:[UIAlertAction actionWithTitle:@"Open Theme Settings"
+                                             style:UIAlertActionStyleDefault
+                                           handler:^(UIAlertAction *_) {
+        [self navigateToSettingsSectionForPackage:pkg];
+    }]];
+    [alert addAction:[UIAlertAction actionWithTitle:@"Cancel"
+                                             style:UIAlertActionStyleCancel
+                                           handler:nil]];
+    [self presentViewController:alert animated:YES completion:nil];
+}
+
+- (void)navigateToSettingsSectionForPackage:(Package *)pkg
+{
+    UITabBarController *tab = self.tabBarController;
+    NSUInteger settingsIndex = NSNotFound;
+    UINavigationController *settingsNav = nil;
+    for (NSUInteger i = 0; i < tab.viewControllers.count; i++) {
+        UIViewController *vc = tab.viewControllers[i];
+        if ([vc.tabBarItem.title isEqualToString:@"Settings"]) {
+            settingsIndex = i;
+            if ([vc isKindOfClass:UINavigationController.class]) {
+                settingsNav = (UINavigationController *)vc;
+            }
+            break;
+        }
+    }
+    if (settingsIndex == NSNotFound || !settingsNav) return;
+
+    [settingsNav popToRootViewControllerAnimated:NO];
+    SettingsViewController *bundle = [[SettingsViewController alloc] initWithUnderlyingSection:pkg.settingsSection
+                                                                                   bundleTitle:pkg.name];
+    bundle.installerReturnPackageName = pkg.name;
+    [settingsNav pushViewController:bundle animated:NO];
+    tab.selectedIndex = settingsIndex;
 }
 
 - (void)presentConfigureAlertForPackage:(Package *)pkg

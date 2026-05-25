@@ -48,6 +48,11 @@ extern NSString * const kSettingsAxonLiteEnabled;
 
 extern NSString * const kSettingsTypeBannerEnabled;
 
+extern NSString * const kSettingsThemerEnabled;
+extern NSString * const kSettingsThemerThemeID;
+extern NSString * const kSettingsThemerCustomThemePath;
+extern NSString * const kSettingsThemerCustomThemeName;
+
 extern NSString * const kSettingsExperimentalTweaksEnabled;
 
 extern NSString * const kSettingsLogUploadEnabled;
@@ -66,6 +71,8 @@ BOOL settings_device_supported(void);
 // inline. Presented from `host`.
 void cyanide_present_contact(UIViewController *host);
 BOOL settings_apply_ota_disabled(BOOL disabled);
+BOOL settings_themer_has_selected_theme(void);
+NSString *settings_themer_selected_theme_display_name(void);
 
 // Synchronously runs kexploit and writes/clears the NanoRegistry pairing-
 // compatibility override using the four numbers currently in NSUserDefaults

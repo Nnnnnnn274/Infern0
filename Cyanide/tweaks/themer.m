@@ -1,0 +1,1925 @@
+//
+//  themer.m
+//  RemoteCall-only icon theming. Per-bundle PNG swap on every SBIconView.
+//
+
+#import "themer.h"
+#import "remote_objc.h"
+#import "sb_walk.h"
+#import "../TaskRop/RemoteCall.h"
+#import "../LogTextView.h"
+
+#import <Foundation/Foundation.h>
+#import <UIKit/UIKit.h>
+#import <stdio.h>
+#import <string.h>
+#import <time.h>
+
+typedef struct {
+    char bundle[128];
+    uint64_t image;      // retained SB UIImage*
+    uint64_t dataSource; // retained SB helper from earlier model experiments
+    bool iconServicesSeeded;
+} ThemerEntry;
+
+static const int    kThemerMaxCache    = 128;
+static const size_t kThemerMaxPngBytes = 1 << 18;   // 256 KB hard cap per icon
+static const uint32_t kThemerApplySettleUS = 0;
+static const bool kThemerDetailedIconLogs = false;
+
+// Debug focus: when non-empty, only apply to this single bundle. Keeps the
+// log readable while we figure out which iOS 26 render path actually sticks.
+// Set to "" or NULL to re-enable the full theme.
+static const char *kThemerFocusBundle = "";
+
+static ThemerEntry gThemerCache[kThemerMaxCache];
+static int         gThemerCacheCount = 0;
+static int         gThemerLogBudget  = 48;
+static bool        gThemerModelProbeLogged = false;
+static bool        gThemerIconServicesProbeLogged = false;
+
+// -1 unprobed, 0 nothing works, 1/2/3/4 chosen rung.
+static int  gThemerRung              = -1;
+static bool gThemerHasUpdateAfter    = false;
+static bool gThemerHasUpdateImageView = false;
+
+static uint64_t themer_now_us(void)
+{
+    struct timespec ts = {0};
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return ((uint64_t)ts.tv_sec * 1000000ULL) + ((uint64_t)ts.tv_nsec / 1000ULL);
+}
+
+static uint64_t themer_lookup_cached(const char *bundle)
+{
+    if (!bundle || !bundle[0]) return 0;
+    for (int i = 0; i < gThemerCacheCount; i++) {
+        if (strcmp(gThemerCache[i].bundle, bundle) == 0) {
+            return gThemerCache[i].image;
+        }
+    }
+    return 0;
+}
+
+static ThemerEntry *themer_lookup_entry(const char *bundle)
+{
+    if (!bundle || !bundle[0]) return NULL;
+    for (int i = 0; i < gThemerCacheCount; i++) {
+        if (strcmp(gThemerCache[i].bundle, bundle) == 0) {
+            return &gThemerCache[i];
+        }
+    }
+    return NULL;
+}
+
+// Membership test: is `image` one of the remote UIImage pointers we've already
+// installed? Used by the live loop to skip views that still show our override —
+// no bundle-read or msgSend storm needed for stable state.
+static bool themer_image_is_ours(uint64_t image)
+{
+    if (!image) return false;
+    for (int i = 0; i < gThemerCacheCount; i++) {
+        if (gThemerCache[i].image == image) return true;
+    }
+    return false;
+}
+
+static void themer_cache_image(const char *bundle, uint64_t image)
+{
+    if (!bundle || !bundle[0] || !r_is_objc_ptr(image)) return;
+    if (gThemerCacheCount >= kThemerMaxCache) return;
+    ThemerEntry *e = &gThemerCache[gThemerCacheCount++];
+    snprintf(e->bundle, sizeof(e->bundle), "%s", bundle);
+    e->image = image;
+    e->dataSource = 0;
+    e->iconServicesSeeded = false;
+}
+
+// Read a remote ObjC object's class name into a local C buffer.
+static void themer_read_class_name(uint64_t obj, char *out, size_t outLen)
+{
+    if (!out || outLen == 0) return;
+    out[0] = '\0';
+    if (!r_is_objc_ptr(obj)) return;
+    uint64_t cls = r_dlsym_call(R_TIMEOUT, "object_getClass", obj, 0, 0, 0, 0, 0, 0, 0);
+    if (!r_is_objc_ptr(cls)) return;
+    uint64_t name = r_dlsym_call(R_TIMEOUT, "class_getName", cls, 0, 0, 0, 0, 0, 0, 0);
+    if (!name) return;
+    uint64_t heap = r_dlsym_call(R_TIMEOUT, "strdup", name, 0, 0, 0, 0, 0, 0, 0);
+    if (!heap) return;
+    if (remote_read(heap, out, outLen - 1)) out[outLen - 1] = '\0';
+    r_free(heap);
+}
+
+static void themer_read_class_object_name(uint64_t cls, char *out, size_t outLen)
+{
+    if (!out || outLen == 0) return;
+    out[0] = '\0';
+    if (!r_is_objc_ptr(cls)) return;
+    uint64_t name = r_dlsym_call(R_TIMEOUT, "class_getName",
+                                 cls, 0, 0, 0, 0, 0, 0, 0);
+    if (!name) return;
+    uint64_t heap = r_dlsym_call(R_TIMEOUT, "strdup",
+                                 name, 0, 0, 0, 0, 0, 0, 0);
+    if (!heap) return;
+    if (remote_read(heap, out, outLen - 1)) out[outLen - 1] = '\0';
+    r_free(heap);
+}
+
+static uint64_t themer_lookup_class(const char *name)
+{
+    if (!name || !name[0]) return 0;
+    uint64_t s = r_alloc_str(name);
+    if (!s) return 0;
+    uint64_t cls = r_dlsym_call(R_TIMEOUT, "objc_lookUpClass",
+                                s, 0, 0, 0, 0, 0, 0, 0);
+    r_free(s);
+    return cls;
+}
+
+static uint64_t themer_method_imp(uint64_t cls, const char *selName)
+{
+    if (!r_is_objc_ptr(cls) || !selName) return 0;
+    uint64_t sel = r_sel(selName);
+    if (!sel) return 0;
+    uint64_t method = r_dlsym_call(R_TIMEOUT, "class_getInstanceMethod",
+                                   cls, sel, 0, 0, 0, 0, 0, 0);
+    if (!method) return 0;
+    return r_dlsym_call(R_TIMEOUT, "method_getImplementation",
+                        method, 0, 0, 0, 0, 0, 0, 0);
+}
+
+static bool themer_add_method(uint64_t cls, const char *selName,
+                              uint64_t imp, const char *types)
+{
+    if (!r_is_objc_ptr(cls) || !selName || !imp || !types) return false;
+    uint64_t sel = r_sel(selName);
+    uint64_t typeStr = r_alloc_str(types);
+    if (!sel || !typeStr) {
+        if (typeStr) r_free(typeStr);
+        return false;
+    }
+    uint64_t ok = r_dlsym_call(R_TIMEOUT, "class_addMethod",
+                               cls, sel, imp, typeStr, 0, 0, 0, 0);
+    r_free(typeStr);
+    return (ok & 0xff) != 0;
+}
+
+static bool themer_add_methods(uint64_t cls, const char **sels, int count,
+                               uint64_t imp, const char *types)
+{
+    if (!r_is_objc_ptr(cls) || !sels || count <= 0 || !imp || !types) return false;
+    bool ok = true;
+    for (int i = 0; i < count; i++) {
+        ok = themer_add_method(cls, sels[i], imp, types) && ok;
+    }
+    return ok;
+}
+
+static uint64_t themer_remote_symbol_addr(const char *name)
+{
+    if (!name || !name[0]) return 0;
+    uint64_t remoteName = r_alloc_str(name);
+    if (!remoteName) return 0;
+    uint64_t sym = r_dlsym_call(R_TIMEOUT, "dlsym",
+                                (uint64_t)-2, remoteName, 0, 0, 0, 0, 0, 0);
+    r_free(remoteName);
+    return sym;
+}
+
+static bool themer_ensure_iconservices_loaded(void)
+{
+    if (r_is_objc_ptr(themer_lookup_class("ISBundleIdentifierIcon")) &&
+        r_is_objc_ptr(themer_lookup_class("ISImageDescriptor")) &&
+        r_is_objc_ptr(themer_lookup_class("ISIconManager")) &&
+        r_is_objc_ptr(themer_lookup_class("IFImage"))) {
+        return true;
+    }
+
+    uint64_t foundationPath = r_alloc_str("/System/Library/PrivateFrameworks/IconFoundation.framework/IconFoundation");
+    if (foundationPath) {
+        r_dlsym_call(R_TIMEOUT, "dlopen", foundationPath, 1, 0, 0, 0, 0, 0, 0);
+        r_free(foundationPath);
+    }
+
+    uint64_t path = r_alloc_str("/System/Library/PrivateFrameworks/IconServices.framework/IconServices");
+    if (!path) return false;
+    uint64_t handle = r_dlsym_call(R_TIMEOUT, "dlopen", path, 1, 0, 0, 0, 0, 0, 0);
+    r_free(path);
+    (void)handle;
+
+    return r_is_objc_ptr(themer_lookup_class("ISBundleIdentifierIcon")) &&
+           r_is_objc_ptr(themer_lookup_class("ISImageDescriptor")) &&
+           r_is_objc_ptr(themer_lookup_class("ISIconManager")) &&
+           r_is_objc_ptr(themer_lookup_class("IFImage"));
+}
+
+static NSData *themer_rounded_png_data(NSData *bytes, const char *label)
+{
+    if (!bytes || bytes.length == 0 || bytes.length > kThemerMaxPngBytes) return bytes;
+
+    @autoreleasepool {
+        UIImage *src = [UIImage imageWithData:bytes];
+        CGImageRef cg = src.CGImage;
+        if (!src || !cg) return bytes;
+
+        size_t width = CGImageGetWidth(cg);
+        size_t height = CGImageGetHeight(cg);
+        if (width < 2 || height < 2) return bytes;
+
+        CGSize size = CGSizeMake((CGFloat)width, (CGFloat)height);
+        UIGraphicsImageRendererFormat *format = [UIGraphicsImageRendererFormat defaultFormat];
+        format.scale = 1.0;
+        format.opaque = NO;
+
+        CGFloat radius = (CGFloat)MIN(width, height) * 0.225;
+        UIGraphicsImageRenderer *renderer =
+            [[UIGraphicsImageRenderer alloc] initWithSize:size format:format];
+        UIImage *rounded = [renderer imageWithActions:^(UIGraphicsImageRendererContext *ctx) {
+            (void)ctx;
+            CGRect rect = CGRectMake(0, 0, size.width, size.height);
+            [[UIBezierPath bezierPathWithRoundedRect:rect cornerRadius:radius] addClip];
+            [src drawInRect:rect];
+        }];
+
+        NSData *out = UIImagePNGRepresentation(rounded);
+        if (out.length > 0 && out.length <= kThemerMaxPngBytes) return out;
+
+        if (out.length > kThemerMaxPngBytes) {
+            printf("[THEMER] rounded PNG too large bundle=%s rounded=%lu original=%lu cap=%zu\n",
+                   label ?: "?",
+                   (unsigned long)out.length,
+                   (unsigned long)bytes.length,
+                   kThemerMaxPngBytes);
+        }
+        return bytes;
+    }
+}
+
+static double themer_screen_scale(void)
+{
+    double scale = 3.0;
+    uint64_t UIScreen = r_class("UIScreen");
+    uint64_t screen = r_is_objc_ptr(UIScreen)
+        ? r_msg2(UIScreen, "mainScreen", 0, 0, 0, 0) : 0;
+    if (r_is_objc_ptr(screen) && r_responds_main(screen, "scale")) {
+        uint64_t bits = r_msg2_main(screen, "scale", 0, 0, 0, 0);
+        memcpy(&scale, &bits, sizeof(scale));
+    }
+    if (scale < 1.0 || scale > 4.0) scale = 3.0;
+    return scale;
+}
+
+static uint64_t themer_make_is_descriptor(double pointSize,
+                                          double scale,
+                                          int64_t appearance,
+                                          uint64_t variant,
+                                          bool useVariantFactory)
+{
+    uint64_t descCls = themer_lookup_class("ISImageDescriptor");
+    if (!r_is_objc_ptr(descCls)) return 0;
+
+    uint64_t desc = 0;
+    if (useVariantFactory &&
+        r_responds_main(descCls, "imageDescriptorWithIconVariant:options:")) {
+        desc = r_msg2_main(descCls, "imageDescriptorWithIconVariant:options:",
+                           variant, 0, 0, 0);
+        if (r_is_objc_ptr(desc)) {
+            desc = r_msg2(desc, "retain", 0, 0, 0, 0);
+        }
+    }
+
+    if (!r_is_objc_ptr(desc)) {
+        uint64_t alloc = r_msg2(descCls, "alloc", 0, 0, 0, 0);
+        struct { double width; double height; } size = { pointSize, pointSize };
+        desc = r_is_objc_ptr(alloc)
+            ? r_msg2_main_raw(alloc, "initWithSize:scale:",
+                              &size, sizeof(size),
+                              &scale, sizeof(scale),
+                              NULL, 0, NULL, 0)
+            : 0;
+    }
+    if (!r_is_objc_ptr(desc)) return 0;
+
+    struct { double width; double height; } size = { pointSize, pointSize };
+    if (r_responds_main(desc, "setSize:")) {
+        r_msg2_main_raw(desc, "setSize:",
+                        &size, sizeof(size),
+                        NULL, 0, NULL, 0, NULL, 0);
+    }
+    if (r_responds_main(desc, "setScale:")) {
+        r_msg2_main_raw(desc, "setScale:",
+                        &scale, sizeof(scale),
+                        NULL, 0, NULL, 0, NULL, 0);
+    }
+    if (r_responds_main(desc, "setAppearance:")) {
+        r_msg2_main(desc, "setAppearance:", (uint64_t)appearance, 0, 0, 0);
+    }
+    if (r_responds_main(desc, "setAppearanceVariant:")) {
+        r_msg2_main(desc, "setAppearanceVariant:", (uint64_t)appearance, 0, 0, 0);
+    }
+    if (r_responds_main(desc, "setIgnoreCache:")) {
+        r_msg2_main(desc, "setIgnoreCache:", 0, 0, 0, 0);
+    }
+    return desc;
+}
+
+static uint64_t themer_make_if_image(uint64_t uiImage)
+{
+    if (!r_is_objc_ptr(uiImage)) return 0;
+
+    uint64_t IFImage = themer_lookup_class("IFImage");
+    if (!r_is_objc_ptr(IFImage)) return 0;
+
+    uint64_t cgImage = r_responds_main(uiImage, "CGImage")
+        ? r_msg2_main(uiImage, "CGImage", 0, 0, 0, 0) : 0;
+    if (!cgImage) return 0;
+
+    double scale = themer_screen_scale();
+    if (r_responds_main(uiImage, "scale")) {
+        uint64_t bits = r_msg2_main(uiImage, "scale", 0, 0, 0, 0);
+        memcpy(&scale, &bits, sizeof(scale));
+        if (scale < 1.0 || scale > 4.0) scale = themer_screen_scale();
+    }
+
+    uint64_t alloc = r_msg2(IFImage, "alloc", 0, 0, 0, 0);
+    if (!r_is_objc_ptr(alloc)) return 0;
+    return r_msg2_main_raw(alloc, "initWithCGImage:scale:",
+                           &cgImage, sizeof(cgImage),
+                           &scale, sizeof(scale),
+                           NULL, 0, NULL, 0);
+}
+
+static int themer_seed_iconservices_cache(const char *bundle,
+                                          uint64_t image,
+                                          double pointSize)
+{
+    if (!bundle || !bundle[0] || !r_is_objc_ptr(image)) return 0;
+    if (!themer_ensure_iconservices_loaded()) return 0;
+
+    uint64_t bid = r_nsstr_retained(bundle);
+    uint64_t iconCls = themer_lookup_class("ISBundleIdentifierIcon");
+    uint64_t mgrCls = themer_lookup_class("ISIconManager");
+    if (!r_is_objc_ptr(bid) || !r_is_objc_ptr(iconCls) || !r_is_objc_ptr(mgrCls)) {
+        if (r_is_objc_ptr(bid)) r_msg2(bid, "release", 0, 0, 0, 0);
+        return 0;
+    }
+
+    uint64_t iconAlloc = r_msg2(iconCls, "alloc", 0, 0, 0, 0);
+    uint64_t icon = r_is_objc_ptr(iconAlloc)
+        ? r_msg2_main(iconAlloc, "initWithBundleIdentifier:", bid, 0, 0, 0)
+        : 0;
+    r_msg2(bid, "release", 0, 0, 0, 0);
+    if (!r_is_objc_ptr(icon)) return 0;
+
+    uint64_t mgr = r_msg2(mgrCls, "sharedInstance", 0, 0, 0, 0);
+    uint64_t createdIcon = icon;
+    uint64_t registered = (r_is_objc_ptr(mgr) &&
+                           r_responds_main(mgr, "findOrRegisterIcon:"))
+        ? r_msg2_main(mgr, "findOrRegisterIcon:", icon, 0, 0, 0) : 0;
+    if (r_is_objc_ptr(registered) && registered != icon) {
+        r_msg2(icon, "release", 0, 0, 0, 0);
+        icon = registered;
+    }
+
+    uint64_t imageCache = r_responds_main(icon, "imageCache")
+        ? r_msg2_main(icon, "imageCache", 0, 0, 0, 0) : 0;
+    if (!r_is_objc_ptr(imageCache) ||
+        !r_responds_main(imageCache, "setImage:forDescriptor:")) {
+        if (icon == createdIcon) r_msg2(icon, "release", 0, 0, 0, 0);
+        return 0;
+    }
+
+    uint64_t cacheImage = themer_make_if_image(image);
+    if (!r_is_objc_ptr(cacheImage)) {
+        if (icon == createdIcon) r_msg2(icon, "release", 0, 0, 0, 0);
+        return 0;
+    }
+
+    double scale = themer_screen_scale();
+    if (pointSize < 20.0 || pointSize > 120.0) pointSize = 60.0;
+
+    double sizes[2] = { pointSize, 60.0 };
+    int seeded = 0;
+    int readbackHits = 0;
+    bool checkedReadback = false;
+    for (int s = 0; s < 2; s++) {
+        if (s == 1 && sizes[1] == sizes[0]) continue;
+        for (int appearance = 0; appearance <= 1; appearance++) {
+            for (int variant = 0; variant < 2; variant++) {
+                uint64_t desc = themer_make_is_descriptor(sizes[s], scale,
+                                                          appearance,
+                                                          (uint64_t)variant,
+                                                          variant != 0);
+                if (!r_is_objc_ptr(desc)) continue;
+                r_msg2_main(imageCache, "setImage:forDescriptor:",
+                            cacheImage, desc, 0, 0);
+                seeded++;
+
+                uint64_t readback = (!checkedReadback &&
+                                      r_responds_main(icon, "imageForDescriptor:"))
+                    ? r_msg2_main(icon, "imageForDescriptor:", desc, 0, 0, 0) : 0;
+                checkedReadback = true;
+                if (readback == cacheImage) readbackHits++;
+                r_msg2(desc, "release", 0, 0, 0, 0);
+            }
+        }
+    }
+
+    if (!gThemerIconServicesProbeLogged) {
+        gThemerIconServicesProbeLogged = true;
+        uint64_t cachePath = 0;
+        uint64_t iconCache = (r_is_objc_ptr(mgr) && r_responds_main(mgr, "iconCache"))
+            ? r_msg2_main(mgr, "iconCache", 0, 0, 0, 0) : 0;
+        if (r_is_objc_ptr(iconCache) && r_responds_main(iconCache, "cachePath")) {
+            cachePath = r_msg2_main(iconCache, "cachePath", 0, 0, 0, 0);
+        }
+        char cachePathStr[240] = {0};
+        if (r_is_objc_ptr(cachePath)) {
+            r_read_nsstring(cachePath, cachePathStr, sizeof(cachePathStr));
+        }
+        printf("[THEMER] IconServices seed probe bundle=%s icon=0x%llx imageCache=0x%llx "
+               "ifImage=0x%llx seeded=%d readback=%d pointSize=%.1f scale=%.1f cachePath=\"%s\"\n",
+               bundle,
+               (unsigned long long)icon,
+               (unsigned long long)imageCache,
+               (unsigned long long)cacheImage,
+               seeded, readbackHits,
+               pointSize, scale,
+               cachePathStr);
+    }
+
+    r_msg2(cacheImage, "release", 0, 0, 0, 0);
+    if (icon == createdIcon) r_msg2(icon, "release", 0, 0, 0, 0);
+    return seeded;
+}
+
+// Ships PNG bytes into SB and returns a retained SB UIImage* (+1 owned by
+// caller). `label` is just for log output (e.g. "com.apple.mobilesafari").
+static uint64_t themer_build_remote_uiimage_from_data(NSData *bytes, const char *label)
+{
+    if (!bytes || bytes.length == 0 || bytes.length > kThemerMaxPngBytes) {
+        printf("[THEMER] PNG size out of range label=%s size=%lu cap=%zu\n",
+               label ?: "?",
+               (unsigned long)bytes.length,
+               kThemerMaxPngBytes);
+        return 0;
+    }
+
+    uint64_t remoteBuf = r_dlsym_call(R_TIMEOUT, "malloc",
+                                      bytes.length, 0, 0, 0, 0, 0, 0, 0);
+    if (!remoteBuf) {
+        printf("[THEMER] remote malloc(%lu) failed label=%s\n",
+               (unsigned long)bytes.length, label ?: "?");
+        return 0;
+    }
+    if (!remote_write(remoteBuf, bytes.bytes, bytes.length)) {
+        printf("[THEMER] remote_write failed buf=0x%llx size=%lu label=%s\n",
+               (unsigned long long)remoteBuf, (unsigned long)bytes.length, label ?: "?");
+        r_free(remoteBuf);
+        return 0;
+    }
+
+    uint64_t NSDataCls  = r_class("NSData");
+    uint64_t UIImageCls = r_class("UIImage");
+    if (!r_is_objc_ptr(NSDataCls) || !r_is_objc_ptr(UIImageCls)) {
+        printf("[THEMER] missing class NSData=0x%llx UIImage=0x%llx\n",
+               (unsigned long long)NSDataCls,
+               (unsigned long long)UIImageCls);
+        r_free(remoteBuf);
+        return 0;
+    }
+
+    uint64_t dataAlloc = r_msg2(NSDataCls, "alloc", 0, 0, 0, 0);
+    uint64_t nsdata = r_is_objc_ptr(dataAlloc)
+        ? r_msg2(dataAlloc, "initWithBytes:length:", remoteBuf, bytes.length, 0, 0)
+        : 0;
+    r_free(remoteBuf);  // NSData copied the bytes
+
+    if (!r_is_objc_ptr(nsdata)) {
+        printf("[THEMER] NSData init failed label=%s\n", label ?: "?");
+        return 0;
+    }
+
+    uint64_t image = r_msg2(UIImageCls, "imageWithData:", nsdata, 0, 0, 0);
+    if (r_is_objc_ptr(image)) {
+        r_msg2(image, "retain", 0, 0, 0, 0);
+    }
+    r_msg2(nsdata, "release", 0, 0, 0, 0);
+
+    if (!r_is_objc_ptr(image)) {
+        printf("[THEMER] UIImage decode failed for %s (PNG malformed?)\n",
+               label ?: "?");
+        return 0;
+    }
+    return image;
+}
+
+static uint64_t themer_ensure_datasource_class(void)
+{
+    static uint64_t cls = 0;
+    if (r_is_objc_ptr(cls)) return cls;
+
+    cls = themer_lookup_class("CNDIconLayerDataSource");
+    if (r_is_objc_ptr(cls)) return cls;
+
+    uint64_t NSObject = r_class("NSObject");
+    if (!r_is_objc_ptr(NSObject)) return 0;
+
+    uint64_t name = r_alloc_str("CNDIconLayerDataSource");
+    if (!name) return 0;
+    cls = r_dlsym_call(R_TIMEOUT, "objc_allocateClassPair",
+                       NSObject, name, 0, 0, 0, 0, 0, 0);
+    r_free(name);
+    if (!r_is_objc_ptr(cls)) return 0;
+
+    uint64_t getAssocImp = themer_remote_symbol_addr("objc_getAssociatedObject");
+    uint64_t nilImp = themer_method_imp(NSObject, "isProxy");
+    bool ok = getAssocImp &&
+        themer_add_method(cls, "icon:imageWithInfo:traitCollection:options:",
+                          getAssocImp, "@@:@@@Q") &&
+        themer_add_method(cls, "icon:layerWithInfo:traitCollection:options:",
+                          getAssocImp, "@@:@@@Q") &&
+        themer_add_method(cls, "icon:displayNameForLocation:",
+                          getAssocImp, "@@:@q") &&
+        themer_add_method(cls, "icon:accessibilityLabelForLocation:",
+                          getAssocImp, "@@:@q") &&
+        nilImp &&
+        themer_add_method(cls, "icon:badgeNumberOrStringForLocation:",
+                          nilImp, "@@:@q");
+
+    r_dlsym_call(R_TIMEOUT, "objc_registerClassPair",
+                 cls, 0, 0, 0, 0, 0, 0, 0);
+
+    if (!ok) {
+        printf("[THEMER] model graft: datasource class incomplete getAssoc=0x%llx nil=0x%llx\n",
+               (unsigned long long)getAssocImp,
+               (unsigned long long)nilImp);
+        return 0;
+    }
+    return cls;
+}
+
+static double themer_icon_width_for_view(uint64_t iconView)
+{
+    uint64_t iiv = r_ivar_value(iconView, "_iconImageView");
+    if (!r_is_objc_ptr(iiv) && r_responds_main(iconView, "_iconImageView")) {
+        iiv = r_msg2_main(iconView, "_iconImageView", 0, 0, 0, 0);
+    }
+    uint64_t layer = r_is_objc_ptr(iiv) && r_responds_main(iiv, "layer")
+        ? r_msg2_main(iiv, "layer", 0, 0, 0, 0) : 0;
+    struct { double x, y, w, h; } b = {0};
+    if (r_is_objc_ptr(layer) &&
+        r_responds_main(layer, "bounds") &&
+        r_msg2_main_struct_ret(layer, "bounds", &b, sizeof(b),
+            NULL, 0, NULL, 0, NULL, 0, NULL, 0) &&
+        b.w > 1.0) {
+        return b.w;
+    }
+    return 60.0;
+}
+
+static uint64_t themer_icon_image_view_for_iconview(uint64_t iconView)
+{
+    if (!r_is_objc_ptr(iconView)) return 0;
+    uint64_t iiv = r_ivar_value(iconView, "_iconImageView");
+    if (!r_is_objc_ptr(iiv) && r_responds_main(iconView, "_iconImageView")) {
+        iiv = r_msg2_main(iconView, "_iconImageView", 0, 0, 0, 0);
+    }
+    return r_is_objc_ptr(iiv) ? iiv : 0;
+}
+
+static bool themer_should_pin_dynamic_overlay(const char *bundle, uint64_t iconView)
+{
+    if (bundle &&
+        (strcmp(bundle, "com.apple.mobiletimer") == 0 ||
+         strcmp(bundle, "com.apple.mobilecal") == 0)) {
+        return true;
+    }
+
+    uint64_t iiv = themer_icon_image_view_for_iconview(iconView);
+    char cls[128] = {0};
+    themer_read_class_name(iiv, cls, sizeof(cls));
+    return strstr(cls, "Clock") != NULL ||
+           strstr(cls, "Calendar") != NULL;
+}
+
+static bool themer_prefers_view_level_overlay(const char *bundle)
+{
+    (void)bundle;
+    return false;
+}
+
+static bool themer_needs_visible_push(const char *bundle)
+{
+    (void)bundle;
+    return false;
+}
+
+static bool themer_clear_overlay_on_object(uint64_t obj, uint64_t key)
+{
+    if (!r_is_objc_ptr(obj) || !key) return false;
+
+    uint64_t overlay = r_dlsym_call(R_TIMEOUT, "objc_getAssociatedObject",
+                                    obj, key, 0, 0, 0, 0, 0, 0);
+    if (!r_is_objc_ptr(overlay)) return false;
+
+    if (r_responds_main(overlay, "setHidden:")) {
+        r_msg2_main(overlay, "setHidden:", 1, 0, 0, 0);
+    }
+    if (r_responds_main(overlay, "removeFromSuperview")) {
+        r_msg2_main(overlay, "removeFromSuperview", 0, 0, 0, 0);
+    }
+    r_dlsym_call(R_TIMEOUT, "objc_setAssociatedObject",
+                 obj, key, 0, 1, 0, 0, 0, 0);
+    return true;
+}
+
+static bool themer_clear_dynamic_overlay(uint64_t iconView)
+{
+    if (!r_is_objc_ptr(iconView)) return false;
+    uint64_t key = r_sel("cnd_themer_pinned_overlay");
+    if (!key) return false;
+
+    bool cleared = themer_clear_overlay_on_object(iconView, key);
+    uint64_t iiv = themer_icon_image_view_for_iconview(iconView);
+    cleared = themer_clear_overlay_on_object(iiv, key) || cleared;
+    return cleared;
+}
+
+static bool themer_pin_dynamic_overlay(uint64_t iconView, uint64_t image,
+                                       const char *bundle)
+{
+    if (!r_is_objc_ptr(iconView) || !r_is_objc_ptr(image)) return false;
+
+    uint64_t iiv = themer_icon_image_view_for_iconview(iconView);
+    if (!r_is_objc_ptr(iiv)) return false;
+    bool viewLevel = themer_prefers_view_level_overlay(bundle);
+    uint64_t overlayParent = viewLevel ? iconView : iiv;
+
+    uint64_t key = r_sel("cnd_themer_pinned_overlay");
+    if (!key) return false;
+
+    uint64_t overlay = r_dlsym_call(R_TIMEOUT, "objc_getAssociatedObject",
+                                    iconView, key, 0, 0, 0, 0, 0, 0);
+    uint64_t imageViewOverlay = r_dlsym_call(R_TIMEOUT, "objc_getAssociatedObject",
+                                             iiv, key, 0, 0, 0, 0, 0, 0);
+    if (!r_is_objc_ptr(overlay) && r_is_objc_ptr(imageViewOverlay)) {
+        overlay = imageViewOverlay;
+        r_dlsym_call(R_TIMEOUT, "objc_setAssociatedObject",
+                     iconView, key, overlay, 1, 0, 0, 0, 0);
+    } else if (r_is_objc_ptr(overlay) && r_is_objc_ptr(imageViewOverlay) &&
+               overlay != imageViewOverlay) {
+        themer_clear_overlay_on_object(iiv, key);
+    }
+
+    bool created = false;
+    if (!r_is_objc_ptr(overlay)) {
+        uint64_t overlayCls = r_class("UIImageView");
+        uint64_t alloc = r_is_objc_ptr(overlayCls)
+            ? r_msg2(overlayCls, "alloc", 0, 0, 0, 0) : 0;
+        overlay = r_is_objc_ptr(alloc)
+            ? r_msg2_main(alloc, "initWithImage:", image, 0, 0, 0) : 0;
+        if (!r_is_objc_ptr(overlay)) return false;
+
+        r_dlsym_call(R_TIMEOUT, "objc_setAssociatedObject",
+                     iconView, key, overlay, 1, 0, 0, 0, 0);
+        r_msg2(overlay, "release", 0, 0, 0, 0);
+        created = true;
+    } else if (r_responds_main(overlay, "setImage:")) {
+        r_msg2_main(overlay, "setImage:", image, 0, 0, 0);
+    }
+
+    r_dlsym_call(R_TIMEOUT, "objc_setAssociatedObject",
+                 iiv, key, overlay, 1, 0, 0, 0, 0);
+    if (r_responds_main(overlay, "removeFromSuperview")) {
+        r_msg2_main(overlay, "removeFromSuperview", 0, 0, 0, 0);
+    }
+    if (r_responds_main(overlayParent, "addSubview:")) {
+        r_msg2_main(overlayParent, "addSubview:", overlay, 0, 0, 0);
+    }
+
+    struct { double x, y, w, h; } bounds = {0.0, 0.0, 0.0, 0.0};
+    if (!r_responds_main(iiv, "bounds") ||
+        !r_msg2_main_struct_ret(iiv, "bounds",
+            &bounds, sizeof(bounds),
+            NULL, 0, NULL, 0, NULL, 0, NULL, 0) ||
+        bounds.w <= 1.0 || bounds.h <= 1.0) {
+        double width = themer_icon_width_for_view(iconView);
+        bounds.w = width;
+        bounds.h = width;
+    }
+    if (viewLevel &&
+        r_responds_main(iiv, "frame")) {
+        struct { double x, y, w, h; } frame = {0.0, 0.0, 0.0, 0.0};
+        if (r_msg2_main_struct_ret(iiv, "frame",
+            &frame, sizeof(frame),
+            NULL, 0, NULL, 0, NULL, 0, NULL, 0) &&
+            frame.w > 1.0 && frame.h > 1.0) {
+            bounds.x = frame.x;
+            bounds.y = frame.y;
+            bounds.w = frame.w;
+            bounds.h = frame.h;
+        }
+    }
+
+    if (r_responds_main(overlay, "setFrame:")) {
+        r_msg2_main_raw(overlay, "setFrame:",
+            &bounds, sizeof(bounds),
+            NULL, 0, NULL, 0, NULL, 0);
+    }
+    if (r_responds_main(overlay, "setBounds:")) {
+        struct { double x, y, w, h; } localBounds = {0.0, 0.0, bounds.w, bounds.h};
+        r_msg2_main_raw(overlay, "setBounds:",
+            &localBounds, sizeof(localBounds),
+            NULL, 0, NULL, 0, NULL, 0);
+    }
+    if (r_responds_main(overlay, "setAutoresizingMask:")) {
+        r_msg2_main(overlay, "setAutoresizingMask:", 18, 0, 0, 0);
+    }
+    if (r_responds_main(overlay, "setUserInteractionEnabled:")) {
+        r_msg2_main(overlay, "setUserInteractionEnabled:", 0, 0, 0, 0);
+    }
+    if (r_responds_main(overlay, "setContentMode:")) {
+        r_msg2_main(overlay, "setContentMode:", 0, 0, 0, 0);
+    }
+    if (r_responds_main(overlay, "setHidden:")) {
+        r_msg2_main(overlay, "setHidden:", 0, 0, 0, 0);
+    }
+    if (r_responds_main(overlayParent, "bringSubviewToFront:")) {
+        r_msg2_main(overlayParent, "bringSubviewToFront:", overlay, 0, 0, 0);
+    }
+
+    uint64_t layer = r_responds_main(overlay, "layer")
+        ? r_msg2_main(overlay, "layer", 0, 0, 0, 0) : 0;
+    if (r_is_objc_ptr(layer)) {
+        double radius = bounds.w > 1.0 ? bounds.w * 0.225 : 15.0;
+        if (r_responds_main(layer, "setCornerRadius:")) {
+            r_msg2_main_raw(layer, "setCornerRadius:",
+                &radius, sizeof(radius),
+                NULL, 0, NULL, 0, NULL, 0);
+        }
+        if (r_responds_main(layer, "setMasksToBounds:")) {
+            r_msg2_main(layer, "setMasksToBounds:", 1, 0, 0, 0);
+        }
+    }
+
+    static bool logged = false;
+    if (!logged) {
+        logged = true;
+        char iivCls[128] = {0};
+        themer_read_class_name(iiv, iivCls, sizeof(iivCls));
+        printf("[THEMER] dynamic overlay pinned bundle=%s iconView=0x%llx "
+               "iiv=0x%llx (%s) overlay=0x%llx viewLevel=%d created=%d\n",
+               bundle ?: "?",
+               (unsigned long long)iconView,
+               (unsigned long long)iiv,
+               iivCls,
+               (unsigned long long)overlay,
+               viewLevel,
+               created);
+    }
+
+    return true;
+}
+
+static uint64_t themer_make_datasource(uint64_t image, double width)
+{
+    if (!r_is_objc_ptr(image)) return 0;
+    uint64_t dsCls = themer_ensure_datasource_class();
+    if (!r_is_objc_ptr(dsCls)) return 0;
+
+    uint64_t alloc = r_msg2(dsCls, "alloc", 0, 0, 0, 0);
+    uint64_t ds = r_is_objc_ptr(alloc)
+        ? r_msg2_main(alloc, "init", 0, 0, 0, 0) : 0;
+    if (!r_is_objc_ptr(ds)) return 0;
+
+    uint64_t layerCls = r_class("CALayer");
+    uint64_t layerAlloc = r_is_objc_ptr(layerCls)
+        ? r_msg2(layerCls, "alloc", 0, 0, 0, 0) : 0;
+    uint64_t layer = r_is_objc_ptr(layerAlloc)
+        ? r_msg2_main(layerAlloc, "init", 0, 0, 0, 0) : 0;
+    if (!r_is_objc_ptr(layer)) {
+        r_msg2(ds, "release", 0, 0, 0, 0);
+        return 0;
+    }
+
+    uint64_t cgImage = r_responds_main(image, "CGImage")
+        ? r_msg2_main(image, "CGImage", 0, 0, 0, 0) : 0;
+    if (cgImage && r_responds_main(layer, "setContents:")) {
+        r_msg2_main(layer, "setContents:", cgImage, 0, 0, 0);
+    }
+
+    struct { double x, y, w, h; } bounds = {0.0, 0.0, width, width};
+    if (r_responds_main(layer, "setBounds:")) {
+        r_msg2_main_raw(layer, "setBounds:",
+            &bounds, sizeof(bounds),
+            NULL, 0, NULL, 0, NULL, 0);
+    }
+
+    double radius = width * 0.225;
+    if (r_responds_main(layer, "setCornerRadius:")) {
+        r_msg2_main_raw(layer, "setCornerRadius:",
+            &radius, sizeof(radius),
+            NULL, 0, NULL, 0, NULL, 0);
+    }
+    if (r_responds_main(layer, "setMasksToBounds:")) {
+        r_msg2_main(layer, "setMasksToBounds:", 1, 0, 0, 0);
+    }
+
+    double scale = 3.0;
+    uint64_t UIScreen = r_class("UIScreen");
+    uint64_t screen = r_is_objc_ptr(UIScreen)
+        ? r_msg2(UIScreen, "mainScreen", 0, 0, 0, 0) : 0;
+    if (r_is_objc_ptr(screen) && r_responds_main(screen, "scale")) {
+        uint64_t bits = r_msg2_main(screen, "scale", 0, 0, 0, 0);
+        memcpy(&scale, &bits, sizeof(scale));
+    }
+    if (r_responds_main(layer, "setContentsScale:")) {
+        r_msg2_main_raw(layer, "setContentsScale:",
+            &scale, sizeof(scale),
+            NULL, 0, NULL, 0, NULL, 0);
+    }
+
+    uint64_t imageSel = r_sel("icon:imageWithInfo:traitCollection:options:");
+    if (imageSel) {
+        r_dlsym_call(R_TIMEOUT, "objc_setAssociatedObject",
+                     ds, imageSel, image, 1, 0, 0, 0, 0);
+    }
+    uint64_t layerSel = r_sel("icon:layerWithInfo:traitCollection:options:");
+    if (layerSel) {
+        r_dlsym_call(R_TIMEOUT, "objc_setAssociatedObject",
+                     ds, layerSel, layer, 1, 0, 0, 0, 0);
+    }
+    r_msg2(layer, "release", 0, 0, 0, 0);
+    return ds;
+}
+
+static uint64_t themer_make_icon_layer(uint64_t image, double width)
+{
+    if (!r_is_objc_ptr(image)) return 0;
+
+    uint64_t layerCls = r_class("CALayer");
+    uint64_t layerAlloc = r_is_objc_ptr(layerCls)
+        ? r_msg2(layerCls, "alloc", 0, 0, 0, 0) : 0;
+    uint64_t layer = r_is_objc_ptr(layerAlloc)
+        ? r_msg2_main(layerAlloc, "init", 0, 0, 0, 0) : 0;
+    if (!r_is_objc_ptr(layer)) return 0;
+
+    uint64_t cgImage = r_responds_main(image, "CGImage")
+        ? r_msg2_main(image, "CGImage", 0, 0, 0, 0) : 0;
+    if (cgImage && r_responds_main(layer, "setContents:")) {
+        r_msg2_main(layer, "setContents:", cgImage, 0, 0, 0);
+    }
+
+    struct { double x, y, w, h; } bounds = {0.0, 0.0, width, width};
+    if (r_responds_main(layer, "setBounds:")) {
+        r_msg2_main_raw(layer, "setBounds:",
+            &bounds, sizeof(bounds),
+            NULL, 0, NULL, 0, NULL, 0);
+    }
+
+    double radius = width * 0.225;
+    if (r_responds_main(layer, "setCornerRadius:")) {
+        r_msg2_main_raw(layer, "setCornerRadius:",
+            &radius, sizeof(radius),
+            NULL, 0, NULL, 0, NULL, 0);
+    }
+    if (r_responds_main(layer, "setMasksToBounds:")) {
+        r_msg2_main(layer, "setMasksToBounds:", 1, 0, 0, 0);
+    }
+
+    double scale = 3.0;
+    uint64_t UIScreen = r_class("UIScreen");
+    uint64_t screen = r_is_objc_ptr(UIScreen)
+        ? r_msg2(UIScreen, "mainScreen", 0, 0, 0, 0) : 0;
+    if (r_is_objc_ptr(screen) && r_responds_main(screen, "scale")) {
+        uint64_t bits = r_msg2_main(screen, "scale", 0, 0, 0, 0);
+        memcpy(&scale, &bits, sizeof(scale));
+    }
+    if (r_responds_main(layer, "setContentsScale:")) {
+        r_msg2_main_raw(layer, "setContentsScale:",
+            &scale, sizeof(scale),
+            NULL, 0, NULL, 0, NULL, 0);
+    }
+
+    return layer;
+}
+
+static uint64_t themer_copy_icon_label(uint64_t icon)
+{
+    if (!r_is_objc_ptr(icon)) return 0;
+
+    uint64_t label = 0;
+    if (r_responds_main(icon, "displayNameForLocation:")) {
+        label = r_msg2_main(icon, "displayNameForLocation:", 0, 0, 0, 0);
+    }
+    if (!r_is_objc_ptr(label) && r_responds_main(icon, "displayName")) {
+        label = r_msg2_main(icon, "displayName", 0, 0, 0, 0);
+    }
+    if (!r_is_objc_ptr(label) && r_responds_main(icon, "application")) {
+        uint64_t app = r_msg2_main(icon, "application", 0, 0, 0, 0);
+        if (r_is_objc_ptr(app) && r_responds_main(app, "displayName")) {
+            label = r_msg2_main(app, "displayName", 0, 0, 0, 0);
+        }
+    }
+    if (!r_is_objc_ptr(label)) return 0;
+    return r_msg2(label, "copy", 0, 0, 0, 0);
+}
+
+static void themer_seed_datasource_metadata(uint64_t ds, uint64_t icon)
+{
+    if (!r_is_objc_ptr(ds) || !r_is_objc_ptr(icon)) return;
+
+    uint64_t label = themer_copy_icon_label(icon);
+    if (!r_is_objc_ptr(label)) return;
+
+    uint64_t displaySel = r_sel("icon:displayNameForLocation:");
+    if (displaySel) {
+        r_dlsym_call(R_TIMEOUT, "objc_setAssociatedObject",
+                     ds, displaySel, label, 1, 0, 0, 0, 0);
+    }
+    uint64_t axSel = r_sel("icon:accessibilityLabelForLocation:");
+    if (axSel) {
+        r_dlsym_call(R_TIMEOUT, "objc_setAssociatedObject",
+                     ds, axSel, label, 1, 0, 0, 0, 0);
+    }
+    r_msg2(label, "release", 0, 0, 0, 0);
+}
+
+static uint64_t themer_ensure_model_class(uint64_t currentClass)
+{
+    if (!r_is_objc_ptr(currentClass)) return 0;
+
+    uint64_t baseClass = currentClass;
+    char clsName[160] = {0};
+    themer_read_class_object_name(baseClass, clsName, sizeof(clsName));
+    while (strncmp(clsName, "CNDThemed", 9) == 0) {
+        uint64_t superCls = r_dlsym_call(R_TIMEOUT, "class_getSuperclass",
+                                         baseClass, 0, 0, 0, 0, 0, 0, 0);
+        if (!r_is_objc_ptr(superCls) || superCls == baseClass) break;
+        baseClass = superCls;
+        themer_read_class_object_name(baseClass, clsName, sizeof(clsName));
+    }
+    if (!clsName[0]) return 0;
+
+    char subName[192] = {0};
+    snprintf(subName, sizeof(subName), "CNDThemedV5_%s", clsName);
+
+    uint64_t sub = themer_lookup_class(subName);
+    if (r_is_objc_ptr(sub)) return sub;
+
+    uint64_t name = r_alloc_str(subName);
+    if (!name) return 0;
+    sub = r_dlsym_call(R_TIMEOUT, "objc_allocateClassPair",
+                       baseClass, name, 0, 0, 0, 0, 0, 0);
+    r_free(name);
+    if (!r_is_objc_ptr(sub)) return 0;
+
+    uint64_t getAssocImp = themer_remote_symbol_addr("objc_getAssociatedObject");
+
+    static const char *imageSels[] = {
+        "makeIconImageWithInfo:traitCollection:context:options:",
+        "iconImageWithInfo:traitCollection:context:options:",
+    };
+    static const char *imageSels3[] = {
+        "iconImageWithInfo:traitCollection:options:",
+    };
+
+    bool ok = getAssocImp &&
+        themer_add_methods(sub, imageSels, 2, getAssocImp, "@@:@@@Q") &&
+        themer_add_methods(sub, imageSels3, 1, getAssocImp, "@@:@@Q");
+
+    r_dlsym_call(R_TIMEOUT, "objc_registerClassPair",
+                 sub, 0, 0, 0, 0, 0, 0, 0);
+
+    if (!ok) {
+        printf("[THEMER] model graft: subclass incomplete %s getAssoc=0x%llx\n",
+               subName,
+               (unsigned long long)getAssocImp);
+        return 0;
+    }
+    return sub;
+}
+
+static bool themer_graft_icon_model(uint64_t icon, uint64_t image,
+                                    ThemerEntry *entry, uint64_t iconView,
+                                    bool *changedOut)
+{
+    if (changedOut) *changedOut = false;
+    if (!r_is_objc_ptr(icon) || !r_is_objc_ptr(image) || !entry) return false;
+
+    uint64_t currentClass = r_dlsym_call(R_TIMEOUT, "object_getClass",
+                                         icon, 0, 0, 0, 0, 0, 0, 0);
+    uint64_t themedClass = themer_ensure_model_class(currentClass);
+    if (!r_is_objc_ptr(themedClass)) return false;
+
+    static const char *imageSels[] = {
+        "makeIconImageWithInfo:traitCollection:context:options:",
+        "iconImageWithInfo:traitCollection:context:options:",
+        "iconImageWithInfo:traitCollection:options:",
+    };
+    for (int i = 0; i < 3; i++) {
+        uint64_t sel = r_sel(imageSels[i]);
+        if (!sel) return false;
+        r_dlsym_call(R_TIMEOUT, "objc_setAssociatedObject",
+                     icon, sel, image, 1, 0, 0, 0, 0);
+    }
+    (void)iconView;
+
+    if (themedClass != currentClass) {
+        r_dlsym_call(R_TIMEOUT, "object_setClass",
+                     icon, themedClass, 0, 0, 0, 0, 0, 0);
+        if (changedOut) *changedOut = true;
+    }
+
+    if (!gThemerModelProbeLogged) {
+        gThemerModelProbeLogged = true;
+        printf("[THEMER] model graft: icon=0x%llx class=0x%llx changed=%d imageOnly=1\n",
+               (unsigned long long)icon,
+               (unsigned long long)themedClass,
+               changedOut ? *changedOut : false);
+    }
+
+    return true;
+}
+
+// Resolve the bundle identifier for an app SBIconView/SBIcon.
+static bool themer_read_bundle_for_icon(uint64_t icon,
+                                        uint64_t probeIconView,
+                                        char *out, size_t outLen)
+{
+    if (!r_is_objc_ptr(icon) || !out || outLen == 0) return false;
+
+    // Try the SBHApplication path first. On iOS 26 the older leaf identifier
+    // selectors can report support but return non-NSString/private values.
+    uint64_t appObj = r_responds(icon, "application")
+        ? r_msg2(icon, "application", 0, 0, 0, 0) : 0;
+    if (r_is_objc_ptr(appObj) && r_responds(appObj, "bundleIdentifier")) {
+        uint64_t bid = r_msg2(appObj, "bundleIdentifier", 0, 0, 0, 0);
+        if (r_is_objc_ptr(bid) && r_read_nsstring(bid, out, outLen) && out[0]) {
+            return true;
+        }
+    }
+
+    // First-iconView verbose probe: keep this to the known-stable application
+    // path. Calling object_getClass on legacy selector returns can PAC-crash
+    // SpringBoard when a selector returns a private non-object payload.
+    static bool probedShape = false;
+    if (!probedShape) {
+        probedShape = true;
+        char ivCls[96] = {0}, iconCls[96] = {0};
+        if (r_is_objc_ptr(probeIconView)) themer_read_class_name(probeIconView, ivCls, sizeof(ivCls));
+        themer_read_class_name(icon, iconCls, sizeof(iconCls));
+        printf("[THEMER] probe iconView class=%s icon=0x%llx class=%s\n",
+               ivCls, (unsigned long long)icon, iconCls);
+        if (r_is_objc_ptr(appObj)) {
+            char appCls[96] = {0};
+            themer_read_class_name(appObj, appCls, sizeof(appCls));
+            bool appHasBID = r_responds(appObj, "bundleIdentifier");
+            uint64_t appBID = appHasBID
+                ? r_msg2(appObj, "bundleIdentifier", 0, 0, 0, 0) : 0;
+            char appBIDStr[160] = {0};
+            if (r_is_objc_ptr(appBID)) r_read_nsstring(appBID, appBIDStr, sizeof(appBIDStr));
+            printf("[THEMER]   application=0x%llx class=%s bundleIdentifier=\"%s\"\n",
+                   (unsigned long long)appObj, appCls, appBIDStr);
+        }
+    }
+
+    return false;
+}
+
+static bool themer_read_bundle_for_iconview(uint64_t iconView,
+                                            char *out, size_t outLen)
+{
+    if (!r_is_objc_ptr(iconView) || !out || outLen == 0) return false;
+
+    uint64_t icon = r_responds(iconView, "icon")
+        ? r_msg2(iconView, "icon", 0, 0, 0, 0) : 0;
+    return themer_read_bundle_for_icon(icon, iconView, out, outLen);
+}
+
+// Rung 1: iOS 26 path —
+//          setOverrideImage:                       (track the override slot)
+//          + _iconImageView.updateImageContentsWithImage:imageAppearance:animated:
+//            (or fallback: setDisplayedImage:)     (force the rendered pixels)
+// Rung 2: setIconImage:           (iOS 18 and earlier)
+// Rung 3: _setIconImage:          (private variant)
+// Rung 4: _iconImageView.setImage: (last-resort UIImageView-style setter)
+static bool gThemerInnerCanUpdateContents = false;
+static bool gThemerInnerCanSetDisplayed = false;
+
+static int themer_probe_rung(uint64_t iconView)
+{
+    if (gThemerRung >= 0) return gThemerRung;
+    if (!r_is_objc_ptr(iconView)) return -1;
+
+    bool r1 = r_responds_main(iconView, "setOverrideImage:");
+    bool r2 = r_responds_main(iconView, "setIconImage:");
+    bool r3 = r_responds_main(iconView, "_setIconImage:");
+
+    uint64_t iiv = r_ivar_value(iconView, "_iconImageView");
+    if (!r_is_objc_ptr(iiv) && r_responds_main(iconView, "_iconImageView")) {
+        iiv = r_msg2_main(iconView, "_iconImageView", 0, 0, 0, 0);
+    }
+    bool r4 = r_is_objc_ptr(iiv) && r_responds_main(iiv, "setImage:");
+    if (r_is_objc_ptr(iiv)) {
+        gThemerInnerCanUpdateContents = r_responds_main(iiv,
+            "updateImageContentsWithImage:imageAppearance:animated:");
+        gThemerInnerCanSetDisplayed = r_responds_main(iiv, "setDisplayedImage:");
+    }
+
+    gThemerHasUpdateAfter = r_responds_main(iconView,
+        "_updateAfterManualIconImageInfoChangeInvalidatingLayout:");
+    gThemerHasUpdateImageView = r_responds_main(iconView,
+        "_updateIconImageViewAnimated:");
+
+    char iivCls[96] = {0};
+    if (r_is_objc_ptr(iiv)) themer_read_class_name(iiv, iivCls, sizeof(iivCls));
+    printf("[THEMER] probe iconView=0x%llx setOverrideImage:=%d setIconImage:=%d "
+           "_setIconImage:=%d _iconImageView=0x%llx (%s) "
+           "setImage:=%d updateContents:=%d setDisplayedImage:=%d "
+           "update:=%d updateIV:=%d\n",
+           (unsigned long long)iconView, r1, r2, r3,
+           (unsigned long long)iiv, iivCls,
+           r4, gThemerInnerCanUpdateContents, gThemerInnerCanSetDisplayed,
+           gThemerHasUpdateAfter, gThemerHasUpdateImageView);
+
+    if (r1)      gThemerRung = 1;
+    else if (r2) gThemerRung = 2;
+    else if (r3) gThemerRung = 3;
+    else if (r4) gThemerRung = 4;
+    else         gThemerRung = 0;
+
+    return gThemerRung;
+}
+
+// Returns the rung that succeeded (1/2/3/4) or 0 if nothing stuck.
+static int themer_push_image(uint64_t iconView, uint64_t image)
+{
+    if (!r_is_objc_ptr(iconView) || !r_is_objc_ptr(image)) return 0;
+    int rung = themer_probe_rung(iconView);
+
+    switch (rung) {
+        case 1: {
+            // iOS 26 contents-path strategy (from RE of SpringBoardHome):
+            //   shouldDisplayImageLayer is YES by default → sublayer path that
+            //   ignores overrideImage. To force the flat contents path that
+            //   DOES read overrideImage:
+            //   1. Set overrideIconImageAppearance = +[SBHIconImageAppearance lightAppearance]
+            //      (light = appearanceType 0/1 → hasGlass returns NO)
+            //   2. Set iconImageView.showsSquareCorners = YES
+            //   3. Now shouldDisplayImageLayer returns NO, and
+            //      updateImageAnimated: takes updateImageContentsAnimated:,
+            //      which calls updateImageContentsWithImage:imageAppearance:animated:
+            //      using [iconView overrideImage].
+            //   4. Set overrideImage = our UIImage (also triggers updateImageAnimated:NO).
+            uint64_t iiv = r_ivar_value(iconView, "_iconImageView");
+            if (!r_is_objc_ptr(iiv)) {
+                iiv = r_msg2_main(iconView, "_iconImageView", 0, 0, 0, 0);
+            }
+            if (!r_is_objc_ptr(iiv)) break;
+
+            // PERSISTENCE: populate SBHIconImageCache for this icon. The
+            // home-screen render pipeline goes via SBIcon →
+            // iconLayerViewWithInfo: → SBHIconImageVariantCache.cachedImage
+            // → SBHIconImageAppearanceStore. Cache-populated images stick
+            // across layout passes (page swipe, rotation) so home icons
+            // don't revert. -[SBHIconImageCache cacheImage:forIcon:imageAppearance:]
+            // calls through to setImage:forIcon:appearance: on the underlying
+            // store plus bookkeeping.
+            uint64_t icon = r_responds_main(iconView, "icon")
+                ? r_msg2_main(iconView, "icon", 0, 0, 0, 0) : 0;
+            uint64_t cache = r_responds_main(iiv, "iconImageCache")
+                ? r_msg2_main(iiv, "iconImageCache", 0, 0, 0, 0) : 0;
+            uint64_t appearance = r_responds_main(iiv, "effectiveIconImageAppearance")
+                ? r_msg2_main(iiv, "effectiveIconImageAppearance", 0, 0, 0, 0) : 0;
+            if (r_is_objc_ptr(cache) && r_is_objc_ptr(icon) &&
+                r_is_objc_ptr(appearance) &&
+                r_responds_main(cache, "cacheImage:forIcon:imageAppearance:")) {
+                r_msg2_main(cache, "cacheImage:forIcon:imageAppearance:",
+                            image, icon, appearance, 0);
+            }
+
+            uint64_t appearanceCls = r_class("SBHIconImageAppearance");
+            uint64_t lightAppearance = r_is_objc_ptr(appearanceCls)
+                ? r_msg2(appearanceCls, "lightAppearance", 0, 0, 0, 0) : 0;
+            if (r_is_objc_ptr(lightAppearance) &&
+                r_responds_main(iconView, "setOverrideIconImageAppearance:")) {
+                r_msg2_main(iconView, "setOverrideIconImageAppearance:",
+                            lightAppearance, 0, 0, 0);
+            }
+            if (r_responds_main(iiv, "setShowsSquareCorners:")) {
+                r_msg2_main(iiv, "setShowsSquareCorners:", 1, 0, 0, 0);
+            }
+            r_msg2_main(iconView, "setOverrideImage:", image, 0, 0, 0);
+
+            // App launch/resume can leave the SBIconView carrying our
+            // overrideImage while its inner contents/layer was discarded.
+            // Force the iOS 26 flat-contents path too, so a cached repaint
+            // repairs that state even when setOverrideImage: sees the same
+            // pointer it already had.
+            uint64_t updateAppearance = r_is_objc_ptr(lightAppearance)
+                ? lightAppearance : appearance;
+            if (gThemerInnerCanUpdateContents && r_is_objc_ptr(updateAppearance) &&
+                r_responds_main(iiv, "updateImageContentsWithImage:imageAppearance:animated:")) {
+                r_msg2_main(iiv, "updateImageContentsWithImage:imageAppearance:animated:",
+                            image, updateAppearance, 0, 0);
+            } else if (gThemerInnerCanSetDisplayed &&
+                       r_responds_main(iiv, "setDisplayedImage:")) {
+                r_msg2_main(iiv, "setDisplayedImage:", image, 0, 0, 0);
+            }
+
+            // Also cache for the light appearance specifically, in case
+            // future layout fetches request that variant (we've flipped the
+            // override appearance to light, so the cache lookup key likely
+            // ends up there).
+            if (r_is_objc_ptr(cache) && r_is_objc_ptr(icon) &&
+                r_is_objc_ptr(lightAppearance) &&
+                r_responds_main(cache, "cacheImage:forIcon:imageAppearance:")) {
+                r_msg2_main(cache, "cacheImage:forIcon:imageAppearance:",
+                            image, icon, lightAppearance, 0);
+            }
+
+            // showsSquareCorners=YES exposed the full iconImageView bounds.
+            // Reapply rounded mask on iiv.layer (~22.5% of width).
+            uint64_t iivLayer = r_responds_main(iiv, "layer")
+                ? r_msg2_main(iiv, "layer", 0, 0, 0, 0) : 0;
+            if (r_is_objc_ptr(iivLayer)) {
+                struct { double x, y, w, h; } b = {0};
+                double radius = 15.0;
+                if (r_responds_main(iivLayer, "bounds") &&
+                    r_msg2_main_struct_ret(iivLayer, "bounds",
+                        &b, sizeof(b),
+                        NULL, 0, NULL, 0, NULL, 0, NULL, 0) &&
+                    b.w > 0.0) {
+                    radius = b.w * 0.225;
+                }
+                r_msg2_main_raw(iivLayer, "setCornerRadius:",
+                    &radius, sizeof(radius),
+                    NULL, 0, NULL, 0, NULL, 0);
+                if (r_responds_main(iivLayer, "setMasksToBounds:")) {
+                    r_msg2_main(iivLayer, "setMasksToBounds:", 1, 0, 0, 0);
+                }
+            }
+
+            static bool postProbed = false;
+            if (!postProbed) {
+                postProbed = true;
+                bool shouldDisplay = r_responds_main(iiv, "shouldDisplayImageLayer")
+                    ? (r_msg2_main(iiv, "shouldDisplayImageLayer", 0, 0, 0, 0) & 0xff) != 0
+                    : true;
+                bool sqCorners = r_responds_main(iiv, "showsSquareCorners")
+                    ? (r_msg2_main(iiv, "showsSquareCorners", 0, 0, 0, 0) & 0xff) != 0
+                    : false;
+                uint64_t effApp = r_responds_main(iiv, "effectiveIconImageAppearance")
+                    ? r_msg2_main(iiv, "effectiveIconImageAppearance", 0, 0, 0, 0) : 0;
+                bool hasGlass = (r_is_objc_ptr(effApp) && r_responds_main(effApp, "hasGlass"))
+                    ? (r_msg2_main(effApp, "hasGlass", 0, 0, 0, 0) & 0xff) != 0
+                    : true;
+                uint64_t displayedRead = r_responds_main(iiv, "displayedImage")
+                    ? r_msg2_main(iiv, "displayedImage", 0, 0, 0, 0) : 0;
+                uint64_t overrideRead = r_responds_main(iconView, "overrideImage")
+                    ? r_msg2_main(iconView, "overrideImage", 0, 0, 0, 0) : 0;
+                char appCls[96] = {0};
+                themer_read_class_name(effApp, appCls, sizeof(appCls));
+                printf("[THEMER] post: shouldDisplayImageLayer=%d showsSquareCorners=%d "
+                       "hasGlass=%d effApp=0x%llx (%s) displayed=0x%llx override=0x%llx "
+                       "(want image=0x%llx) lightAppearance=0x%llx\n",
+                       shouldDisplay, sqCorners, hasGlass,
+                       (unsigned long long)effApp, appCls,
+                       (unsigned long long)displayedRead,
+                       (unsigned long long)overrideRead,
+                       (unsigned long long)image,
+                       (unsigned long long)lightAppearance);
+            }
+            break;
+        }
+        case 2:
+            r_msg2_main(iconView, "setIconImage:", image, 0, 0, 0);
+            break;
+        case 3:
+            r_msg2_main(iconView, "_setIconImage:", image, 0, 0, 0);
+            break;
+        case 4: {
+            uint64_t iiv = r_ivar_value(iconView, "_iconImageView");
+            if (!r_is_objc_ptr(iiv)) {
+                iiv = r_msg2_main(iconView, "_iconImageView", 0, 0, 0, 0);
+            }
+            if (!r_is_objc_ptr(iiv)) return 0;
+            r_msg2_main(iiv, "setImage:", image, 0, 0, 0);
+            break;
+        }
+        default:
+            return 0;
+    }
+
+    return rung;
+}
+
+static int themer_iter_iconviews(uint64_t listView,
+                                 NSDictionary<NSString *, NSData *> *dataByBundle,
+                                 uint64_t iconViewCls,
+                                 int *rungHits,
+                                 int *misses)
+{
+    if (!r_is_objc_ptr(listView) || !r_is_objc_ptr(iconViewCls)) return 0;
+
+    // BFS the list view so we pick up SBIconViews regardless of how iOS 26
+    // wraps them (AMUIInfographIconListLayout adds intermediate containers).
+    enum { IV_CAP = 64 };
+    uint64_t ivs[IV_CAP];
+    int n = sb_collect_views(listView, iconViewCls, ivs, IV_CAP);
+
+    if (n == 0) {
+        if (gThemerLogBudget > 0) {
+            uint64_t subs = r_msg2(listView, "subviews", 0, 0, 0, 0);
+            uint64_t sc = r_is_objc_ptr(subs) ? r_msg2(subs, "count", 0, 0, 0, 0) : 0;
+            char lvCls[96];
+            themer_read_class_name(listView, lvCls, sizeof(lvCls));
+            printf("[THEMER] listView=0x%llx class=%s no iconViews; direct subviews=%llu\n",
+                   (unsigned long long)listView, lvCls, (unsigned long long)sc);
+            uint64_t cap = sc > 6 ? 6 : sc;
+            for (uint64_t i = 0; i < cap; i++) {
+                uint64_t child = r_msg2(subs, "objectAtIndex:", i, 0, 0, 0);
+                char cls[96] = {0};
+                themer_read_class_name(child, cls, sizeof(cls));
+                printf("[THEMER]   subview[%llu]=0x%llx class=%s\n",
+                       (unsigned long long)i, (unsigned long long)child, cls);
+            }
+            gThemerLogBudget--;
+        }
+        return 0;
+    }
+
+    if (gThemerLogBudget > 0) {
+        printf("[THEMER] listView=0x%llx iconViews=%d (BFS)\n",
+               (unsigned long long)listView, n);
+        gThemerLogBudget--;
+    }
+
+    int applied = 0;
+    for (int i = 0; i < n; i++) {
+        uint64_t v = ivs[i];
+        if (!r_is_objc_ptr(v)) continue;
+
+        // Fast-skip: if this iconView is already displaying one of our remote
+        // UIImage pointers, assume it's still themed correctly and move on.
+        // 1 msgSend per view in the stable case, vs ~15-20 for a full
+        // bundle-read + apply. -[SBIconView prepareForReuse] clears
+        // overrideImage to nil on recycle, so a recycled view will fall
+        // through to the full path naturally.
+        bool hasOurOverride = false;
+        if (r_responds_main(v, "overrideImage")) {
+            uint64_t cur = r_msg2_main(v, "overrideImage", 0, 0, 0, 0);
+            if (themer_image_is_ours(cur)) {
+                hasOurOverride = true;
+            }
+        }
+
+        char bundle[128] = {0};
+        if (!themer_read_bundle_for_iconview(v, bundle, sizeof(bundle))) {
+            themer_clear_dynamic_overlay(v);
+            if (gThemerLogBudget > 0) {
+                char ivCls[96] = {0};
+                themer_read_class_name(v, ivCls, sizeof(ivCls));
+                printf("[THEMER]   bundle read failed iconView=0x%llx class=%s\n",
+                       (unsigned long long)v, ivCls);
+                gThemerLogBudget--;
+            }
+            continue;
+        }
+
+        // Debug: skip everything except the focus bundle so the log is
+        // small enough to reason about.
+        if (kThemerFocusBundle && kThemerFocusBundle[0] &&
+            strcmp(bundle, kThemerFocusBundle) != 0) {
+            continue;
+        }
+
+        bool dynamicOverlay = themer_should_pin_dynamic_overlay(bundle, v);
+        if (hasOurOverride && !dynamicOverlay) {
+            themer_clear_dynamic_overlay(v);
+            applied++;
+            continue;
+        }
+
+        uint64_t image = themer_lookup_cached(bundle);
+        if (!image) {
+            NSString *key = [NSString stringWithUTF8String:bundle];
+            NSData *pngBytes = key ? dataByBundle[key] : nil;
+            if (!pngBytes) {
+                themer_clear_dynamic_overlay(v);
+                if (misses) (*misses)++;
+                if (gThemerLogBudget > 0) {
+                    printf("[THEMER] miss bundle=%s (no override in theme)\n", bundle);
+                    gThemerLogBudget--;
+                }
+                continue;
+            }
+            NSData *uploadBytes = themer_rounded_png_data(pngBytes, bundle);
+            image = themer_build_remote_uiimage_from_data(uploadBytes ?: pngBytes, bundle);
+            if (!image) {
+                themer_clear_dynamic_overlay(v);
+                if (misses) (*misses)++;
+                continue;
+            }
+            themer_cache_image(bundle, image);
+            if (gThemerLogBudget > 0) {
+                printf("[THEMER] built bundle=%s image=0x%llx\n",
+                       bundle, (unsigned long long)image);
+                gThemerLogBudget--;
+            }
+        }
+        if (!dynamicOverlay) {
+            themer_clear_dynamic_overlay(v);
+            if (!themer_needs_visible_push(bundle)) {
+                applied++;
+                continue;
+            }
+        }
+
+        // Most icons persist through the model/cache pass. Dynamic/special
+        // icons keep a pinned overlay because their mounted image views can
+        // redraw from private live renderers.
+        bool viewLevelOverlay = themer_prefers_view_level_overlay(bundle);
+        (void)viewLevelOverlay;
+        int rung = 0;
+        if (dynamicOverlay && themer_pin_dynamic_overlay(v, image, bundle)) {
+            rung = 1;
+        } else if (!dynamicOverlay && themer_needs_visible_push(bundle)) {
+            rung = themer_push_image(v, image);
+        }
+
+        ThemerEntry *entry = themer_lookup_entry(bundle);
+        if (entry && !entry->iconServicesSeeded) {
+            double iconWidth = themer_icon_width_for_view(v);
+            entry->iconServicesSeeded =
+                themer_seed_iconservices_cache(bundle, image, iconWidth) > 0;
+        }
+        if (rung > 0) {
+            applied++;
+            if (rungHits && rung >= 1 && rung <= 4) rungHits[rung - 1]++;
+            if (kThemerDetailedIconLogs) {
+                uint64_t superv = r_responds_main(v, "superview")
+                    ? r_msg2_main(v, "superview", 0, 0, 0, 0) : 0;
+                char supCls[96] = {0};
+                themer_read_class_name(superv, supCls, sizeof(supCls));
+                double alpha = 1.0;
+                if (r_responds_main(v, "alpha")) {
+                    r_msg2_main_struct_ret(v, "alpha", &alpha, sizeof(alpha),
+                        NULL, 0, NULL, 0, NULL, 0, NULL, 0);
+                }
+                bool hidden = r_responds_main(v, "isHidden")
+                    ? (r_msg2_main(v, "isHidden", 0, 0, 0, 0) & 0xff) != 0
+                    : false;
+                bool wasBorrowed = r_responds_main(v, "isIconImageViewBorrowed")
+                    ? (r_msg2_main(v, "isIconImageViewBorrowed", 0, 0, 0, 0) & 0xff) != 0
+                    : false;
+                printf("[THEMER]   %s superview=%s borrowed=%d alpha=%.2f hidden=%d\n",
+                       bundle, supCls, wasBorrowed, alpha, hidden);
+            }
+        } else {
+            if (misses) (*misses)++;
+            if (gThemerLogBudget > 0) {
+                printf("[THEMER] no rung stuck bundle=%s iconView=0x%llx\n",
+                       bundle, (unsigned long long)v);
+                gThemerLogBudget--;
+            }
+        }
+    }
+    return applied;
+}
+
+static int themer_repaint_cached_iconviews(uint64_t listView,
+                                           uint64_t iconViewCls,
+                                           int *rungHits,
+                                           int *misses,
+                                           int *skips,
+                                           bool force)
+{
+    if (!r_is_objc_ptr(listView) || !r_is_objc_ptr(iconViewCls)) return 0;
+
+    enum { IV_CAP = 64 };
+    uint64_t ivs[IV_CAP];
+    int n = sb_collect_views(listView, iconViewCls, ivs, IV_CAP);
+    int applied = 0;
+
+    for (int i = 0; i < n; i++) {
+        uint64_t v = ivs[i];
+        if (!r_is_objc_ptr(v)) continue;
+
+        char bundle[128] = {0};
+        if (!themer_read_bundle_for_iconview(v, bundle, sizeof(bundle))) {
+            themer_clear_dynamic_overlay(v);
+            if (misses) (*misses)++;
+            continue;
+        }
+
+        uint64_t image = themer_lookup_cached(bundle);
+        if (!r_is_objc_ptr(image)) {
+            themer_clear_dynamic_overlay(v);
+            if (misses) (*misses)++;
+            continue;
+        }
+
+        uint64_t overrideRead = r_responds_main(v, "overrideImage")
+            ? r_msg2_main(v, "overrideImage", 0, 0, 0, 0) : 0;
+        uint64_t iiv = r_ivar_value(v, "_iconImageView");
+        if (!r_is_objc_ptr(iiv) && r_responds_main(v, "_iconImageView")) {
+            iiv = r_msg2_main(v, "_iconImageView", 0, 0, 0, 0);
+        }
+        uint64_t displayedRead = (r_is_objc_ptr(iiv) &&
+                                  r_responds_main(iiv, "displayedImage"))
+            ? r_msg2_main(iiv, "displayedImage", 0, 0, 0, 0) : 0;
+        bool dynamicOverlay = themer_should_pin_dynamic_overlay(bundle, v);
+        if (!force && !dynamicOverlay &&
+            overrideRead == image && displayedRead == image) {
+            themer_clear_dynamic_overlay(v);
+            if (skips) (*skips)++;
+            continue;
+        }
+        if (!dynamicOverlay) {
+            themer_clear_dynamic_overlay(v);
+            if (!themer_needs_visible_push(bundle)) {
+                if (skips) (*skips)++;
+                continue;
+            }
+        }
+
+        int rung = 0;
+        if (dynamicOverlay && themer_pin_dynamic_overlay(v, image, bundle)) {
+            rung = 1;
+        } else if (!dynamicOverlay && themer_needs_visible_push(bundle)) {
+            rung = themer_push_image(v, image);
+        }
+        if (rung > 0) {
+            applied++;
+            if (rungHits && rung >= 1 && rung <= 4) rungHits[rung - 1]++;
+        } else if (misses) {
+            (*misses)++;
+        }
+    }
+
+    return applied;
+}
+
+static void themer_add_unique(uint64_t *items, int *count, int cap, uint64_t item)
+{
+    if (!r_is_objc_ptr(item) || !items || !count || *count >= cap) return;
+    for (int i = 0; i < *count; i++) {
+        if (items[i] == item) return;
+    }
+    items[(*count)++] = item;
+}
+
+static int themer_collect_model_lookup_roots(uint64_t *roots, int cap)
+{
+    if (!roots || cap <= 0) return 0;
+    int count = 0;
+
+    uint64_t controllerCls = r_class("SBIconController");
+    uint64_t controller = (r_is_objc_ptr(controllerCls) &&
+                           r_responds(controllerCls, "sharedInstance"))
+        ? r_msg2(controllerCls, "sharedInstance", 0, 0, 0, 0) : 0;
+    themer_add_unique(roots, &count, cap, controller);
+
+    uint64_t managerCls = r_class("SBHIconManager");
+    uint64_t manager = (r_is_objc_ptr(managerCls) &&
+                        r_responds(managerCls, "sharedInstance"))
+        ? r_msg2(managerCls, "sharedInstance", 0, 0, 0, 0) : 0;
+    themer_add_unique(roots, &count, cap, manager);
+
+    const char *childSels[] = {
+        "model",
+        "iconModel",
+        "_iconModel",
+        "rootFolder",
+        "rootFolderController",
+        "rootFolderViewController",
+    };
+    int initial = count;
+    for (int i = 0; i < initial && count < cap; i++) {
+        uint64_t root = roots[i];
+        for (size_t s = 0; s < sizeof(childSels) / sizeof(childSels[0]) && count < cap; s++) {
+            if (!r_responds_main(root, childSels[s])) continue;
+            uint64_t child = r_msg2_main(root, childSels[s], 0, 0, 0, 0);
+            themer_add_unique(roots, &count, cap, child);
+        }
+    }
+
+    return count;
+}
+
+static uint64_t themer_lookup_model_icon_for_bundle(const char *bundle)
+{
+    if (!bundle || !bundle[0]) return 0;
+
+    uint64_t bid = r_nsstr_retained(bundle);
+    if (!r_is_objc_ptr(bid)) return 0;
+
+    enum { ROOT_CAP = 24 };
+    uint64_t roots[ROOT_CAP] = {0};
+    int rootCount = themer_collect_model_lookup_roots(roots, ROOT_CAP);
+
+    const char *lookupSels[] = {
+        "applicationIconForBundleIdentifier:",
+        "applicationIconForDisplayIdentifier:",
+        "expectedIconForDisplayIdentifier:",
+        "iconForApplicationIdentifier:",
+        "iconForIdentifier:",
+        "leafIconForIdentifier:",
+        "_leafIconForIdentifier:",
+        "iconWithIdentifier:",
+    };
+
+    static bool loggedShape = false;
+    uint64_t found = 0;
+    const char *foundSel = NULL;
+    uint64_t foundRoot = 0;
+    static int mismatchLogs = 0;
+    for (int r = 0; r < rootCount && !found; r++) {
+        uint64_t root = roots[r];
+        for (size_t s = 0; s < sizeof(lookupSels) / sizeof(lookupSels[0]); s++) {
+            const char *sel = lookupSels[s];
+            if (!r_responds_main(root, sel)) continue;
+            uint64_t icon = r_msg2_main(root, sel, bid, 0, 0, 0);
+            if (!r_is_objc_ptr(icon)) continue;
+
+            char actual[128] = {0};
+            if (!themer_read_bundle_for_icon(icon, 0, actual, sizeof(actual)) ||
+                strcmp(actual, bundle) != 0) {
+                if (mismatchLogs < 8) {
+                    printf("[THEMER] model lookup rejected requested=%s actual=%s "
+                           "root=0x%llx selector=%s icon=0x%llx\n",
+                           bundle,
+                           actual[0] ? actual : "?",
+                           (unsigned long long)root,
+                           sel,
+                           (unsigned long long)icon);
+                    mismatchLogs++;
+                }
+                continue;
+            }
+
+            found = icon;
+            foundSel = sel;
+            foundRoot = root;
+            break;
+        }
+    }
+    r_msg2(bid, "release", 0, 0, 0, 0);
+
+    if (!loggedShape) {
+        loggedShape = true;
+        printf("[THEMER] model lookup probe roots=%d firstBundle=%s root=0x%llx "
+               "selector=%s icon=0x%llx\n",
+               rootCount,
+               bundle,
+               (unsigned long long)foundRoot,
+               foundSel ?: "(none)",
+               (unsigned long long)found);
+    }
+
+    return found;
+}
+
+static int themer_graft_icon_models_for_theme(NSDictionary<NSString *, NSData *> *dataByBundle,
+                                              int *misses)
+{
+    int grafted = 0;
+    int modelMisses = 0;
+    for (NSString *key in dataByBundle) {
+        if (![key isKindOfClass:NSString.class] || key.length == 0) continue;
+        const char *bundle = key.UTF8String;
+        if (!bundle || !bundle[0]) continue;
+
+        if (kThemerFocusBundle && kThemerFocusBundle[0] &&
+            strcmp(bundle, kThemerFocusBundle) != 0) {
+            continue;
+        }
+
+        NSData *pngBytes = dataByBundle[key];
+        if (![pngBytes isKindOfClass:NSData.class] || pngBytes.length == 0) continue;
+
+        uint64_t image = themer_lookup_cached(bundle);
+        if (!image) {
+            NSData *uploadBytes = themer_rounded_png_data(pngBytes, bundle);
+            image = themer_build_remote_uiimage_from_data(uploadBytes ?: pngBytes, bundle);
+            if (!image) {
+                modelMisses++;
+                continue;
+            }
+            themer_cache_image(bundle, image);
+        }
+
+        uint64_t icon = themer_lookup_model_icon_for_bundle(bundle);
+        if (!r_is_objc_ptr(icon)) {
+            modelMisses++;
+            continue;
+        }
+
+        ThemerEntry *entry = themer_lookup_entry(bundle);
+        if (entry && !entry->iconServicesSeeded) {
+            entry->iconServicesSeeded =
+                themer_seed_iconservices_cache(bundle, image, 60.0) > 0;
+        }
+
+        bool changed = false;
+        if (entry && themer_graft_icon_model(icon, image, entry, 0, &changed)) {
+            grafted++;
+        } else {
+            modelMisses++;
+        }
+    }
+
+    if (misses) *misses += modelMisses;
+    printf("[THEMER] model pass grafted=%d misses=%d cache=%d\n",
+           grafted, modelMisses, gThemerCacheCount);
+    return grafted;
+}
+
+static bool themer_repaint_cached_views_internal(bool force)
+{
+    if (gThemerCacheCount <= 0) {
+        printf("[THEMER] cached repaint skipped; cache empty\n");
+        return false;
+    }
+
+    uint64_t startUS = themer_now_us();
+    uint32_t prevSettle = r_settle_us(kThemerApplySettleUS);
+
+    uint64_t listViewCls = r_class("SBIconListView");
+    uint64_t iconViewCls = r_class("SBIconView");
+    if (!r_is_objc_ptr(listViewCls) || !r_is_objc_ptr(iconViewCls)) {
+        r_settle_us(prevSettle);
+        return false;
+    }
+
+    enum { LV_CAP = 64 };
+    uint64_t lvs[LV_CAP];
+    int nlv = sb_collect_views_in_windows(listViewCls, lvs, LV_CAP);
+    if (nlv == 0) {
+        r_settle_us(prevSettle);
+        printf("[THEMER] cached repaint: no visible SBIconListView\n");
+        return false;
+    }
+
+    int rungHits[4] = {0};
+    int misses = 0;
+    int skips = 0;
+    int applied = 0;
+    for (int i = 0; i < nlv; i++) {
+        applied += themer_repaint_cached_iconviews(lvs[i], iconViewCls,
+                                                   rungHits, &misses, &skips,
+                                                   force);
+    }
+
+    r_settle_us(prevSettle);
+    uint64_t elapsedUS = themer_now_us() - startUS;
+    printf("[THEMER] cached repaint%s lists=%d applied=%d skipped=%d misses=%d rungs={1:%d,2:%d,3:%d,4:%d} cache=%d elapsed=%llums\n",
+           force ? " force" : "",
+           nlv, applied, skips, misses,
+           rungHits[0], rungHits[1], rungHits[2], rungHits[3],
+           gThemerCacheCount,
+           (unsigned long long)(elapsedUS / 1000ULL));
+    return applied > 0 || skips > 0 || nlv > 0;
+}
+
+bool themer_repaint_cached_views_in_session(void)
+{
+    return themer_repaint_cached_views_internal(false);
+}
+
+bool themer_force_repaint_cached_views_in_session(void)
+{
+    return themer_repaint_cached_views_internal(true);
+}
+
+bool themer_apply_data_in_session(NSDictionary<NSString *, NSData *> *imageDataByBundle)
+{
+    if (imageDataByBundle.count == 0) {
+        printf("[THEMER] apply data: empty dictionary\n");
+        return false;
+    }
+    printf("[THEMER] apply data entries=%lu cacheCarried=%d\n",
+           (unsigned long)imageDataByBundle.count, gThemerCacheCount);
+
+    // Drop the per-msgSend settle for the duration of the apply. The stable
+    // RemoteCall trampoline already serializes the calls; sleeping before every
+    // ObjC send just makes the initial icon flip visibly lag.
+    uint64_t startUS = themer_now_us();
+    uint32_t prevSettle = r_settle_us(kThemerApplySettleUS);
+
+    uint64_t listViewCls = r_class("SBIconListView");
+    uint64_t iconViewCls = r_class("SBIconView");
+    if (!r_is_objc_ptr(listViewCls) || !r_is_objc_ptr(iconViewCls)) {
+        printf("[THEMER] missing class SBIconListView=0x%llx SBIconView=0x%llx\n",
+               (unsigned long long)listViewCls,
+               (unsigned long long)iconViewCls);
+        r_settle_us(prevSettle);
+        return false;
+    }
+
+    enum { LV_CAP = 64 };
+    uint64_t lvs[LV_CAP];
+    int nlv = sb_collect_views_in_windows(listViewCls, lvs, LV_CAP);
+    if (nlv == 0) {
+        printf("[THEMER] no SBIconListView visible (home screen not active?)\n");
+        r_settle_us(prevSettle);
+        return false;
+    }
+
+    int rungHits[4] = {0};
+    int misses = 0;
+    int modelGrafted = themer_graft_icon_models_for_theme(imageDataByBundle,
+                                                          &misses);
+    int applied = 0;
+    for (int i = 0; i < nlv; i++) {
+        applied += themer_iter_iconviews(lvs[i], imageDataByBundle, iconViewCls,
+                                         rungHits, &misses);
+    }
+
+    r_settle_us(prevSettle);
+    uint64_t elapsedUS = themer_now_us() - startUS;
+    printf("[THEMER] done lists=%d model=%d applied=%d misses=%d rungs={1:%d,2:%d,3:%d,4:%d} cache=%d elapsed=%llums settle=%uus\n",
+           nlv, modelGrafted, applied, misses,
+           rungHits[0], rungHits[1], rungHits[2], rungHits[3],
+           gThemerCacheCount,
+           (unsigned long long)(elapsedUS / 1000ULL),
+           kThemerApplySettleUS);
+    return applied > 0;
+}
+
+bool themer_apply_in_session(const char *themePath)
+{
+    if (!themePath || !themePath[0]) {
+        printf("[THEMER] apply: nil path\n");
+        return false;
+    }
+
+    NSString *themeDir = @(themePath);
+    NSFileManager *fm = [NSFileManager defaultManager];
+    BOOL isDir = NO;
+    if (![fm fileExistsAtPath:themeDir isDirectory:&isDir] || !isDir) {
+        printf("[THEMER] apply: missing dir %s\n", themePath);
+        return false;
+    }
+
+    NSArray<NSString *> *files = [fm contentsOfDirectoryAtPath:themeDir error:NULL];
+    NSMutableDictionary<NSString *, NSData *> *dict = [NSMutableDictionary dictionary];
+    for (NSString *f in files) {
+        if (![f.pathExtension.lowercaseString isEqualToString:@"png"]) continue;
+        NSString *full = [themeDir stringByAppendingPathComponent:f];
+        NSData *bytes = [NSData dataWithContentsOfFile:full];
+        if (bytes.length) dict[f.stringByDeletingPathExtension] = bytes;
+    }
+    printf("[THEMER] apply path=%s loaded=%lu\n",
+           themePath, (unsigned long)dict.count);
+    return themer_apply_data_in_session(dict);
+}
+
+bool themer_stop_in_session(void)
+{
+    int released = 0;
+    for (int i = 0; i < gThemerCacheCount; i++) {
+        if (r_is_objc_ptr(gThemerCache[i].image)) {
+            r_msg2(gThemerCache[i].image, "release", 0, 0, 0, 0);
+            released++;
+        }
+        if (r_is_objc_ptr(gThemerCache[i].dataSource)) {
+            r_msg2(gThemerCache[i].dataSource, "release", 0, 0, 0, 0);
+            released++;
+        }
+        gThemerCache[i].image = 0;
+        gThemerCache[i].dataSource = 0;
+        gThemerCache[i].iconServicesSeeded = false;
+        gThemerCache[i].bundle[0] = '\0';
+    }
+    gThemerCacheCount = 0;
+    gThemerRung = -1;
+    gThemerHasUpdateAfter = false;
+    gThemerHasUpdateImageView = false;
+    gThemerLogBudget = 48;
+    gThemerModelProbeLogged = false;
+    gThemerIconServicesProbeLogged = false;
+    printf("[THEMER] stop released=%d\n", released);
+    return true;
+}
+
+void themer_forget_remote_state(void)
+{
+    for (int i = 0; i < kThemerMaxCache; i++) {
+        gThemerCache[i].image = 0;
+        gThemerCache[i].dataSource = 0;
+        gThemerCache[i].iconServicesSeeded = false;
+        gThemerCache[i].bundle[0] = '\0';
+    }
+    gThemerCacheCount = 0;
+    gThemerRung = -1;
+    gThemerHasUpdateAfter = false;
+    gThemerHasUpdateImageView = false;
+    gThemerLogBudget = 48;
+    gThemerModelProbeLogged = false;
+    gThemerIconServicesProbeLogged = false;
+}

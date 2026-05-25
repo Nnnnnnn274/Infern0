@@ -171,6 +171,18 @@ typedef NS_ENUM(NSInteger, PackageDetailSection) {
     return self.package.settingsSection != NSIntegerMax;
 }
 
+- (BOOL)requiresThemeSelection
+{
+    return [self.package.identifier isEqualToString:@"com.darksword.themer"];
+}
+
+- (BOOL)needsThemeBeforeInstall
+{
+    return [self requiresThemeSelection] &&
+           !self.package.isInstalled &&
+           !settings_themer_has_selected_theme();
+}
+
 - (void)viewDidLoad
 {
     [super viewDidLoad];
@@ -253,8 +265,12 @@ typedef NS_ENUM(NSInteger, PackageDetailSection) {
         badge = [self badgeWithText:[self manualStateText].uppercaseString
                          background:[color colorWithAlphaComponent:0.16]
                           textColor:color];
+    } else if (self.package.experimental) {
+        badge = [self badgeWithText:@"EXPERIMENTAL"
+                         background:[UIColor.systemRedColor colorWithAlphaComponent:0.16]
+                          textColor:UIColor.systemRedColor];
     } else if (self.package.isInstallDisabled) {
-        badge = [self badgeWithText:@"BUGGY"
+        badge = [self badgeWithText:@"DISABLED"
                          background:[UIColor.systemRedColor colorWithAlphaComponent:0.16]
                           textColor:UIColor.systemRedColor];
     } else if (self.package.isNew) {
@@ -351,6 +367,9 @@ typedef NS_ENUM(NSInteger, PackageDetailSection) {
     } else if (self.package.isInstallDisabled) {
         title = @"Disabled";
         tint = UIColor.secondaryLabelColor;
+    } else if ([self needsThemeBeforeInstall]) {
+        title = @"Select Theme";
+        style = UIBarButtonItemStyleDone;
     } else {
         title = @"Install";
         style = UIBarButtonItemStyleDone;
@@ -378,8 +397,13 @@ typedef NS_ENUM(NSInteger, PackageDetailSection) {
         return;
     }
     if (self.package.isInstallDisabled && !self.package.isInstalled) {
-        log_user("[INSTALLER] Signal Readouts is disabled for now: %s\n",
+        log_user("[INSTALLER] %s is disabled for now: %s\n",
+                 self.package.name.UTF8String,
                  self.package.installDisabledReason.UTF8String);
+        return;
+    }
+    if ([self needsThemeBeforeInstall]) {
+        [self promptSelectThemeBeforeInstall];
         return;
     }
     if (NO && !self.package.isInstalled && [self hasSettingsBundle]) {
@@ -397,6 +421,22 @@ typedef NS_ENUM(NSInteger, PackageDetailSection) {
         log_user("[INSTALLER] Queued install: %s\n", self.package.name.UTF8String);
     }
     [[PackageQueue sharedQueue] toggleForPackage:self.package];
+}
+
+- (void)promptSelectThemeBeforeInstall
+{
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Select a Theme"
+                                                                   message:@"Cyanide Themer needs a selected theme before it can be queued. Choose iOS 6 Theme or import a custom theme first."
+                                                            preferredStyle:UIAlertControllerStyleAlert];
+    [alert addAction:[UIAlertAction actionWithTitle:@"Open Theme Settings"
+                                             style:UIAlertActionStyleDefault
+                                           handler:^(UIAlertAction *_) {
+        [self navigateToSettingsSection];
+    }]];
+    [alert addAction:[UIAlertAction actionWithTitle:@"Cancel"
+                                             style:UIAlertActionStyleCancel
+                                           handler:nil]];
+    [self presentViewController:alert animated:YES completion:nil];
 }
 
 - (void)promptConfigureBeforeInstall

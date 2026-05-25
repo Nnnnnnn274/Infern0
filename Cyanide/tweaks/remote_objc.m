@@ -428,6 +428,28 @@ uint64_t r_ivar_value(uint64_t obj, const char *ivarName)
     return remote_read64(obj + offset);
 }
 
+bool r_read_nsstring(uint64_t str, char *out, size_t outLen)
+{
+    if (!r_is_objc_ptr(str) || !out || outLen == 0) return false;
+    memset(out, 0, outLen);
+
+    uint64_t buf = r_dlsym_call(R_TIMEOUT, "malloc", outLen, 0, 0, 0, 0, 0, 0, 0);
+    if (!buf) return false;
+    r_dlsym_call(R_TIMEOUT, "memset", buf, 0, outLen, 0, 0, 0, 0, 0);
+
+    bool copied = false;
+    if (r_responds(str, "getCString:maxLength:encoding:")) {
+        uint64_t ok = r_msg2(str, "getCString:maxLength:encoding:", buf, outLen, 4, 0);
+        if ((ok & 0xff) && remote_read(buf, out, outLen - 1)) {
+            out[outLen - 1] = '\0';
+            copied = out[0] != '\0';
+        }
+    }
+
+    r_free(buf);
+    return copied;
+}
+
 #ifdef __OBJC__
 #define R_SESSION_RETURN(session, type, fallback, expr) do { \
     if (!(session)) return (expr); \

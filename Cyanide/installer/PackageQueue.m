@@ -14,6 +14,17 @@ NSString * const PackageQueueDidChangeNotification = @"PackageQueueDidChangeNoti
 @property (nonatomic, strong) NSMutableArray<Package *> *uninstalls;
 @end
 
+static BOOL PackageRequiresThemerTheme(Package *package)
+{
+    return [package.identifier isEqualToString:@"com.darksword.themer"];
+}
+
+static BOOL PackageCanQueueInstall(Package *package)
+{
+    if (!PackageRequiresThemerTheme(package)) return YES;
+    return settings_themer_has_selected_theme();
+}
+
 @implementation PackageQueue
 
 + (instancetype)sharedQueue
@@ -38,6 +49,7 @@ NSString * const PackageQueueDidChangeNotification = @"PackageQueueDidChangeNoti
     NSMutableArray<Package *> *out = [self.installs mutableCopy];
     for (Package *p in [PackageCatalog allPackages]) {
         if (p.isInstallDisabled) continue;
+        if (!PackageCanQueueInstall(p)) continue;
         if (!p.isQueuedForApply) continue;
         if ([self packageInArray:out matching:p]) continue;
         if ([self packageInArray:self.uninstalls matching:p]) continue;
@@ -51,6 +63,7 @@ NSString * const PackageQueueDidChangeNotification = @"PackageQueueDidChangeNoti
 
 - (PackageQueueIntent)intentForPackage:(Package *)package
 {
+    if (!package.isInstalled && !PackageCanQueueInstall(package)) return PackageQueueIntentNone;
     if ([self packageInArray:self.installs matching:package])   return PackageQueueIntentInstall;
     if ([self packageInArray:self.uninstalls matching:package]) return PackageQueueIntentUninstall;
     if (package.isInstallDisabled) return PackageQueueIntentNone;
@@ -74,6 +87,7 @@ NSString * const PackageQueueDidChangeNotification = @"PackageQueueDidChangeNoti
         return;
     }
     if (package.isInstallDisabled && !package.isInstalled) return;
+    if (!package.isInstalled && !PackageCanQueueInstall(package)) return;
     if (package.isInstalled) {
         [self.uninstalls addObject:package];
     } else {
@@ -86,6 +100,7 @@ NSString * const PackageQueueDidChangeNotification = @"PackageQueueDidChangeNoti
 {
     [self removePackage:package];
     if (intent == PackageQueueIntentInstall) {
+        if (!PackageCanQueueInstall(package)) return;
         [self.installs addObject:package];
     } else if (intent == PackageQueueIntentUninstall) {
         [self.uninstalls addObject:package];
