@@ -31,7 +31,7 @@ static const CGFloat kPopupPadding = 2.0;
     [NSLayoutConstraint activateConstraints:@[
         [self.popupBar.leadingAnchor  constraintEqualToAnchor:self.view.leadingAnchor  constant:12.0],
         [self.popupBar.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-12.0],
-        [self.popupBar.bottomAnchor   constraintEqualToAnchor:self.view.safeAreaLayoutGuide.bottomAnchor constant:-kPopupGap],
+        [self.popupBar.bottomAnchor   constraintEqualToAnchor:self.tabBar.topAnchor constant:-kPopupGap],
         [self.popupBar.heightAnchor   constraintEqualToConstant:kPopupHeight],
     ]];
 

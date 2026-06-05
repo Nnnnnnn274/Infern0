@@ -19,6 +19,10 @@ Avoid vague bullets like "Update settings", "Change project files", or
 
 ## Released
 
+### v1.2.7 - 2026-06-05
+
+- [x] Fixed the Installer queue popup overlapping the bottom tab bar on iOS 18.
+
 ### v1.2.6 - 2026-06-05
 
 - [x] Fixed LiveWP video changes stopping after one run and SnowBoard Lite icon themes drawing over rounded icon corners.
