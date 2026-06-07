@@ -1,0 +1,217 @@
+name: Issue Status Labels
+
+on:
+  issues:
+    types: [opened, edited, reopened]
+  issue_comment:
+    types: [created, edited]
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: "Optional issue number to resync"
+        required: false
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  status-labels:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Sync issue status label
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const statusLabels = [
+              "status:needs-info",
+              "status:needs-testing",
+              "status:investigating",
+              "status:parked-ios17",
+              "status:confirmed",
+            ];
+
+            const { owner, repo } = context.repo;
+
+            async function getIssue(issue_number) {
+              const { data } = await github.rest.issues.get({
+                owner,
+                repo,
+                issue_number,
+              });
+              return data;
+            }
+
+            async function getComments(issue_number) {
+              const comments = await github.paginate(github.rest.issues.listComments, {
+                owner,
+                repo,
+                issue_number,
+                per_page: 100,
+              });
+              return comments;
+            }
+
+            async function addLabel(issue_number, label) {
+              await github.rest.issues.addLabels({
+                owner,
+                repo,
+                issue_number,
+                labels: [label],
+              });
+            }
+
+            async function removeLabel(issue_number, label) {
+              try {
+                await github.rest.issues.removeLabel({
+                  owner,
+                  repo,
+                  issue_number,
+                  name: label,
+                });
+              } catch (error) {
+                if (error.status !== 404) throw error;
+              }
+            }
+
+            async function setStatus(issue, label) {
+              const current = new Set(issue.labels.map((entry) => entry.name));
+              if (current.has(label) && statusLabels.every((candidate) => candidate === label || !current.has(candidate))) {
+                core.info(`#${issue.number} already has only ${label}`);
+                return;
+              }
+
+              await addLabel(issue.number, label);
+              await Promise.all(
+                statusLabels
+                  .filter((candidate) => candidate !== label && current.has(candidate))
+                  .map((candidate) => removeLabel(issue.number, candidate))
+              );
+              core.info(`#${issue.number} -> ${label}`);
+            }
+
+            function isBug(issue) {
+              return issue.labels.some((entry) => entry.name === "bug");
+            }
+
+            function isMaintainerAssociation(association) {
+              return ["OWNER", "MEMBER", "COLLABORATOR"].includes(association);
+            }
+
+            function textMatches(text, patterns) {
+              return patterns.some((pattern) => pattern.test(text));
+            }
+
+            function issueMentionsIos17(issue) {
+              const text = `${issue.title || ""}\n${issue.body || ""}`;
+              return /\bios\s*17\b|\bios\s*17[.\d]*\b|\bipados\s*17\b|\b17\.\d+\b/i.test(text);
+            }
+
+            function maintainerAskedForTesting(text) {
+              return textMatches(text, [
+                /\bplease\s+test\b/i,
+                /\btest\s+(the\s+)?new\s+build\b/i,
+                /\binstall\s+the\s+new\s+build\b/i,
+                /\bnew\s+build\b/i,
+                /\bv\d+\.\d+\.\d+\b/i,
+                /\brelease:\s*https?:\/\//i,
+              ]);
+            }
+
+            function maintainerAskedForInfo(text) {
+              return textMatches(text, [
+                /\bneed\s+(more\s+)?(info|details|logs|evidence)\b/i,
+                /\bplease\s+(attach|add|send|share|provide)\b/i,
+                /\bchain-\*\.log\b/i,
+                /\bchain log\b/i,
+                /\banalytics data\b/i,
+                /\bspringboard\b/i,
+                /\bpanic(-full|-base)?\b/i,
+              ]);
+            }
+
+            function reporterProvidedEvidence(text) {
+              return textMatches(text, [
+                /github\.com\/user-attachments\//i,
+                /\bchain-\d{8}-\d{6}\.log\b/i,
+                /\bchain-\*?\.log\b/i,
+                /\bpanic(-full|-base)?\b/i,
+                /\bspringboard\b/i,
+                /\banalytics data\b/i,
+                /\bcrash report\b/i,
+                /\bkernel panic\b/i,
+                /\btested\b/i,
+                /\bstill (crash|respring|panic|happen|broken|not work)/i,
+                /\bworks now\b|\bno longer\b|\bfixed\b/i,
+              ]);
+            }
+
+            async function inferStatusFromComments(issue) {
+              const comments = await getComments(issue.number);
+              let inferred = null;
+
+              for (const comment of comments) {
+                const body = comment.body || "";
+                if (isMaintainerAssociation(comment.author_association)) {
+                  if (maintainerAskedForTesting(body)) inferred = "status:needs-testing";
+                  else if (maintainerAskedForInfo(body)) inferred = "status:needs-info";
+                } else if (reporterProvidedEvidence(body)) {
+                  inferred = "status:investigating";
+                }
+              }
+
+              return inferred;
+            }
+
+            async function processIssue(issue) {
+              if (issue.pull_request) {
+                core.info(`#${issue.number} is a pull request; skipping.`);
+                return;
+              }
+
+              if (!isBug(issue)) {
+                core.info(`#${issue.number} is not labeled bug; skipping.`);
+                return;
+              }
+
+              if (issueMentionsIos17(issue)) {
+                await setStatus(issue, "status:parked-ios17");
+                return;
+              }
+
+              const nextStatus = await inferStatusFromComments(issue);
+              if (!nextStatus) {
+                core.info(`#${issue.number}: no status change inferred.`);
+                return;
+              }
+
+              await setStatus(issue, nextStatus);
+            }
+
+            if (context.eventName === "workflow_dispatch") {
+              const issueNumber = Number(core.getInput("issue_number"));
+              if (issueNumber) {
+                await processIssue(await getIssue(issueNumber));
+                return;
+              }
+
+              const issues = await github.paginate(github.rest.issues.listForRepo, {
+                owner,
+                repo,
+                state: "open",
+                labels: "bug",
+                per_page: 100,
+              });
+              for (const issue of issues) {
+                await processIssue(issue);
+              }
+              return;
+            }
+
+            const issueNumber = context.payload.issue && context.payload.issue.number;
+            if (!issueNumber) {
+              core.info("No issue found in event payload.");
+              return;
+            }
+
+            await processIssue(await getIssue(issueNumber));
