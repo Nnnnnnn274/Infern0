@@ -19,6 +19,10 @@ Avoid vague bullets like "Update settings", "Change project files", or
 
 ## Released
 
+### v1.2.12 - 2026-06-08
+
+- [x] Fixed Location Simulator exact coordinate entry so pasted decimal pairs and compass-suffix coordinates are normalized correctly.
+
 ### v1.2.11 - 2026-06-07
 
 - [x] Added an optional simulator build path that uses a simulator XPF dylib without changing the normal device IPA build.

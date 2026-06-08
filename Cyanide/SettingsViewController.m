@@ -4128,19 +4128,136 @@ static NSString *settings_location_sim_host_process(NSUserDefaults *d)
     return host.length > 0 ? host : @"Maps";
 }
 
-static BOOL settings_location_sim_parse_double(NSString *text, double *outValue)
+static NSArray<NSDictionary *> *settings_location_sim_number_tokens_from_text(NSString *text)
 {
-    if (!outValue) return NO;
+    NSMutableArray<NSDictionary *> *tokens = [NSMutableArray array];
     NSScanner *scanner = [NSScanner scannerWithString:text ?: @""];
-    scanner.charactersToBeSkipped = NSCharacterSet.whitespaceAndNewlineCharacterSet;
-    double value = 0.0;
-    if (![scanner scanDouble:&value]) return NO;
-    [scanner scanCharactersFromSet:NSCharacterSet.whitespaceAndNewlineCharacterSet
-                        intoString:nil];
-    if (!scanner.isAtEnd) return NO;
-    if (!isfinite(value)) return NO;
-    *outValue = value;
-    return YES;
+    scanner.charactersToBeSkipped = nil;
+    while (!scanner.isAtEnd) {
+        double value = 0.0;
+        NSUInteger start = scanner.scanLocation;
+        if ([scanner scanDouble:&value]) {
+            if (isfinite(value)) {
+                NSRange range = NSMakeRange(start, scanner.scanLocation - start);
+                [tokens addObject:@{ @"value": @(value),
+                                     @"range": [NSValue valueWithRange:range] }];
+            }
+            continue;
+        }
+        scanner.scanLocation = scanner.scanLocation + 1;
+    }
+    return tokens;
+}
+
+static NSInteger settings_location_sim_axis_sign_for_word(NSString *word, BOOL latitude)
+{
+    NSString *upper = [(word ?: @"") uppercaseString];
+    if (upper.length != 1) return 0;
+    unichar c = [upper characterAtIndex:0];
+    if (latitude) {
+        if (c == 'N') return 1;
+        if (c == 'S') return -1;
+    } else {
+        if (c == 'E') return 1;
+        if (c == 'W') return -1;
+    }
+    return 0;
+}
+
+static NSInteger settings_location_sim_axis_kind_for_word(NSString *word)
+{
+    NSString *upper = [(word ?: @"") uppercaseString];
+    if ([upper isEqualToString:@"LAT"] ||
+        [upper isEqualToString:@"LATITUDE"]) {
+        return 1;
+    }
+    if ([upper isEqualToString:@"LON"] ||
+        [upper isEqualToString:@"LNG"] ||
+        [upper isEqualToString:@"LONG"] ||
+        [upper isEqualToString:@"LONGITUDE"]) {
+        return 2;
+    }
+    return 0;
+}
+
+static BOOL settings_location_sim_is_axis_separator(unichar c)
+{
+    if ([NSCharacterSet.whitespaceAndNewlineCharacterSet characterIsMember:c]) return YES;
+    if ([NSCharacterSet.punctuationCharacterSet characterIsMember:c]) return YES;
+    if ([NSCharacterSet.symbolCharacterSet characterIsMember:c]) return YES;
+    return NO;
+}
+
+static NSString *settings_location_sim_axis_word_after_range(NSString *text, NSRange range)
+{
+    NSUInteger i = NSMaxRange(range);
+    while (i < text.length &&
+           settings_location_sim_is_axis_separator([text characterAtIndex:i])) {
+        i++;
+    }
+    NSUInteger start = i;
+    while (i < text.length &&
+           [NSCharacterSet.letterCharacterSet characterIsMember:[text characterAtIndex:i]]) {
+        i++;
+    }
+    return i > start ? [text substringWithRange:NSMakeRange(start, i - start)] : @"";
+}
+
+static NSString *settings_location_sim_axis_word_before_range(NSString *text, NSRange range)
+{
+    if (range.location == 0) return @"";
+    NSInteger i = (NSInteger)range.location - 1;
+    while (i >= 0 &&
+           settings_location_sim_is_axis_separator([text characterAtIndex:(NSUInteger)i])) {
+        i--;
+    }
+    NSInteger end = i + 1;
+    while (i >= 0 &&
+           [NSCharacterSet.letterCharacterSet characterIsMember:[text characterAtIndex:(NSUInteger)i]]) {
+        i--;
+    }
+    NSInteger start = i + 1;
+    return end > start ? [text substringWithRange:NSMakeRange((NSUInteger)start, (NSUInteger)(end - start))] : @"";
+}
+
+static NSInteger settings_location_sim_axis_sign_near_range(NSString *text,
+                                                            NSRange range,
+                                                            BOOL latitude)
+{
+    NSInteger sign = settings_location_sim_axis_sign_for_word(settings_location_sim_axis_word_after_range(text ?: @"", range),
+                                                              latitude);
+    if (sign != 0) return sign;
+    return settings_location_sim_axis_sign_for_word(settings_location_sim_axis_word_before_range(text ?: @"", range),
+                                                   latitude);
+}
+
+static NSInteger settings_location_sim_axis_kind_near_range(NSString *text, NSRange range)
+{
+    NSInteger kind = settings_location_sim_axis_kind_for_word(settings_location_sim_axis_word_before_range(text ?: @"", range));
+    if (kind != 0) return kind;
+    return settings_location_sim_axis_kind_for_word(settings_location_sim_axis_word_after_range(text ?: @"", range));
+}
+
+static NSInteger settings_location_sim_axis_sign_from_text(NSString *text, BOOL latitude)
+{
+    NSString *upper = [(text ?: @"") uppercaseString];
+    NSInteger sign = 0;
+    for (NSUInteger i = 0; i < upper.length; i++) {
+        unichar c = [upper characterAtIndex:i];
+        NSInteger candidate = settings_location_sim_axis_sign_for_word([NSString stringWithCharacters:&c length:1],
+                                                                       latitude);
+        if (candidate == 0) continue;
+
+        BOOL prevIsLetter = (i > 0) && [NSCharacterSet.letterCharacterSet characterIsMember:[upper characterAtIndex:i - 1]];
+        BOOL nextIsLetter = (i + 1 < upper.length) && [NSCharacterSet.letterCharacterSet characterIsMember:[upper characterAtIndex:i + 1]];
+        if (!prevIsLetter && !nextIsLetter) sign = candidate;
+    }
+    return sign;
+}
+
+static double settings_location_sim_apply_axis_sign(double value, NSInteger sign)
+{
+    return sign != 0 ? fabs(value) * (double)sign : value;
 }
 
 static BOOL settings_location_sim_coordinates_valid(double latitude, double longitude)
@@ -4148,6 +4265,132 @@ static BOOL settings_location_sim_coordinates_valid(double latitude, double long
     return isfinite(latitude) && isfinite(longitude) &&
            latitude >= -90.0 && latitude <= 90.0 &&
            longitude >= -180.0 && longitude <= 180.0;
+}
+
+static BOOL settings_location_sim_component_valid(double value, BOOL latitude)
+{
+    if (!isfinite(value)) return NO;
+    return latitude
+        ? (value >= -90.0 && value <= 90.0)
+        : (value >= -180.0 && value <= 180.0);
+}
+
+static BOOL settings_location_sim_parse_coordinate_component(NSString *text,
+                                                             BOOL latitude,
+                                                             double *outValue)
+{
+    if (!outValue) return NO;
+    NSArray<NSDictionary *> *tokens = settings_location_sim_number_tokens_from_text(text);
+    if (tokens.count != 1) return NO;
+
+    NSDictionary *token = tokens.firstObject;
+    double value = [token[@"value"] doubleValue];
+    NSRange range = [token[@"range"] rangeValue];
+    NSInteger sign = settings_location_sim_axis_sign_near_range(text, range, latitude);
+    if (sign == 0) sign = settings_location_sim_axis_sign_from_text(text, latitude);
+    value = settings_location_sim_apply_axis_sign(value, sign);
+    if (!settings_location_sim_component_valid(value, latitude)) return NO;
+
+    *outValue = value;
+    return YES;
+}
+
+static BOOL settings_location_sim_parse_coordinate_pair(NSString *text,
+                                                        double *latitudeOut,
+                                                        double *longitudeOut)
+{
+    if (!latitudeOut || !longitudeOut) return NO;
+    NSArray<NSDictionary *> *tokens = settings_location_sim_number_tokens_from_text(text);
+    if (tokens.count != 2) return NO;
+
+    NSDictionary *firstToken = tokens[0];
+    NSDictionary *secondToken = tokens[1];
+    double first = [firstToken[@"value"] doubleValue];
+    double second = [secondToken[@"value"] doubleValue];
+    NSRange firstRange = [firstToken[@"range"] rangeValue];
+    NSRange secondRange = [secondToken[@"range"] rangeValue];
+    NSInteger firstLatSign = settings_location_sim_axis_sign_near_range(text, firstRange, YES);
+    NSInteger firstLonSign = settings_location_sim_axis_sign_near_range(text, firstRange, NO);
+    NSInteger secondLatSign = settings_location_sim_axis_sign_near_range(text, secondRange, YES);
+    NSInteger secondLonSign = settings_location_sim_axis_sign_near_range(text, secondRange, NO);
+    NSInteger firstKind = settings_location_sim_axis_kind_near_range(text, firstRange);
+    NSInteger secondKind = settings_location_sim_axis_kind_near_range(text, secondRange);
+
+    if (firstKind == 1 && secondKind == 2) {
+        double latitude = settings_location_sim_apply_axis_sign(first, firstLatSign);
+        double longitude = settings_location_sim_apply_axis_sign(second, secondLonSign);
+        if (!settings_location_sim_coordinates_valid(latitude, longitude)) return NO;
+        *latitudeOut = latitude;
+        *longitudeOut = longitude;
+        return YES;
+    }
+
+    if (firstKind == 2 && secondKind == 1) {
+        double latitude = settings_location_sim_apply_axis_sign(second, secondLatSign);
+        double longitude = settings_location_sim_apply_axis_sign(first, firstLonSign);
+        if (!settings_location_sim_coordinates_valid(latitude, longitude)) return NO;
+        *latitudeOut = latitude;
+        *longitudeOut = longitude;
+        return YES;
+    }
+
+    if (firstLatSign != 0 && secondLonSign != 0) {
+        double latitude = settings_location_sim_apply_axis_sign(first, firstLatSign);
+        double longitude = settings_location_sim_apply_axis_sign(second, secondLonSign);
+        if (!settings_location_sim_coordinates_valid(latitude, longitude)) return NO;
+        *latitudeOut = latitude;
+        *longitudeOut = longitude;
+        return YES;
+    }
+
+    if (firstLonSign != 0 && secondLatSign != 0) {
+        double latitude = settings_location_sim_apply_axis_sign(second, secondLatSign);
+        double longitude = settings_location_sim_apply_axis_sign(first, firstLonSign);
+        if (!settings_location_sim_coordinates_valid(latitude, longitude)) return NO;
+        *latitudeOut = latitude;
+        *longitudeOut = longitude;
+        return YES;
+    }
+
+    NSInteger latitudeSign = settings_location_sim_axis_sign_from_text(text, YES);
+    NSInteger longitudeSign = settings_location_sim_axis_sign_from_text(text, NO);
+
+    double latitude = first;
+    double longitude = second;
+    latitude = settings_location_sim_apply_axis_sign(latitude, latitudeSign);
+    longitude = settings_location_sim_apply_axis_sign(longitude, longitudeSign);
+    if (!settings_location_sim_coordinates_valid(latitude, longitude)) {
+        latitude = second;
+        longitude = first;
+        latitude = settings_location_sim_apply_axis_sign(latitude, latitudeSign);
+        longitude = settings_location_sim_apply_axis_sign(longitude, longitudeSign);
+        if (!settings_location_sim_coordinates_valid(latitude, longitude)) return NO;
+    }
+
+    *latitudeOut = latitude;
+    *longitudeOut = longitude;
+    return YES;
+}
+
+static BOOL settings_location_sim_parse_coordinate_fields(NSString *latitudeText,
+                                                          NSString *longitudeText,
+                                                          double *latitudeOut,
+                                                          double *longitudeOut)
+{
+    if (!latitudeOut || !longitudeOut) return NO;
+    if (settings_location_sim_parse_coordinate_pair(latitudeText, latitudeOut, longitudeOut)) return YES;
+    if (settings_location_sim_parse_coordinate_pair(longitudeText, latitudeOut, longitudeOut)) return YES;
+
+    double latitude = 0.0;
+    double longitude = 0.0;
+    BOOL ok = settings_location_sim_parse_coordinate_component(latitudeText, YES, &latitude) &&
+              settings_location_sim_parse_coordinate_component(longitudeText, NO, &longitude) &&
+              settings_location_sim_coordinates_valid(latitude, longitude);
+    if (!ok) return NO;
+
+    *latitudeOut = latitude;
+    *longitudeOut = longitude;
+    return YES;
 }
 
 static BOOL settings_location_sim_is_active(NSUserDefaults *d)
@@ -9290,7 +9533,7 @@ void cyanide_present_contact(UIViewController *host)
 - (void)presentLocationSimInvalidCoordinateAlert
 {
     UIAlertController *ac = [UIAlertController alertControllerWithTitle:@"Invalid Coordinates"
-                                                                message:@"Latitude must be between -90 and 90. Longitude must be between -180 and 180."
+                                                                message:@"Use decimal degrees. Latitude must be between -90 and 90. Longitude must be between -180 and 180."
                                                          preferredStyle:UIAlertControllerStyleAlert];
     [ac addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
     settings_present_controller(ac, self);
@@ -9300,10 +9543,10 @@ void cyanide_present_contact(UIViewController *host)
 {
     NSUserDefaults *d = NSUserDefaults.standardUserDefaults;
     UIAlertController *ac = [UIAlertController alertControllerWithTitle:@"Exact Coordinates"
-                                                                message:@"Enter decimal degrees."
+                                                                message:@"Enter decimal degrees, or paste a pair like 40.7128, -74.0060."
                                                          preferredStyle:UIAlertControllerStyleAlert];
     [ac addTextFieldWithConfigurationHandler:^(UITextField *field) {
-        field.placeholder = @"Latitude";
+        field.placeholder = @"Latitude or lat, lon";
         field.text = [NSString stringWithFormat:@"%.8f", [d doubleForKey:kSettingsLocationSimLatitude]];
         field.keyboardType = UIKeyboardTypeNumbersAndPunctuation;
         field.clearButtonMode = UITextFieldViewModeWhileEditing;
@@ -9321,9 +9564,10 @@ void cyanide_present_contact(UIViewController *host)
         if (!strongSelf) return;
         double latitude = 0.0;
         double longitude = 0.0;
-        BOOL ok = settings_location_sim_parse_double(ac.textFields.firstObject.text, &latitude) &&
-                  settings_location_sim_parse_double(ac.textFields.lastObject.text, &longitude) &&
-                  settings_location_sim_coordinates_valid(latitude, longitude);
+        BOOL ok = settings_location_sim_parse_coordinate_fields(ac.textFields.firstObject.text,
+                                                                ac.textFields.lastObject.text,
+                                                                &latitude,
+                                                                &longitude);
         if (!ok) {
             [strongSelf presentLocationSimInvalidCoordinateAlert];
             return;
