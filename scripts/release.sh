@@ -12,6 +12,7 @@
 #   BUMP=none  ./scripts/release.sh "..."               # leave MARKETING_VERSION as-is
 #   VERSION=1.5.3 ./scripts/release.sh "..."            # set an explicit version
 #   TAG=v1.2.3 ./scripts/release.sh "..."               # override tag (defaults to v${VERSION})
+#   # Signal release notifications are ON by default.
 #   SIGNAL_RELEASE_NOTIFY=0 ./scripts/release.sh "..."  # skip Signal group post
 #   # Signal posts default to jf-mac-mini@jf-mac-mini.local over SSH.
 #   SIGNAL_BOT_SSH_HOST=user@host ./scripts/release.sh "..."  # post via remote Signal bot
