@@ -57,14 +57,29 @@ notify_signal_release() {
     fi
 
     if [ -n "$signal_ssh_host" ]; then
-        local quoted_env quoted_version quoted_tag quoted_url quoted_notes quoted_dry_run remote_cmd
-        printf -v quoted_env "%q" "$signal_remote_env"
-        printf -v quoted_version "%q" "$version"
-        printf -v quoted_tag "%q" "$tag"
-        printf -v quoted_url "%q" "$release_url"
-        printf -v quoted_notes "%q" "$notes"
-        printf -v quoted_dry_run "%q" "${SIGNAL_RELEASE_NOTIFY_DRY_RUN:-0}"
-        remote_cmd="SIGNAL_BOT_ENV=$quoted_env CYANIDE_VERSION=$quoted_version CYANIDE_TAG=$quoted_tag CYANIDE_RELEASE_URL=$quoted_url CYANIDE_RELEASE_NOTES=$quoted_notes SIGNAL_RELEASE_NOTIFY_DRY_RUN=$quoted_dry_run python3 -"
+        # Base64-encode each value before sending through the SSH command
+        # string. Release notes contain newlines, backticks, quotes, and
+        # other shell-significant characters that broke the previous
+        # `printf %q` approach: the escaped form was re-parsed by the
+        # remote shell and landed in the Signal message body as literal
+        # `\ ` and `$'\n'` junk. The base64 alphabet ([A-Za-z0-9+/=]) is
+        # shell-safe, so the encoded values can be inlined directly into
+        # remote_cmd and decoded on the remote side.
+        local b64_env b64_version b64_tag b64_url b64_notes b64_dry_run
+        b64_env=$(printf '%s' "$signal_remote_env" | base64 | tr -d '\n')
+        b64_version=$(printf '%s' "$version" | base64 | tr -d '\n')
+        b64_tag=$(printf '%s' "$tag" | base64 | tr -d '\n')
+        b64_url=$(printf '%s' "$release_url" | base64 | tr -d '\n')
+        b64_notes=$(printf '%s' "$notes" | base64 | tr -d '\n')
+        b64_dry_run=$(printf '%s' "${SIGNAL_RELEASE_NOTIFY_DRY_RUN:-0}" | base64 | tr -d '\n')
+
+        remote_cmd="SIGNAL_BOT_ENV=\$(printf %s $b64_env | base64 -d) \
+CYANIDE_VERSION=\$(printf %s $b64_version | base64 -d) \
+CYANIDE_TAG=\$(printf %s $b64_tag | base64 -d) \
+CYANIDE_RELEASE_URL=\$(printf %s $b64_url | base64 -d) \
+CYANIDE_RELEASE_NOTES=\$(printf %s $b64_notes | base64 -d) \
+SIGNAL_RELEASE_NOTIFY_DRY_RUN=\$(printf %s $b64_dry_run | base64 -d) \
+python3 -"
 
         # Non-fatal: releases should still ship if the always-on Signal bot is
         # offline, off-network, or not yet configured for SSH.
