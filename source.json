@@ -20,10 +20,10 @@
       "tintColor": "#02D7E0",
       "versions": [
         {
-          "version": "1.2.24",
-          "date": "2026-06-13",
-          "size": 7604604,
-          "downloadURL": "https://github.com/zeroxjf/cyanide/releases/download/v1.2.24/Cyanide-1.2.24.ipa",
+          "version": "1.2.25",
+          "date": "2026-06-17",
+          "size": 7629382,
+          "downloadURL": "https://github.com/zeroxjf/cyanide/releases/download/v1.2.26/Cyanide-1.2.25.ipa",
           "localizedDescription": "",
           "minOSVersion": "17.0"
         }
