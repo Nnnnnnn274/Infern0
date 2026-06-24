@@ -153,6 +153,7 @@ void settings_application_did_become_active(void);
 // back to the Packages tab — so the install action stays one tap away
 // after customizing.
 @property (nonatomic, copy, nullable) NSString *installerReturnPackageName;
+@property (nonatomic, assign) BOOL quickLoaderStandalone;
 
 // Current values for each configurable row in a settings section.
 // Each entry: @{@"title": <label string>, @"value": <current value string>}.

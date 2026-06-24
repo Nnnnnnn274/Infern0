@@ -13,13 +13,13 @@ static NSString * const kGitHubIssuesURL = @"https://github.com/zeroxjf/cyanide/
 static NSString * const kGitHubRepoURL   = @"https://github.com/zeroxjf/cyanide";
 static NSString * const kPatreonURL      = @"https://www.patreon.com/zeroxjf";
 
-static const CGFloat kPad    = 16.0;
 static const CGFloat kMargin = 20.0;
-static const CGFloat kGap    = 20.0;
 
 @interface HomeViewController ()
 @property (nonatomic, strong) UIScrollView *scrollView;
 @property (nonatomic, strong) UIStackView *stack;
+@property (nonatomic, weak) UIView *heroView;
+@property (nonatomic, weak) CAGradientLayer *heroGrad;
 @end
 
 @implementation HomeViewController
@@ -31,9 +31,7 @@ static const CGFloat kGap    = 20.0;
     self.view.backgroundColor = UIColor.systemGroupedBackgroundColor;
     self.navigationItem.largeTitleDisplayMode = UINavigationItemLargeTitleDisplayModeAlways;
     self.navigationController.navigationBar.prefersLargeTitles = YES;
-
-    NSString *ver = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleShortVersionString"] ?: @"";
-    self.navigationItem.title = [NSString stringWithFormat:@"Cyanide v%@", ver];
+    self.navigationItem.title = @"Cyanide";
 
     self.scrollView = [[UIScrollView alloc] init];
     self.scrollView.translatesAutoresizingMaskIntoConstraints = NO;
@@ -43,7 +41,7 @@ static const CGFloat kGap    = 20.0;
     self.stack = [[UIStackView alloc] init];
     self.stack.translatesAutoresizingMaskIntoConstraints = NO;
     self.stack.axis = UILayoutConstraintAxisVertical;
-    self.stack.spacing = kGap;
+    self.stack.spacing = 24.0;
     self.stack.alignment = UIStackViewAlignmentFill;
     [self.scrollView addSubview:self.stack];
 
@@ -52,28 +50,37 @@ static const CGFloat kGap    = 20.0;
         [self.scrollView.leadingAnchor  constraintEqualToAnchor:self.view.leadingAnchor],
         [self.scrollView.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
         [self.scrollView.bottomAnchor   constraintEqualToAnchor:self.view.bottomAnchor],
-        [self.stack.topAnchor      constraintEqualToAnchor:self.scrollView.contentLayoutGuide.topAnchor constant:8.0],
+        [self.stack.topAnchor      constraintEqualToAnchor:self.scrollView.contentLayoutGuide.topAnchor constant:4.0],
         [self.stack.leadingAnchor  constraintEqualToAnchor:self.scrollView.contentLayoutGuide.leadingAnchor constant:kMargin],
         [self.stack.trailingAnchor constraintEqualToAnchor:self.scrollView.contentLayoutGuide.trailingAnchor constant:-kMargin],
-        [self.stack.bottomAnchor   constraintEqualToAnchor:self.scrollView.contentLayoutGuide.bottomAnchor constant:-28.0],
+        [self.stack.bottomAnchor   constraintEqualToAnchor:self.scrollView.contentLayoutGuide.bottomAnchor constant:-32.0],
         [self.stack.widthAnchor    constraintEqualToAnchor:self.scrollView.frameLayoutGuide.widthAnchor constant:-kMargin * 2],
     ]];
 
-    [self.stack addArrangedSubview:[self buildBanner]];
-    [self.stack addArrangedSubview:[self section:@"WHAT'S NEW" card:[self whatsNewCard]]];
-    [self.stack addArrangedSubview:[self section:@"JAVASCRIPT TWEAKS" card:[self jsCard]]];
-    [self.stack addArrangedSubview:[self section:@"REMOTECALL TWEAKS" card:[self rcCard]]];
-    [self.stack addArrangedSubview:[self section:@"COMMUNITY" card:[self communityCard]]];
+    [self.stack addArrangedSubview:[self buildHero]];
+    [self.stack addArrangedSubview:[self buildQuickActions]];
+    [self.stack addArrangedSubview:[self buildWhatsNew]];
+    [self.stack addArrangedSubview:[self buildGetStarted]];
+    [self.stack addArrangedSubview:[self buildCommunity]];
 }
 
-#pragma mark - Banner
+#pragma mark - Hero
 
-- (UIView *)buildBanner
+- (UIView *)buildHero
 {
-    UIView *banner = [[UIView alloc] init];
-    banner.backgroundColor = [UIColor.systemCyanColor colorWithAlphaComponent:0.08];
-    banner.layer.cornerRadius = 14.0;
-    banner.layer.cornerCurve = kCACornerCurveContinuous;
+    UIView *hero = [[UIView alloc] init];
+    hero.layer.cornerRadius = 20.0;
+    hero.layer.cornerCurve = kCACornerCurveContinuous;
+    hero.clipsToBounds = YES;
+
+    CAGradientLayer *grad = [CAGradientLayer layer];
+    grad.colors = @[
+        (id)[UIColor colorWithRed:0.0 green:0.72 blue:0.84 alpha:1.0].CGColor,
+        (id)[UIColor colorWithRed:0.0 green:0.50 blue:0.90 alpha:1.0].CGColor,
+    ];
+    grad.startPoint = CGPointMake(0.0, 0.0);
+    grad.endPoint = CGPointMake(1.0, 1.0);
+    [hero.layer insertSublayer:grad atIndex:0];
 
     UIImageView *icon = [[UIImageView alloc] init];
     icon.translatesAutoresizingMaskIntoConstraints = NO;
@@ -83,313 +90,431 @@ static const CGFloat kGap    = 20.0;
         appIcon = f ? [UIImage imageNamed:f] : nil;
     }
     icon.image = appIcon;
-    icon.layer.cornerRadius = 12.0;
+    icon.layer.cornerRadius = 14.0;
     icon.layer.cornerCurve = kCACornerCurveContinuous;
     icon.clipsToBounds = YES;
     icon.contentMode = UIViewContentModeScaleAspectFit;
-    [banner addSubview:icon];
+    icon.layer.borderWidth = 1.5;
+    icon.layer.borderColor = [UIColor colorWithWhite:1.0 alpha:0.25].CGColor;
+    [hero addSubview:icon];
+
+    NSString *ver = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleShortVersionString"] ?: @"";
+
+    UILabel *tagline = [[UILabel alloc] init];
+    tagline.translatesAutoresizingMaskIntoConstraints = NO;
+    tagline.text = @"SpringBoard tweaks for stock iOS";
+    tagline.font = [UIFont systemFontOfSize:17.0 weight:UIFontWeightBold];
+    tagline.textColor = UIColor.whiteColor;
+    tagline.textAlignment = NSTextAlignmentCenter;
+    [hero addSubview:tagline];
+
+    UILabel *sub = [[UILabel alloc] init];
+    sub.translatesAutoresizingMaskIntoConstraints = NO;
+    sub.text = [NSString stringWithFormat:@"No jailbreak required · v%@", ver];
+    sub.font = [UIFont systemFontOfSize:13.0 weight:UIFontWeightMedium];
+    sub.textColor = [UIColor colorWithWhite:1.0 alpha:0.65];
+    sub.textAlignment = NSTextAlignmentCenter;
+    [hero addSubview:sub];
+
+    [NSLayoutConstraint activateConstraints:@[
+        [icon.centerXAnchor  constraintEqualToAnchor:hero.centerXAnchor],
+        [icon.topAnchor      constraintEqualToAnchor:hero.topAnchor constant:20.0],
+        [icon.widthAnchor    constraintEqualToConstant:48.0],
+        [icon.heightAnchor   constraintEqualToConstant:48.0],
+
+        [tagline.centerXAnchor  constraintEqualToAnchor:hero.centerXAnchor],
+        [tagline.topAnchor      constraintEqualToAnchor:icon.bottomAnchor constant:10.0],
+
+        [sub.centerXAnchor  constraintEqualToAnchor:hero.centerXAnchor],
+        [sub.topAnchor      constraintEqualToAnchor:tagline.bottomAnchor constant:4.0],
+        [sub.bottomAnchor   constraintEqualToAnchor:hero.bottomAnchor constant:-18.0],
+    ]];
+
+    self.heroGrad = grad;
+    self.heroView = hero;
+    return hero;
+}
+
+- (void)viewDidLayoutSubviews
+{
+    [super viewDidLayoutSubviews];
+    if (self.heroGrad && self.heroView) {
+        self.heroGrad.frame = self.heroView.bounds;
+    }
+}
+
+#pragma mark - Quick Actions
+
+- (UIView *)buildQuickActions
+{
+    UIStackView *row = [[UIStackView alloc] init];
+    row.axis = UILayoutConstraintAxisHorizontal;
+    row.spacing = 12.0;
+    row.distribution = UIStackViewDistributionFillEqually;
+
+    [row addArrangedSubview:[self actionCard:@"Packages"
+                                       icon:@"shippingbox.fill"
+                                      color:UIColor.systemBlueColor
+                                        sel:@selector(openPackagesTab)]];
+    [row addArrangedSubview:[self actionCard:@"Sources"
+                                       icon:@"tray.and.arrow.down.fill"
+                                      color:UIColor.systemGreenColor
+                                        sel:@selector(openSourcesTab)]];
+
+    return row;
+}
+
+- (UIView *)actionCard:(NSString *)title icon:(NSString *)iconName color:(UIColor *)color sel:(SEL)sel
+{
+    UIView *card = [[UIView alloc] init];
+    card.backgroundColor = UIColor.secondarySystemGroupedBackgroundColor;
+    card.layer.cornerRadius = 16.0;
+    card.layer.cornerCurve = kCACornerCurveContinuous;
+
+    UIView *iconCircle = [[UIView alloc] init];
+    iconCircle.translatesAutoresizingMaskIntoConstraints = NO;
+    iconCircle.backgroundColor = [color colorWithAlphaComponent:0.12];
+    iconCircle.layer.cornerRadius = 20.0;
+    [card addSubview:iconCircle];
+
+    UIImageView *iv = [[UIImageView alloc] initWithImage:
+        [UIImage systemImageNamed:iconName
+               withConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:18.0 weight:UIImageSymbolWeightSemibold]]];
+    iv.translatesAutoresizingMaskIntoConstraints = NO;
+    iv.tintColor = color;
+    iv.contentMode = UIViewContentModeCenter;
+    [iconCircle addSubview:iv];
 
     UILabel *lbl = [[UILabel alloc] init];
     lbl.translatesAutoresizingMaskIntoConstraints = NO;
-    lbl.numberOfLines = 0;
-    lbl.text = @"SpringBoard tweaks and JavaScript packages — no jailbreak required.";
-    lbl.font = [UIFont systemFontOfSize:14.0 weight:UIFontWeightMedium];
-    lbl.textColor = UIColor.secondaryLabelColor;
-    [banner addSubview:lbl];
+    lbl.text = title;
+    lbl.font = [UIFont systemFontOfSize:15.0 weight:UIFontWeightSemibold];
+    lbl.textColor = UIColor.labelColor;
+    [card addSubview:lbl];
+
+    UIImageView *chev = [[UIImageView alloc] initWithImage:
+        [UIImage systemImageNamed:@"chevron.right"
+               withConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:11.0 weight:UIImageSymbolWeightBold]]];
+    chev.translatesAutoresizingMaskIntoConstraints = NO;
+    chev.tintColor = UIColor.tertiaryLabelColor;
+    [card addSubview:chev];
 
     [NSLayoutConstraint activateConstraints:@[
-        [icon.leadingAnchor  constraintEqualToAnchor:banner.leadingAnchor constant:14.0],
-        [icon.centerYAnchor  constraintEqualToAnchor:banner.centerYAnchor],
-        [icon.widthAnchor    constraintEqualToConstant:44.0],
-        [icon.heightAnchor   constraintEqualToConstant:44.0],
-        [lbl.leadingAnchor   constraintEqualToAnchor:icon.trailingAnchor constant:12.0],
-        [lbl.trailingAnchor  constraintEqualToAnchor:banner.trailingAnchor constant:-14.0],
-        [lbl.topAnchor       constraintEqualToAnchor:banner.topAnchor constant:14.0],
-        [lbl.bottomAnchor    constraintEqualToAnchor:banner.bottomAnchor constant:-14.0],
+        [card.heightAnchor constraintEqualToConstant:64.0],
+        [iconCircle.leadingAnchor constraintEqualToAnchor:card.leadingAnchor constant:14.0],
+        [iconCircle.centerYAnchor constraintEqualToAnchor:card.centerYAnchor],
+        [iconCircle.widthAnchor constraintEqualToConstant:40.0],
+        [iconCircle.heightAnchor constraintEqualToConstant:40.0],
+        [iv.centerXAnchor constraintEqualToAnchor:iconCircle.centerXAnchor],
+        [iv.centerYAnchor constraintEqualToAnchor:iconCircle.centerYAnchor],
+        [lbl.leadingAnchor constraintEqualToAnchor:iconCircle.trailingAnchor constant:12.0],
+        [lbl.centerYAnchor constraintEqualToAnchor:card.centerYAnchor],
+        [chev.trailingAnchor constraintEqualToAnchor:card.trailingAnchor constant:-14.0],
+        [chev.centerYAnchor constraintEqualToAnchor:card.centerYAnchor],
     ]];
-    return banner;
-}
 
-#pragma mark - Section
-
-- (UIView *)section:(NSString *)title card:(UIView *)card
-{
-    UIView *w = [[UIView alloc] init];
-    UILabel *h = [[UILabel alloc] init];
-    h.translatesAutoresizingMaskIntoConstraints = NO;
-    h.attributedText = [[NSAttributedString alloc]
-        initWithString:title attributes:@{
-            NSFontAttributeName: [UIFont systemFontOfSize:13.0 weight:UIFontWeightSemibold],
-            NSForegroundColorAttributeName: UIColor.secondaryLabelColor,
-            NSKernAttributeName: @(0.6),
-        }];
-    [w addSubview:h];
-
-    card.translatesAutoresizingMaskIntoConstraints = NO;
-    [w addSubview:card];
-
+    UIButton *tap = [UIButton buttonWithType:UIButtonTypeCustom];
+    tap.translatesAutoresizingMaskIntoConstraints = NO;
+    [tap addAction:[UIAction actionWithHandler:^(UIAction *_) {
+        #pragma clang diagnostic push
+        #pragma clang diagnostic ignored "-Warc-performSelector-leaks"
+        [self performSelector:sel];
+        #pragma clang diagnostic pop
+    }] forControlEvents:UIControlEventTouchUpInside];
+    [card addSubview:tap];
     [NSLayoutConstraint activateConstraints:@[
-        [h.topAnchor     constraintEqualToAnchor:w.topAnchor],
-        [h.leadingAnchor constraintEqualToAnchor:w.leadingAnchor constant:4.0],
-        [card.topAnchor     constraintEqualToAnchor:h.bottomAnchor constant:8.0],
-        [card.leadingAnchor constraintEqualToAnchor:w.leadingAnchor],
-        [card.trailingAnchor constraintEqualToAnchor:w.trailingAnchor],
-        [card.bottomAnchor  constraintEqualToAnchor:w.bottomAnchor],
+        [tap.topAnchor constraintEqualToAnchor:card.topAnchor],
+        [tap.leadingAnchor constraintEqualToAnchor:card.leadingAnchor],
+        [tap.trailingAnchor constraintEqualToAnchor:card.trailingAnchor],
+        [tap.bottomAnchor constraintEqualToAnchor:card.bottomAnchor],
     ]];
-    return w;
+
+    return card;
 }
 
 #pragma mark - What's New
 
-- (UIView *)whatsNewCard
+- (UIView *)buildWhatsNew
 {
     UIView *card = [self card];
-    UIStackView *s = [self vstack:12.0];
-    [card addSubview:s];
-    [self pin:s in:card];
+    UIStackView *s = [self vstackInCard:card spacing:14.0];
 
-    [s addArrangedSubview:[self badgeRow:@"QuickLoader + RepoTweaks by @MinePlayer16 — JS tweak runners from local files and online sources"
-                                   icon:@"bolt.fill" color:UIColor.systemOrangeColor]];
-    [s addArrangedSubview:[self badgeRow:@"Default repo with Hide Dock by @MinePlayer16, Color Dock, FlexButBreaks, and more on the way"
-                                   icon:@"arrow.down.circle.fill" color:UIColor.systemGreenColor]];
-    [s addArrangedSubview:[self badgeRow:@"SnowBoard Lite, SBCustomizer, and SpringBoard stability fixes"
-                                   icon:@"wrench.and.screwdriver.fill" color:UIColor.systemBlueColor]];
-    return card;
-}
+    UILabel *header = [self sectionHeader:@"What's New"];
+    [s addArrangedSubview:header];
 
-#pragma mark - JS Tweaks
-
-- (UIView *)jsCard
-{
-    UIView *card = [self card];
-    UIStackView *s = [self vstack:12.0];
-    [card addSubview:s];
-    [self pin:s in:card];
-
-    UILabel *intro = [self body:@"Run custom JS tweaks through Cyanide's SpringBoard bridge. Contributed by @MinePlayer16."];
-    [s addArrangedSubview:intro];
-
-    [s addArrangedSubview:[self badgeRow:@"Import .js files from Files with configurable @param settings"
-                                   icon:@"doc.text.fill" color:UIColor.systemBlueColor]];
-    [s addArrangedSubview:[self badgeRow:@"Add HTTPS repos in Sources, browse tweaks, install with one tap"
-                                   icon:@"tray.and.arrow.down.fill" color:UIColor.systemGreenColor]];
-
-    [s addArrangedSubview:[self sep]];
-
-    UIStackView *btns = [self hstack:8.0];
-    btns.distribution = UIStackViewDistributionFillEqually;
-    [btns addArrangedSubview:[self actionBtn:@"QuickLoader" icon:@"doc.text.fill" color:UIColor.systemBlueColor sel:@selector(openQuickLoader)]];
-    [btns addArrangedSubview:[self actionBtn:@"Add Source" icon:@"plus.circle.fill" color:UIColor.systemGreenColor sel:@selector(openSourcesTab)]];
-    [btns.heightAnchor constraintEqualToConstant:42.0].active = YES;
-    [s addArrangedSubview:btns];
-
-    UILabel *note = [self footnote:@"Hide Dock by @MinePlayer16 available now. Color Dock, FlexButBreaks, Hide SearchPill, and more on the way."];
-    [s addArrangedSubview:note];
+    [s addArrangedSubview:[self compactRow:@"JavaScript tweak support by @MinePlayer16"
+                                     icon:@"bolt.fill" color:UIColor.systemOrangeColor]];
+    [s addArrangedSubview:[self compactRow:@"Source repos with browsable tweak catalogs"
+                                     icon:@"tray.and.arrow.down.fill" color:UIColor.systemGreenColor]];
+    [s addArrangedSubview:[self compactRow:@"SnowBoard Lite and SpringBoard stability fixes"
+                                     icon:@"wrench.and.screwdriver.fill" color:UIColor.systemBlueColor]];
 
     return card;
 }
 
-#pragma mark - RC Tweaks
+#pragma mark - Get Started
 
-- (UIView *)rcCard
+- (UIView *)buildGetStarted
 {
     UIView *card = [self card];
-    UIStackView *s = [self vstack:12.0];
-    [card addSubview:s];
-    [self pin:s in:card];
+    UIStackView *s = [self vstackInCard:card spacing:12.0];
 
-    [s addArrangedSubview:[self body:@"Native tweaks applied through a live SpringBoard channel — no system file changes."]];
+    [s addArrangedSubview:[self sectionHeader:@"Get Started"]];
 
-    [s addArrangedSubview:[self featureRow:@"Status Bar" sub:@"StatBar, NSBar, NiceBar Lite"
-                                     icon:@"chart.bar.fill" color:UIColor.systemTealColor]];
-    [s addArrangedSubview:[self featureRow:@"Home Screen" sub:@"SBCustomizer, Layout Extras, Gravity Lite, SnowBoard Lite"
-                                     icon:@"square.grid.3x3.fill" color:UIColor.systemBlueColor]];
-    [s addArrangedSubview:[self featureRow:@"SpringBoard" sub:@"App Library, animations, Double-Tap Lock, App Switcher Grid"
-                                     icon:@"sparkle" color:UIColor.systemCyanColor]];
-    [s addArrangedSubview:[self featureRow:@"System" sub:@"OTA Updates, Watch Pairing, Call Recording, Location Sim"
-                                     icon:@"gear" color:UIColor.systemGrayColor]];
-
-    [s addArrangedSubview:[self footnote:@"Session-based — active while Cyanide runs, reset on respring. Don't force-quit from the App Switcher."]];
-
+    [s addArrangedSubview:[self bigActionButton:@"Open QuickLoader"
+                                          sub:@"Run a local .js tweak file"
+                                         icon:@"bolt.fill"
+                                        color:UIColor.systemOrangeColor
+                                          sel:@selector(openQuickLoader)]];
+    [s addArrangedSubview:[self bigActionButton:@"Add a Source"
+                                          sub:@"Browse and install JS tweaks from repos"
+                                         icon:@"plus.circle.fill"
+                                        color:UIColor.systemGreenColor
+                                          sel:@selector(openSourcesTab)]];
     return card;
+}
+
+- (UIView *)bigActionButton:(NSString *)title sub:(NSString *)sub icon:(NSString *)iconName color:(UIColor *)color sel:(SEL)sel
+{
+    UIView *btn = [[UIView alloc] init];
+    btn.backgroundColor = [color colorWithAlphaComponent:0.08];
+    btn.layer.cornerRadius = 14.0;
+    btn.layer.cornerCurve = kCACornerCurveContinuous;
+
+    UIView *dot = [[UIView alloc] init];
+    dot.translatesAutoresizingMaskIntoConstraints = NO;
+    dot.backgroundColor = [color colorWithAlphaComponent:0.18];
+    dot.layer.cornerRadius = 18.0;
+    [btn addSubview:dot];
+
+    UIImageView *iv = [[UIImageView alloc] initWithImage:
+        [UIImage systemImageNamed:iconName
+               withConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:16.0 weight:UIImageSymbolWeightSemibold]]];
+    iv.translatesAutoresizingMaskIntoConstraints = NO;
+    iv.tintColor = color;
+    iv.contentMode = UIViewContentModeCenter;
+    [dot addSubview:iv];
+
+    UILabel *t = [[UILabel alloc] init];
+    t.translatesAutoresizingMaskIntoConstraints = NO;
+    t.text = title;
+    t.font = [UIFont systemFontOfSize:16.0 weight:UIFontWeightSemibold];
+    t.textColor = UIColor.labelColor;
+    [btn addSubview:t];
+
+    UILabel *d = [[UILabel alloc] init];
+    d.translatesAutoresizingMaskIntoConstraints = NO;
+    d.text = sub;
+    d.font = [UIFont systemFontOfSize:13.0 weight:UIFontWeightRegular];
+    d.textColor = UIColor.secondaryLabelColor;
+    [btn addSubview:d];
+
+    UIImageView *chev = [[UIImageView alloc] initWithImage:
+        [UIImage systemImageNamed:@"chevron.right"
+               withConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:12.0 weight:UIImageSymbolWeightBold]]];
+    chev.translatesAutoresizingMaskIntoConstraints = NO;
+    chev.tintColor = [color colorWithAlphaComponent:0.6];
+    [btn addSubview:chev];
+
+    [NSLayoutConstraint activateConstraints:@[
+        [btn.heightAnchor   constraintEqualToConstant:64.0],
+        [dot.leadingAnchor  constraintEqualToAnchor:btn.leadingAnchor constant:14.0],
+        [dot.centerYAnchor  constraintEqualToAnchor:btn.centerYAnchor],
+        [dot.widthAnchor    constraintEqualToConstant:36.0],
+        [dot.heightAnchor   constraintEqualToConstant:36.0],
+        [iv.centerXAnchor   constraintEqualToAnchor:dot.centerXAnchor],
+        [iv.centerYAnchor   constraintEqualToAnchor:dot.centerYAnchor],
+        [t.leadingAnchor    constraintEqualToAnchor:dot.trailingAnchor constant:12.0],
+        [t.bottomAnchor     constraintEqualToAnchor:btn.centerYAnchor constant:0.0],
+        [d.leadingAnchor    constraintEqualToAnchor:t.leadingAnchor],
+        [d.topAnchor        constraintEqualToAnchor:t.bottomAnchor constant:2.0],
+        [chev.trailingAnchor constraintEqualToAnchor:btn.trailingAnchor constant:-14.0],
+        [chev.centerYAnchor  constraintEqualToAnchor:btn.centerYAnchor],
+    ]];
+
+    UIButton *tap = [UIButton buttonWithType:UIButtonTypeCustom];
+    tap.translatesAutoresizingMaskIntoConstraints = NO;
+    [tap addAction:[UIAction actionWithHandler:^(UIAction *_) {
+        #pragma clang diagnostic push
+        #pragma clang diagnostic ignored "-Warc-performSelector-leaks"
+        [self performSelector:sel];
+        #pragma clang diagnostic pop
+    }] forControlEvents:UIControlEventTouchUpInside];
+    [btn addSubview:tap];
+    [NSLayoutConstraint activateConstraints:@[
+        [tap.topAnchor constraintEqualToAnchor:btn.topAnchor],
+        [tap.leadingAnchor constraintEqualToAnchor:btn.leadingAnchor],
+        [tap.trailingAnchor constraintEqualToAnchor:btn.trailingAnchor],
+        [tap.bottomAnchor constraintEqualToAnchor:btn.bottomAnchor],
+    ]];
+
+    return btn;
 }
 
 #pragma mark - Community
 
-- (UIView *)communityCard
+- (UIView *)buildCommunity
 {
     UIView *card = [self card];
-    UIStackView *s = [self vstack:0.0];
-    [card addSubview:s];
-    [self pin:s in:card pad:0.0];
+    UIStackView *s = [self vstackInCard:card spacing:0.0];
 
-    [s addArrangedSubview:[self linkRow:@"Join Signal Group" icon:@"bubble.left.and.bubble.right.fill"
-                                 color:UIColor.systemBlueColor url:kSignalGroupURL showSep:YES]];
-    [s addArrangedSubview:[self linkRow:@"Report a Bug" icon:@"exclamationmark.bubble.fill"
-                                 color:UIColor.systemRedColor url:kGitHubIssuesURL showSep:YES]];
-    [s addArrangedSubview:[self linkRow:@"GitHub Repository" icon:@"chevron.left.forwardslash.chevron.right"
-                                 color:UIColor.systemGrayColor url:kGitHubRepoURL showSep:YES]];
-    [s addArrangedSubview:[self linkRow:@"Support on Patreon" icon:@"heart.fill"
-                                 color:UIColor.systemPinkColor url:kPatreonURL showSep:NO]];
+    UILabel *header = [self sectionHeader:@"Community"];
+    UIView *headerWrap = [[UIView alloc] init];
+    header.translatesAutoresizingMaskIntoConstraints = NO;
+    [headerWrap addSubview:header];
+    [NSLayoutConstraint activateConstraints:@[
+        [header.topAnchor constraintEqualToAnchor:headerWrap.topAnchor],
+        [header.leadingAnchor constraintEqualToAnchor:headerWrap.leadingAnchor],
+        [header.trailingAnchor constraintEqualToAnchor:headerWrap.trailingAnchor],
+        [header.bottomAnchor constraintEqualToAnchor:headerWrap.bottomAnchor constant:-4.0],
+    ]];
+    [s addArrangedSubview:headerWrap];
+
+    [s addArrangedSubview:[self linkCell:@"Signal Group" icon:@"bubble.left.and.bubble.right.fill"
+                                  color:UIColor.systemBlueColor url:kSignalGroupURL sep:YES]];
+    [s addArrangedSubview:[self linkCell:@"Report a Bug" icon:@"exclamationmark.bubble.fill"
+                                  color:UIColor.systemRedColor url:kGitHubIssuesURL sep:YES]];
+    [s addArrangedSubview:[self linkCell:@"GitHub" icon:@"chevron.left.forwardslash.chevron.right"
+                                  color:UIColor.systemGrayColor url:kGitHubRepoURL sep:YES]];
+    [s addArrangedSubview:[self linkCell:@"Patreon" icon:@"heart.fill"
+                                  color:UIColor.systemPinkColor url:kPatreonURL sep:NO]];
     return card;
 }
 
-#pragma mark - Primitives
+#pragma mark - Card primitives
 
 - (UIView *)card
 {
     UIView *v = [[UIView alloc] init];
     v.backgroundColor = UIColor.secondarySystemGroupedBackgroundColor;
-    v.layer.cornerRadius = 14.0;
+    v.layer.cornerRadius = 16.0;
     v.layer.cornerCurve = kCACornerCurveContinuous;
-    v.layer.shadowColor = UIColor.blackColor.CGColor;
-    v.layer.shadowOpacity = 0.04f;
-    v.layer.shadowRadius = 8.0;
-    v.layer.shadowOffset = CGSizeMake(0, 2);
     return v;
 }
 
-- (UIStackView *)vstack:(CGFloat)spacing
+- (UIStackView *)vstackInCard:(UIView *)card spacing:(CGFloat)spacing
 {
     UIStackView *s = [[UIStackView alloc] init];
     s.translatesAutoresizingMaskIntoConstraints = NO;
     s.axis = UILayoutConstraintAxisVertical;
     s.spacing = spacing;
     s.alignment = UIStackViewAlignmentFill;
-    return s;
-}
-
-- (UIStackView *)hstack:(CGFloat)spacing
-{
-    UIStackView *s = [[UIStackView alloc] init];
-    s.axis = UILayoutConstraintAxisHorizontal;
-    s.spacing = spacing;
-    s.alignment = UIStackViewAlignmentFill;
-    return s;
-}
-
-- (void)pin:(UIStackView *)s in:(UIView *)c
-{
-    [self pin:s in:c pad:kPad];
-}
-
-- (void)pin:(UIStackView *)s in:(UIView *)c pad:(CGFloat)p
-{
+    [card addSubview:s];
     [NSLayoutConstraint activateConstraints:@[
-        [s.topAnchor constraintEqualToAnchor:c.topAnchor constant:p],
-        [s.leadingAnchor constraintEqualToAnchor:c.leadingAnchor constant:p],
-        [s.trailingAnchor constraintEqualToAnchor:c.trailingAnchor constant:-p],
-        [s.bottomAnchor constraintEqualToAnchor:c.bottomAnchor constant:-p],
+        [s.topAnchor constraintEqualToAnchor:card.topAnchor constant:16.0],
+        [s.leadingAnchor constraintEqualToAnchor:card.leadingAnchor constant:16.0],
+        [s.trailingAnchor constraintEqualToAnchor:card.trailingAnchor constant:-16.0],
+        [s.bottomAnchor constraintEqualToAnchor:card.bottomAnchor constant:-16.0],
     ]];
+    return s;
 }
 
-- (UIView *)iconBadge:(NSString *)iconName color:(UIColor *)color
+- (UILabel *)sectionHeader:(NSString *)title
 {
-    UIView *circle = [[UIView alloc] init];
-    circle.translatesAutoresizingMaskIntoConstraints = NO;
-    circle.backgroundColor = [color colorWithAlphaComponent:0.14];
-    circle.layer.cornerRadius = 14.0;
+    UILabel *h = [[UILabel alloc] init];
+    h.text = title;
+    h.font = [UIFont systemFontOfSize:20.0 weight:UIFontWeightBold];
+    h.textColor = UIColor.labelColor;
+    return h;
+}
 
-    UIImageSymbolConfiguration *cfg = [UIImageSymbolConfiguration configurationWithPointSize:13.0 weight:UIImageSymbolWeightSemibold];
+- (UIView *)compactRow:(NSString *)text icon:(NSString *)iconName color:(UIColor *)color
+{
+    UIView *row = [[UIView alloc] init];
+
+    UIView *dot = [[UIView alloc] init];
+    dot.translatesAutoresizingMaskIntoConstraints = NO;
+    dot.backgroundColor = [color colorWithAlphaComponent:0.14];
+    dot.layer.cornerRadius = 16.0;
+    [row addSubview:dot];
+
     UIImageView *iv = [[UIImageView alloc] initWithImage:
-        [[UIImage systemImageNamed:iconName withConfiguration:cfg]
-            imageWithTintColor:color renderingMode:UIImageRenderingModeAlwaysOriginal]];
+        [UIImage systemImageNamed:iconName
+               withConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:14.0 weight:UIImageSymbolWeightSemibold]]];
     iv.translatesAutoresizingMaskIntoConstraints = NO;
+    iv.tintColor = color;
     iv.contentMode = UIViewContentModeCenter;
-    [circle addSubview:iv];
-
-    [NSLayoutConstraint activateConstraints:@[
-        [circle.widthAnchor constraintEqualToConstant:28.0],
-        [circle.heightAnchor constraintEqualToConstant:28.0],
-        [iv.centerXAnchor constraintEqualToAnchor:circle.centerXAnchor],
-        [iv.centerYAnchor constraintEqualToAnchor:circle.centerYAnchor],
-    ]];
-    return circle;
-}
-
-- (UIView *)badgeRow:(NSString *)text icon:(NSString *)iconName color:(UIColor *)color
-{
-    UIStackView *row = [self hstack:10.0];
-    row.alignment = UIStackViewAlignmentTop;
-
-    UIView *badge = [self iconBadge:iconName color:color];
-    [row addArrangedSubview:badge];
+    [dot addSubview:iv];
 
     UILabel *lbl = [[UILabel alloc] init];
-    lbl.numberOfLines = 0;
+    lbl.translatesAutoresizingMaskIntoConstraints = NO;
     lbl.text = text;
-    lbl.font = [UIFont systemFontOfSize:14.0 weight:UIFontWeightRegular];
+    lbl.font = [UIFont systemFontOfSize:15.0 weight:UIFontWeightMedium];
     lbl.textColor = UIColor.labelColor;
-    [row addArrangedSubview:lbl];
+    lbl.numberOfLines = 0;
+    [row addSubview:lbl];
 
+    [NSLayoutConstraint activateConstraints:@[
+        [dot.leadingAnchor constraintEqualToAnchor:row.leadingAnchor],
+        [dot.topAnchor     constraintEqualToAnchor:row.topAnchor],
+        [dot.widthAnchor   constraintEqualToConstant:32.0],
+        [dot.heightAnchor  constraintEqualToConstant:32.0],
+        [iv.centerXAnchor  constraintEqualToAnchor:dot.centerXAnchor],
+        [iv.centerYAnchor  constraintEqualToAnchor:dot.centerYAnchor],
+        [lbl.leadingAnchor constraintEqualToAnchor:dot.trailingAnchor constant:12.0],
+        [lbl.trailingAnchor constraintEqualToAnchor:row.trailingAnchor],
+        [lbl.centerYAnchor constraintEqualToAnchor:dot.centerYAnchor],
+        [row.bottomAnchor  constraintGreaterThanOrEqualToAnchor:dot.bottomAnchor],
+        [row.bottomAnchor  constraintGreaterThanOrEqualToAnchor:lbl.bottomAnchor],
+    ]];
     return row;
 }
 
-- (UIView *)featureRow:(NSString *)title sub:(NSString *)sub icon:(NSString *)iconName color:(UIColor *)color
+- (UIView *)linkCell:(NSString *)title icon:(NSString *)iconName color:(UIColor *)color url:(NSString *)url sep:(BOOL)sep
 {
-    UIStackView *row = [self hstack:10.0];
-    row.alignment = UIStackViewAlignmentTop;
+    UIView *cell = [[UIView alloc] init];
 
-    UIView *badge = [self iconBadge:iconName color:color];
-    [row addArrangedSubview:badge];
+    UIView *dot = [[UIView alloc] init];
+    dot.translatesAutoresizingMaskIntoConstraints = NO;
+    dot.backgroundColor = [color colorWithAlphaComponent:0.14];
+    dot.layer.cornerRadius = 14.0;
+    [cell addSubview:dot];
 
-    UIStackView *text = [self vstack:1.0];
-    UILabel *t = [[UILabel alloc] init];
-    t.text = title;
-    t.font = [UIFont systemFontOfSize:14.0 weight:UIFontWeightSemibold];
-    t.textColor = UIColor.labelColor;
-    [text addArrangedSubview:t];
-    UILabel *s = [[UILabel alloc] init];
-    s.text = sub;
-    s.font = [UIFont systemFontOfSize:12.5 weight:UIFontWeightRegular];
-    s.textColor = UIColor.secondaryLabelColor;
-    s.numberOfLines = 0;
-    [text addArrangedSubview:s];
-    [row addArrangedSubview:text];
-
-    return row;
-}
-
-- (UIView *)linkRow:(NSString *)title icon:(NSString *)iconName color:(UIColor *)color url:(NSString *)url showSep:(BOOL)showSep
-{
-    UIView *container = [[UIView alloc] init];
-
-    UIView *badge = [self iconBadge:iconName color:color];
-    [container addSubview:badge];
+    UIImageView *iv = [[UIImageView alloc] initWithImage:
+        [UIImage systemImageNamed:iconName
+               withConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:13.0 weight:UIImageSymbolWeightSemibold]]];
+    iv.translatesAutoresizingMaskIntoConstraints = NO;
+    iv.tintColor = color;
+    iv.contentMode = UIViewContentModeCenter;
+    [dot addSubview:iv];
 
     UILabel *lbl = [[UILabel alloc] init];
     lbl.translatesAutoresizingMaskIntoConstraints = NO;
     lbl.text = title;
     lbl.font = [UIFont systemFontOfSize:15.0 weight:UIFontWeightRegular];
     lbl.textColor = UIColor.labelColor;
-    [container addSubview:lbl];
+    [cell addSubview:lbl];
 
-    UIImageSymbolConfiguration *chevCfg = [UIImageSymbolConfiguration configurationWithPointSize:12.0 weight:UIImageSymbolWeightSemibold];
     UIImageView *chev = [[UIImageView alloc] initWithImage:
-        [[UIImage systemImageNamed:@"chevron.right" withConfiguration:chevCfg]
-            imageWithTintColor:UIColor.tertiaryLabelColor renderingMode:UIImageRenderingModeAlwaysOriginal]];
+        [UIImage systemImageNamed:@"chevron.right"
+               withConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:11.0 weight:UIImageSymbolWeightBold]]];
     chev.translatesAutoresizingMaskIntoConstraints = NO;
-    [container addSubview:chev];
+    chev.tintColor = UIColor.tertiaryLabelColor;
+    [cell addSubview:chev];
 
     [NSLayoutConstraint activateConstraints:@[
-        [badge.leadingAnchor constraintEqualToAnchor:container.leadingAnchor constant:14.0],
-        [badge.centerYAnchor constraintEqualToAnchor:container.centerYAnchor],
-        [lbl.leadingAnchor constraintEqualToAnchor:badge.trailingAnchor constant:12.0],
-        [lbl.centerYAnchor constraintEqualToAnchor:container.centerYAnchor],
-        [chev.trailingAnchor constraintEqualToAnchor:container.trailingAnchor constant:-14.0],
-        [chev.centerYAnchor constraintEqualToAnchor:container.centerYAnchor],
-        [container.heightAnchor constraintEqualToConstant:48.0],
+        [cell.heightAnchor  constraintEqualToConstant:48.0],
+        [dot.leadingAnchor  constraintEqualToAnchor:cell.leadingAnchor],
+        [dot.centerYAnchor  constraintEqualToAnchor:cell.centerYAnchor],
+        [dot.widthAnchor    constraintEqualToConstant:28.0],
+        [dot.heightAnchor   constraintEqualToConstant:28.0],
+        [iv.centerXAnchor   constraintEqualToAnchor:dot.centerXAnchor],
+        [iv.centerYAnchor   constraintEqualToAnchor:dot.centerYAnchor],
+        [lbl.leadingAnchor  constraintEqualToAnchor:dot.trailingAnchor constant:12.0],
+        [lbl.centerYAnchor  constraintEqualToAnchor:cell.centerYAnchor],
+        [chev.trailingAnchor constraintEqualToAnchor:cell.trailingAnchor],
+        [chev.centerYAnchor  constraintEqualToAnchor:cell.centerYAnchor],
     ]];
 
-    if (showSep) {
+    if (sep) {
         UIView *line = [[UIView alloc] init];
         line.translatesAutoresizingMaskIntoConstraints = NO;
         line.backgroundColor = UIColor.separatorColor;
-        [container addSubview:line];
+        [cell addSubview:line];
         [NSLayoutConstraint activateConstraints:@[
             [line.leadingAnchor constraintEqualToAnchor:lbl.leadingAnchor],
-            [line.trailingAnchor constraintEqualToAnchor:container.trailingAnchor],
-            [line.bottomAnchor constraintEqualToAnchor:container.bottomAnchor],
+            [line.trailingAnchor constraintEqualToAnchor:cell.trailingAnchor],
+            [line.bottomAnchor constraintEqualToAnchor:cell.bottomAnchor],
             [line.heightAnchor constraintEqualToConstant:1.0 / UIScreen.mainScreen.scale],
         ]];
     }
@@ -398,63 +523,15 @@ static const CGFloat kGap    = 20.0;
     tap.translatesAutoresizingMaskIntoConstraints = NO;
     __weak typeof(self) ws = self;
     [tap addAction:[UIAction actionWithHandler:^(UIAction *_) { [ws openURLString:url]; }] forControlEvents:UIControlEventTouchUpInside];
-    [container addSubview:tap];
+    [cell addSubview:tap];
     [NSLayoutConstraint activateConstraints:@[
-        [tap.topAnchor constraintEqualToAnchor:container.topAnchor],
-        [tap.leadingAnchor constraintEqualToAnchor:container.leadingAnchor],
-        [tap.trailingAnchor constraintEqualToAnchor:container.trailingAnchor],
-        [tap.bottomAnchor constraintEqualToAnchor:container.bottomAnchor],
+        [tap.topAnchor constraintEqualToAnchor:cell.topAnchor],
+        [tap.leadingAnchor constraintEqualToAnchor:cell.leadingAnchor],
+        [tap.trailingAnchor constraintEqualToAnchor:cell.trailingAnchor],
+        [tap.bottomAnchor constraintEqualToAnchor:cell.bottomAnchor],
     ]];
 
-    return container;
-}
-
-- (UIView *)sep
-{
-    UIView *v = [[UIView alloc] init];
-    v.backgroundColor = [UIColor.separatorColor colorWithAlphaComponent:0.3];
-    [v.heightAnchor constraintEqualToConstant:1.0 / UIScreen.mainScreen.scale].active = YES;
-    return v;
-}
-
-- (UILabel *)body:(NSString *)text
-{
-    UILabel *l = [[UILabel alloc] init];
-    l.text = text;
-    l.font = [UIFont systemFontOfSize:14.0 weight:UIFontWeightRegular];
-    l.textColor = UIColor.secondaryLabelColor;
-    l.numberOfLines = 0;
-    return l;
-}
-
-- (UILabel *)footnote:(NSString *)text
-{
-    UILabel *l = [[UILabel alloc] init];
-    l.text = text;
-    l.font = [UIFont systemFontOfSize:12.0 weight:UIFontWeightRegular];
-    l.textColor = UIColor.tertiaryLabelColor;
-    l.numberOfLines = 0;
-    return l;
-}
-
-- (UIButton *)actionBtn:(NSString *)title icon:(NSString *)iconName color:(UIColor *)color sel:(SEL)sel
-{
-    UIButtonConfiguration *cfg = [UIButtonConfiguration filledButtonConfiguration];
-    cfg.title = title;
-    cfg.image = [UIImage systemImageNamed:iconName];
-    cfg.imagePadding = 6.0;
-    cfg.imagePlacement = NSDirectionalRectEdgeLeading;
-    cfg.cornerStyle = UIButtonConfigurationCornerStyleLarge;
-    cfg.baseBackgroundColor = [color colorWithAlphaComponent:0.12];
-    cfg.baseForegroundColor = color;
-    cfg.preferredSymbolConfigurationForImage = [UIImageSymbolConfiguration configurationWithPointSize:13.0 weight:UIImageSymbolWeightSemibold];
-
-    return [UIButton buttonWithConfiguration:cfg primaryAction:[UIAction actionWithHandler:^(UIAction *_) {
-        #pragma clang diagnostic push
-        #pragma clang diagnostic ignored "-Warc-performSelector-leaks"
-        [self performSelector:sel];
-        #pragma clang diagnostic pop
-    }]];
+    return cell;
 }
 
 #pragma mark - Navigation
@@ -463,6 +540,18 @@ static const CGFloat kGap    = 20.0;
 {
     NSURL *u = [NSURL URLWithString:url];
     if (u) [[UIApplication sharedApplication] openURL:u options:@{} completionHandler:nil];
+}
+
+- (void)openPackagesTab
+{
+    UITabBarController *tab = self.tabBarController;
+    if (!tab) return;
+    for (NSUInteger i = 0; i < tab.viewControllers.count; i++) {
+        if ([tab.viewControllers[i].tabBarItem.title isEqualToString:@"Packages"]) {
+            tab.selectedIndex = i;
+            return;
+        }
+    }
 }
 
 - (void)openQuickLoader
@@ -475,7 +564,9 @@ static const CGFloat kGap    = 20.0;
             UINavigationController *nav = [vc isKindOfClass:UINavigationController.class] ? (UINavigationController *)vc : nil;
             if (!nav) return;
             [nav popToRootViewControllerAnimated:NO];
-            [nav pushViewController:[[SettingsViewController alloc] initWithUnderlyingSection:25 bundleTitle:@"QuickLoader"] animated:NO];
+            SettingsViewController *ql = [[SettingsViewController alloc] initWithUnderlyingSection:25 bundleTitle:@"QuickLoader"];
+            ql.quickLoaderStandalone = YES;
+            [nav pushViewController:ql animated:NO];
             tab.selectedIndex = i;
             return;
         }

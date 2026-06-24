@@ -192,6 +192,12 @@ void quickloader_clear_repo_tweak_if_matches(NSString *repoURL, NSString *tweakI
     [d synchronize];
 }
 
+bool quickloader_is_driven_by_repo_tweak(void) {
+    NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
+    NSString *repoURL = quickloader_string_or_empty([d stringForKey:kQuickLoaderSourceRepoURLKey]);
+    return repoURL.length > 0;
+}
+
 bool quickloader_refresh_active_repo_tweak(void) {
     NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
     NSString *repoURL = quickloader_string_or_empty([d stringForKey:kQuickLoaderSourceRepoURLKey]);

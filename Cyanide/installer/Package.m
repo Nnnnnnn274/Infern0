@@ -12,6 +12,11 @@
 #import "../tweaks/RepoTweaks.h"
 #import <math.h>
 
+@interface Package ()
+@property (nonatomic, readwrite, copy) NSString *symbolName;
+@property (nonatomic, readwrite, copy) NSString *author;
+@end
+
 @implementation Package
 
 static NSString *PackageStringValue(NSDictionary *values, NSString *key, NSString *fallback)
@@ -162,6 +167,8 @@ static BOOL PackageRepoScriptRequiresNativeBridge(NSString *rawScript)
     switch (self.kind) {
         case PackageInstallKindToggle:
             if (!self.enabledKey) return NO;
+            if ([self.enabledKey isEqualToString:kSettingsQuickLoaderEnabled] &&
+                quickloader_is_driven_by_repo_tweak()) return NO;
             return [d boolForKey:self.enabledKey];
         case PackageInstallKindOTA:
         case PackageInstallKindNanoRegistry:

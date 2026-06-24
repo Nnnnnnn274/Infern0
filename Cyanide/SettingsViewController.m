@@ -35,6 +35,7 @@
 #import "TaskRop/RemoteCall.h"
 #import "kexploit/kutils.h"
 #import "kexploit/persistence.h"
+#import "installer/CYIconBadge.h"
 #import "installer/InstallProgressViewController.h"
 #import "installer/Package.h"
 #import "installer/PackageCatalog.h"
@@ -272,11 +273,12 @@ static NSArray<NSDictionary *> *settings_repotweaks_tweaks_for_url(NSString *rep
     return self.params.count;   //JS dynamic parameters
 }
 
-- (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section {
-    if (section == 0) return @"Tweak Infos";
-    if (section == 1) return @"Tweak Status";
-    return @"Personalization Options";
+- (UIView *)tableView:(UITableView *)tableView viewForHeaderInSection:(NSInteger)section {
+    if (section == 0) return CYSectionHeaderView(@"Tweak Infos");
+    if (section == 1) return CYSectionHeaderView(@"Tweak Status");
+    return CYSectionHeaderView(@"Personalization Options");
 }
+- (CGFloat)tableView:(UITableView *)tableView heightForHeaderInSection:(NSInteger)section { return 46.0; }
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
     if (indexPath.section == 0) {
@@ -448,13 +450,16 @@ static NSArray<NSDictionary *> *settings_repotweaks_tweaks_for_url(NSString *rep
     return 2; // Section 0: Tweaks, Section 1: Delete
 }
 
-- (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section {
+- (UIView *)tableView:(UITableView *)tableView viewForHeaderInSection:(NSInteger)section {
     if (section == 0) {
         NSDictionary *repo = settings_repotweaks_repo_for_url(self.repoURL);
         NSString *author = settings_string_or_empty(repo[@"author"]);
-        return [NSString stringWithFormat:@"By %@", author.length ? author : @"Unknown"];
+        return CYSectionHeaderView([NSString stringWithFormat:@"By %@", author.length ? author : @"Unknown"]);
     }
     return nil;
+}
+- (CGFloat)tableView:(UITableView *)tableView heightForHeaderInSection:(NSInteger)section {
+    return section == 0 ? UITableViewAutomaticDimension : 0.0;
 }
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
@@ -647,9 +652,10 @@ static NSArray<NSDictionary *> *settings_repotweaks_tweaks_for_url(NSString *rep
 
 // Native tweak sections
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView { return 2; }
-- (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section {
-    return section == 0 ? @"SOURCES" : @"ALL TWEAKS";
+- (UIView *)tableView:(UITableView *)tableView viewForHeaderInSection:(NSInteger)section {
+    return CYSectionHeaderView(section == 0 ? @"Sources" : @"All Tweaks");
 }
+- (CGFloat)tableView:(UITableView *)tableView heightForHeaderInSection:(NSInteger)section { return 46.0; }
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
     if (section == 0) return settings_repotweaks_urls().count;
@@ -1396,6 +1402,43 @@ static NSString *settings_registered_live_loop_status_string(void)
     });
     return [parts componentsJoinedByString:@" "];
 }
+
+static BOOL settings_cleanup_entry_is_js_runner(const SettingsSpringBoardTweakCleanupEntry *entry)
+{
+    if (!entry || !entry->key) return NO;
+    return [entry->key isEqualToString:kSettingsQuickLoaderEnabled] ||
+           [entry->key isEqualToString:kSettingsRepoTweaksEnabled];
+}
+
+static BOOL settings_cleanup_entry_has_runtime_state(NSUserDefaults *d,
+                                                     const SettingsSpringBoardTweakCleanupEntry *entry)
+{
+    if (!entry) return NO;
+    if (entry->isRunning && entry->isRunning()) return YES;
+    if (entry->key && settings_tweak_is_applied(entry->key)) return YES;
+    (void)d;
+    return NO;
+}
+
+static BOOL settings_cleanup_entry_should_stop(NSUserDefaults *d,
+                                               const SettingsSpringBoardTweakCleanupEntry *entry,
+                                               BOOL springboardWillDie)
+{
+    if (!entry || !entry->stop) return NO;
+    if (!settings_cleanup_entry_has_runtime_state(d, entry)) return NO;
+
+    BOOL running = entry->isRunning && entry->isRunning();
+
+    // During a respring SpringBoard is about to die anyway. Avoid expensive
+    // remote restoration for one-shot/applied tweaks and only stop things that
+    // can keep app-side work alive long enough to race the restart.
+    if (springboardWillDie) {
+        return running || settings_cleanup_entry_is_js_runner(entry);
+    }
+
+    (void)d;
+    return YES;
+}
 static volatile int g_app_in_background = 0;
 static volatile int g_screen_awake = 1;
 static volatile int g_screen_locked = 0;
@@ -2035,20 +2078,21 @@ static void settings_stop_springboard_tweaks_locked(const char *reason,
         settings_forget_springboard_tweak_state_locked();
         return;
     }
-    //it needs to be first, because of race conditions a live-js tweak on cleanup may crash the springboard
-    bool repoStopped = repotweaks_stop_in_session();
-    printf("[SETTINGS] %s RepoTweaks stop result=%d\n",
-           reason ?: "SpringBoard cleanup", repoStopped);
 
-    bool qlStopped = quickloader_stop_in_session();
-    printf("[SETTINGS] %s QuickLoader stop result=%d\n",
-           reason ?: "SpringBoard cleanup", qlStopped);
+    NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
+    __block NSUInteger stoppedCount = 0;
+    __block NSUInteger skippedCount = 0;
 
-
-    settings_each_springboard_cleanup_entry(^(const SettingsSpringBoardTweakCleanupEntry *entry) {
+    void (^stopEntry)(const SettingsSpringBoardTweakCleanupEntry *) = ^(const SettingsSpringBoardTweakCleanupEntry *entry) {
         if (!entry->stop) return;
+        if (!settings_cleanup_entry_should_stop(d, entry, springboardWillDie)) {
+            skippedCount++;
+            return;
+        }
+        if (entry->requestStop) entry->requestStop();
         @try {
             bool stopped = entry->stop(springboardWillDie);
+            stoppedCount++;
             printf("[SETTINGS] %s %s stop%s result=%d\n",
                    reason ?: "SpringBoard cleanup",
                    entry->name ?: "tweak",
@@ -2060,7 +2104,26 @@ static void settings_stop_springboard_tweaks_locked(const char *reason,
                    entry->name ?: "tweak",
                    e.reason.UTF8String);
         }
+    };
+
+    // JS runners go first: if a script has active timers/contexts, stop it
+    // before any other cleanup path can race SpringBoard restart.
+    settings_each_springboard_cleanup_entry(^(const SettingsSpringBoardTweakCleanupEntry *entry) {
+        if (!settings_cleanup_entry_is_js_runner(entry)) return;
+        stopEntry(entry);
     });
+
+    settings_each_springboard_cleanup_entry(^(const SettingsSpringBoardTweakCleanupEntry *entry) {
+        if (settings_cleanup_entry_is_js_runner(entry)) return;
+        stopEntry(entry);
+    });
+
+    if (skippedCount > 0) {
+        printf("[SETTINGS] %s skipped %lu inactive SpringBoard tweak stop(s)%s\n",
+               reason ?: "SpringBoard cleanup",
+               (unsigned long)skippedCount,
+               stoppedCount == 0 ? " (nothing active)" : "");
+    }
 
     settings_forget_springboard_tweak_state_locked();
 }
@@ -7702,6 +7765,7 @@ static NSString *settings_pretty_date_for_iso(NSString *iso)
 @property (nonatomic, copy)   NSString *bundleTitle;
 @property (nonatomic, assign) BOOL changelogExpanded;
 @property (nonatomic, copy)   NSString *pendingThemeImportMode;
+@property (nonatomic, assign) BOOL qlStandalone;
 @property (nonatomic, strong) NSString *qlScriptName;
 @property (nonatomic, strong) NSString *qlRawScript;
 @property (nonatomic, strong) NSMutableDictionary *qlValues;
@@ -7752,15 +7816,16 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
     return section == 2 ? 3 : 1;
 }
 
-- (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section
+- (UIView *)tableView:(UITableView *)tableView viewForHeaderInSection:(NSInteger)section
 {
     switch (section) {
-        case 0: return @"Folder Theme";
-        case 1: return @"Plist Theme";
-        case 2: return @"Files";
+        case 0: return CYSectionHeaderView(@"Folder Theme");
+        case 1: return CYSectionHeaderView(@"Plist Theme");
+        case 2: return CYSectionHeaderView(@"Files");
         default: return nil;
     }
 }
+- (CGFloat)tableView:(UITableView *)tableView heightForHeaderInSection:(NSInteger)section { return 46.0; }
 
 - (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section
 {
@@ -7970,6 +8035,7 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
 }
 
 - (NSArray<NSDictionary *> *)quickLoaderRows {
+    self.qlStandalone = self.quickLoaderStandalone;
     NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
 
     //saving settings to storage
@@ -8052,12 +8118,19 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
         }
     }
 
-    if (filename && !enabled) {
-        [rows addObject:@{ @"kind": @"button", @"action": @"quickloader-apply-dynamic",
-                           @"title": @"Activate Tweak", @"style": @"prominent" }];
-    } else if (filename && enabled) {
-        [rows addObject:@{ @"kind": @"button", @"action": @"quickloader-apply-dynamic",
-                           @"title": @"Queued — Run Apply Tweaks" }];
+    if (self.qlStandalone) {
+        if (filename) {
+            [rows addObject:@{ @"kind": @"button", @"action": @"quickloader-run-now",
+                               @"title": @"Run Tweak", @"style": @"prominent" }];
+        }
+    } else {
+        if (filename && !enabled) {
+            [rows addObject:@{ @"kind": @"button", @"action": @"quickloader-apply-dynamic",
+                               @"title": @"Activate Tweak", @"style": @"prominent" }];
+        } else if (filename && enabled) {
+            [rows addObject:@{ @"kind": @"button", @"action": @"quickloader-apply-dynamic",
+                               @"title": @"Queued — Run Apply Tweaks" }];
+        }
     }
 
     [rows addObject:@{ @"kind": @"button", @"action": @"quickloader-run-js", @"title": @"Select .js File" }];
@@ -9154,7 +9227,7 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
     return 0;
 }
 
-- (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section
+- (NSString *)settingsRootSectionTitle:(NSInteger)section
 {
     if (self.detailMode) return nil;
     switch ((RootSection)section) {
@@ -9169,6 +9242,13 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
         default:                        return nil;
     }
 }
+
+- (UIView *)tableView:(UITableView *)tableView viewForHeaderInSection:(NSInteger)section
+{
+    NSString *title = [self settingsRootSectionTitle:section];
+    return title ? CYSectionHeaderView(title) : nil;
+}
+
 
 - (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section
 {
@@ -9291,7 +9371,7 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
         if ((RootSection)section == RootSectionInDev        && self.inDevBundleRows.count  == 0) return CGFLOAT_MIN;
         if ((RootSection)section == RootSectionSystemBundles && self.systemBundleRows.count == 0) return CGFLOAT_MIN;
     }
-    return UITableViewAutomaticDimension;
+    return 46.0;
 }
 
 - (CGFloat)tableView:(UITableView *)tableView heightForFooterInSection:(NSInteger)section
@@ -11778,13 +11858,10 @@ void cyanide_present_contact(UIViewController *host)
         UITableViewCell *cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:nil];
         cell.selectionStyle = UITableViewCellSelectionStyleNone;
         UIListContentConfiguration *config = [UIListContentConfiguration subtitleCellConfiguration];
-        config.image = [UIImage systemImageNamed:@"doc.text.fill"];
-        config.imageProperties.preferredSymbolConfiguration =
-            [UIImageSymbolConfiguration configurationWithPointSize:20.0 weight:UIImageSymbolWeightSemibold];
         BOOL active = [row[@"enabled"] boolValue];
-        config.imageProperties.tintColor = active ? UIColor.systemGreenColor : UIColor.systemOrangeColor;
-        config.imageProperties.reservedLayoutSize = CGSizeMake(34.0, 28.0);
-        config.imageProperties.maximumSize = CGSizeMake(28.0, 28.0);
+        config.image = CYIconBadgeImage(@"doc.text.fill", active ? UIColor.systemGreenColor : UIColor.systemOrangeColor, 36.0);
+        config.imageProperties.reservedLayoutSize = CGSizeMake(36.0, 36.0);
+        config.imageProperties.maximumSize = CGSizeMake(36.0, 36.0);
         config.imageToTextPadding = 14.0;
         config.text = row[@"title"];
         config.textProperties.font = [UIFont systemFontOfSize:17.0 weight:UIFontWeightSemibold];
@@ -11804,12 +11881,9 @@ void cyanide_present_contact(UIViewController *host)
         UITableViewCell *cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:nil];
         cell.selectionStyle = UITableViewCellSelectionStyleNone;
         UIListContentConfiguration *config = [UIListContentConfiguration subtitleCellConfiguration];
-        config.image = [UIImage systemImageNamed:@"doc.text"];
-        config.imageProperties.preferredSymbolConfiguration =
-            [UIImageSymbolConfiguration configurationWithPointSize:20.0 weight:UIImageSymbolWeightSemibold];
-        config.imageProperties.tintColor = UIColor.tertiaryLabelColor;
-        config.imageProperties.reservedLayoutSize = CGSizeMake(34.0, 28.0);
-        config.imageProperties.maximumSize = CGSizeMake(28.0, 28.0);
+        config.image = CYIconBadgeImage(@"doc.text", UIColor.tertiaryLabelColor, 36.0);
+        config.imageProperties.reservedLayoutSize = CGSizeMake(36.0, 36.0);
+        config.imageProperties.maximumSize = CGSizeMake(36.0, 36.0);
         config.imageToTextPadding = 14.0;
         config.text = @"No tweak loaded";
         config.textProperties.font = [UIFont systemFontOfSize:17.0 weight:UIFontWeightMedium];
@@ -13838,6 +13912,15 @@ void cyanide_present_contact(UIViewController *host)
             self.qlValues = nil;
             [self.tableView reloadData];
             [[NSNotificationCenter defaultCenter] postNotificationName:PackageQueueDidChangeNotification object:nil];
+            return;
+        } else if ([action isEqualToString:@"quickloader-run-now"]) {
+            [self applyQuickLoaderScript];
+            NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
+            [d setBool:YES forKey:kSettingsQuickLoaderEnabled];
+            settings_mark_tweak_needs_apply(kSettingsQuickLoaderEnabled);
+            [d synchronize];
+            settings_run_pending_actions();
+            [self.tableView reloadData];
             return;
         } else if ([action isEqualToString:@"quickloader-apply-dynamic"]) {
             [self applyQuickLoaderScript];

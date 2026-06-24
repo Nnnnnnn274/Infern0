@@ -325,6 +325,10 @@ static NSDictionary *repotweaks_sanitized_tweak(id raw, NSString **errorMessage)
         @"description": repotweaks_string_or_empty(dict[@"description"]),
         @"version": repotweaks_string_or_empty(dict[@"version"]),
     } mutableCopy];
+    NSString *symbol = repotweaks_string_or_empty(dict[@"symbol"]);
+    if (symbol.length > 0) out[@"symbol"] = symbol;
+    NSString *author = repotweaks_string_or_empty(dict[@"author"]);
+    if (author.length > 0) out[@"author"] = author;
     return out;
 }
 

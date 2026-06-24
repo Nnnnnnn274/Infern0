@@ -194,7 +194,7 @@ static NSString * const kSourcesLastRefreshKey = @"RepoTweaksLastRefreshTimestam
 - (void)sourcesDidRefresh:(NSNotification *)note
 {
     [self updateSourcesBadge];
-    [self hideRefreshBanner];
+    [self showRefreshSuccessThenHide];
 }
 
 - (void)refreshSourcesIfNeeded
@@ -204,10 +204,12 @@ static NSString * const kSourcesLastRefreshKey = @"RepoTweaksLastRefreshTimestam
     NSTimeInterval now = [[NSDate date] timeIntervalSince1970];
     if (last > 0 && (now - last) < kSourcesRefreshInterval) return;
 
-    [d setDouble:now forKey:kSourcesLastRefreshKey];
-    [d synchronize];
     [self showRefreshBanner];
-    repotweaks_refresh_all_sources(nil);
+    repotweaks_refresh_all_sources(^{
+        NSUserDefaults *dd = [NSUserDefaults standardUserDefaults];
+        [dd setDouble:[[NSDate date] timeIntervalSince1970] forKey:kSourcesLastRefreshKey];
+        [dd synchronize];
+    });
 }
 
 - (void)showRefreshBanner
@@ -220,26 +222,41 @@ static NSString * const kSourcesLastRefreshKey = @"RepoTweaksLastRefreshTimestam
     banner.layer.cornerRadius = 10.0;
     banner.layer.cornerCurve = kCACornerCurveContinuous;
     banner.alpha = 0.0;
+    banner.tag = 0;
 
     UIActivityIndicatorView *spinner = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleMedium];
     spinner.translatesAutoresizingMaskIntoConstraints = NO;
     spinner.color = UIColor.whiteColor;
+    spinner.tag = 100;
     [spinner startAnimating];
     [banner addSubview:spinner];
+
+    UIImageView *checkmark = [[UIImageView alloc] initWithImage:
+        [UIImage systemImageNamed:@"checkmark.circle.fill"
+               withConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:16.0 weight:UIImageSymbolWeightSemibold]]];
+    checkmark.translatesAutoresizingMaskIntoConstraints = NO;
+    checkmark.tintColor = UIColor.whiteColor;
+    checkmark.tag = 101;
+    checkmark.alpha = 0.0;
+    checkmark.hidden = YES;
+    [banner addSubview:checkmark];
 
     UILabel *label = [[UILabel alloc] init];
     label.translatesAutoresizingMaskIntoConstraints = NO;
     label.text = @"Refreshing sources…";
     label.font = [UIFont systemFontOfSize:13.0 weight:UIFontWeightSemibold];
     label.textColor = UIColor.whiteColor;
+    label.tag = 102;
     [banner addSubview:label];
 
     [NSLayoutConstraint activateConstraints:@[
-        [spinner.leadingAnchor  constraintEqualToAnchor:banner.leadingAnchor constant:12.0],
-        [spinner.centerYAnchor  constraintEqualToAnchor:banner.centerYAnchor],
-        [label.leadingAnchor    constraintEqualToAnchor:spinner.trailingAnchor constant:8.0],
-        [label.centerYAnchor    constraintEqualToAnchor:banner.centerYAnchor],
-        [label.trailingAnchor   constraintLessThanOrEqualToAnchor:banner.trailingAnchor constant:-12.0],
+        [spinner.leadingAnchor    constraintEqualToAnchor:banner.leadingAnchor constant:12.0],
+        [spinner.centerYAnchor    constraintEqualToAnchor:banner.centerYAnchor],
+        [checkmark.leadingAnchor  constraintEqualToAnchor:banner.leadingAnchor constant:12.0],
+        [checkmark.centerYAnchor  constraintEqualToAnchor:banner.centerYAnchor],
+        [label.leadingAnchor      constraintEqualToAnchor:spinner.trailingAnchor constant:8.0],
+        [label.centerYAnchor      constraintEqualToAnchor:banner.centerYAnchor],
+        [label.trailingAnchor     constraintLessThanOrEqualToAnchor:banner.trailingAnchor constant:-12.0],
     ]];
 
     [self.view addSubview:banner];
@@ -253,6 +270,38 @@ static NSString * const kSourcesLastRefreshKey = @"RepoTweaksLastRefreshTimestam
     self.refreshBanner = banner;
     [self.view layoutIfNeeded];
     [UIView animateWithDuration:0.3 animations:^{ banner.alpha = 1.0; }];
+}
+
+- (void)showRefreshSuccessThenHide
+{
+    UIView *banner = self.refreshBanner;
+    if (!banner) return;
+
+    UIActivityIndicatorView *spinner = [banner viewWithTag:100];
+    UIImageView *checkmark = (UIImageView *)[banner viewWithTag:101];
+    UILabel *label = (UILabel *)[banner viewWithTag:102];
+
+    [UIView animateWithDuration:0.25 animations:^{
+        spinner.alpha = 0.0;
+        banner.backgroundColor = [UIColor.systemGreenColor colorWithAlphaComponent:0.9];
+    } completion:^(BOOL finished) {
+        [spinner stopAnimating];
+        checkmark.hidden = NO;
+        label.text = @"Sources up to date";
+        [UIView animateWithDuration:0.2 animations:^{
+            checkmark.alpha = 1.0;
+        }];
+    }];
+
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        if (self.refreshBanner != banner) return;
+        self.refreshBanner = nil;
+        [UIView animateWithDuration:0.3 animations:^{
+            banner.alpha = 0.0;
+        } completion:^(BOOL finished) {
+            [banner removeFromSuperview];
+        }];
+    });
 }
 
 - (void)hideRefreshBanner
@@ -270,9 +319,10 @@ static NSString * const kSourcesLastRefreshKey = @"RepoTweaksLastRefreshTimestam
 - (void)updateSourcesBadge
 {
     NSUInteger count = repotweaks_available_update_count();
+    NSString *badge = count > 0 ? [NSString stringWithFormat:@"%lu", (unsigned long)count] : nil;
     for (UIViewController *vc in self.viewControllers) {
-        if ([vc.tabBarItem.title isEqualToString:@"Sources"]) {
-            vc.tabBarItem.badgeValue = count > 0 ? [NSString stringWithFormat:@"%lu", (unsigned long)count] : nil;
+        if ([vc.tabBarItem.title isEqualToString:@"Packages"]) {
+            vc.tabBarItem.badgeValue = badge;
             break;
         }
     }

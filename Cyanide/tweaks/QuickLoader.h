@@ -22,5 +22,6 @@ bool quickloader_save_repo_tweak(NSString *repoURL,
 bool quickloader_is_repo_tweak_installed(NSString *repoURL, NSString *tweakID);
 void quickloader_clear_repo_tweak_if_matches(NSString *repoURL, NSString *tweakID);
 bool quickloader_refresh_active_repo_tweak(void);
+bool quickloader_is_driven_by_repo_tweak(void);
 
 #endif /* QuickLoader_h */

@@ -80,6 +80,22 @@ static BOOL PackageCanQueueInstall(Package *package)
         if ([self packageInArray:self.uninstalls matching:p]) continue;
         [out addObject:p];
     }
+
+    BOOL hasRepoTweakUsingQL = NO;
+    for (Package *p in out) {
+        if (p.kind == PackageInstallKindRepoTweak && p.repoTweakUsesQuickLoader) {
+            hasRepoTweakUsingQL = YES;
+            break;
+        }
+    }
+    if (hasRepoTweakUsingQL) {
+        NSMutableArray<Package *> *filtered = [NSMutableArray arrayWithCapacity:out.count];
+        for (Package *p in out) {
+            if ([p.enabledKey isEqualToString:kSettingsQuickLoaderEnabled]) continue;
+            [filtered addObject:p];
+        }
+        return filtered;
+    }
     return out;
 }
 

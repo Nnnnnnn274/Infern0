@@ -9,6 +9,11 @@
 #import "../tweaks/RepoTweaks.h"
 #import "../tweaks/private_compat.h"
 
+@interface Package ()
+@property (nonatomic, readwrite, copy) NSString *symbolName;
+@property (nonatomic, readwrite, copy) NSString *author;
+@end
+
 @implementation PackageCatalog
 
 static NSString *catalog_string_or_empty(id value)
@@ -76,6 +81,10 @@ static BOOL catalog_repo_script_requires_native_bridge(NSString *rawScript)
                                                                 repoURL:url
                                                             repoTweakID:tweakID
                                                            repoScriptURL:scriptURL];
+            NSString *symbol = catalog_string_or_empty(tweak[@"symbol"]);
+            if (symbol.length > 0) pkg.symbolName = symbol;
+            NSString *tweakAuthor = catalog_string_or_empty(tweak[@"author"]);
+            if (tweakAuthor.length > 0) pkg.author = tweakAuthor;
             NSString *rawScript = [d stringForKey:repotweaks_script_defaults_key(url, tweakID)];
             if (rawScript.length == 0) {
                 pkg.installDisabledReason = @"Refresh this source from the Sources tab before installing.";
@@ -163,7 +172,7 @@ static const NSInteger kSecRepoTweaks       = 26;
                                      symbolName:@"network"
                                            kind:PackageInstallKindToggle
                                      enabledKey:kSettingsNSBarEnabled
-                                          isNew:YES];
+                                          isNew:NO];
         nsBar.settingsSection = kSecNSBar;
 
         Package *niceBarLite = [[Package alloc] initWithIdentifier:@"com.darksword.nicebarlite"
@@ -176,7 +185,7 @@ static const NSInteger kSecRepoTweaks       = 26;
                                      symbolName:@"textformat.size"
                                            kind:PackageInstallKindToggle
                                      enabledKey:kSettingsNiceBarLiteEnabled
-                                          isNew:YES];
+                                          isNew:NO];
         niceBarLite.settingsSection = kSecNiceBarLite;
 
 #if CYANIDE_PRIVATE_TWEAKS_AVAILABLE
@@ -233,7 +242,7 @@ static const NSInteger kSecRepoTweaks       = 26;
                                      symbolName:@"bell.badge.fill"
                                            kind:PackageInstallKindToggle
                                      enabledKey:kSettingsAxonLiteEnabled
-                                          isNew:YES];
+                                          isNew:NO];
         axon.unstableWarning = @"⚠️ Experimental: work-in-progress. Expect SpringBoard crashes, dropped notifications, layout glitches, and breakage between Cyanide builds. Don't rely on it for anything important.";
 
 #if CYANIDE_PRIVATE_TWEAKS_AVAILABLE
@@ -247,7 +256,7 @@ static const NSInteger kSecRepoTweaks       = 26;
                                      symbolName:@"ellipsis.bubble.fill"
                                            kind:PackageInstallKindToggle
                                      enabledKey:kSettingsTypeBannerEnabled
-                                          isNew:YES];
+                                          isNew:NO];
         typeBanner.experimental = YES;
         typeBanner.settingsSection = kSecTypeBanner;
         typeBanner.creatorOnly = YES;
@@ -263,7 +272,7 @@ static const NSInteger kSecRepoTweaks       = 26;
                                      symbolName:@"bell.and.waves.left.and.right.fill"
                                            kind:PackageInstallKindToggle
                                      enabledKey:kSettingsNotificationIslandEnabled
-                                          isNew:YES];
+                                          isNew:NO];
         notificationIsland.settingsSection = kSecNotificationIsland;
         notificationIsland.experimental = YES;
         notificationIsland.creatorOnly = YES;
@@ -279,7 +288,7 @@ static const NSInteger kSecRepoTweaks       = 26;
                                      symbolName:@"lock.open.fill"
                                            kind:PackageInstallKindDirectTool
                                      enabledKey:nil
-                                          isNew:YES];
+                                          isNew:NO];
         ipaDecryptor.settingsSection = kSecIPADecryptor;
         ipaDecryptor.experimental = YES;
         ipaDecryptor.creatorOnly = YES;
@@ -308,7 +317,7 @@ static const NSInteger kSecRepoTweaks       = 26;
                                      symbolName:@"sidebar.left"
                                            kind:PackageInstallKindToggle
                                      enabledKey:kSettingsStageStripEnabled
-                                          isNew:YES];
+                                          isNew:NO];
         stageStrip.experimental = YES;
         stageStrip.unstableWarning = @"⚠️ Early development. First Run takes 1-2 minutes because the picker enumerates every installed app and builds a tile per app. Re-Runs are fast. Touch routing into hosted windows isn't wired yet, so scrolling/typing inside a floating window may not work.";
 #endif
@@ -323,7 +332,7 @@ static const NSInteger kSecRepoTweaks       = 26;
                                      symbolName:@"location.fill"
                                            kind:PackageInstallKindDirectTool
                                      enabledKey:nil
-                                          isNew:YES];
+                                          isNew:NO];
         locationSim.settingsSection = kSecLocationSim;
         locationSim.experimental = NO;
         locationSim.unstableWarning = @"Beta: requires Apple Maps installed and set up. Changes CoreLocation's active simulation state — may affect time zone, date/time, and other location-tied behavior. Some apps and services prohibit or detect simulated locations. Only use this if you know what you're doing.";
@@ -338,7 +347,7 @@ static const NSInteger kSecRepoTweaks       = 26;
                                      symbolName:@"square.stack.3d.up.fill"
                                           kind:PackageInstallKindToggle
                                      enabledKey:kSettingsSnowBoardLiteEnabled
-                                          isNew:YES];
+                                          isNew:NO];
         snowboardLite.settingsSection = kSecSnowBoardLite;
         snowboardLite.unstableWarning = @"Preview: import or select a SnowBoard Lite theme before applying.";
 
@@ -352,7 +361,7 @@ static const NSInteger kSecRepoTweaks       = 26;
                                      symbolName:@"play.rectangle.fill"
                                            kind:PackageInstallKindToggle
                                      enabledKey:kSettingsLiveWPEnabled
-                                          isNew:YES];
+                                          isNew:NO];
         liveWP.settingsSection = kSecLiveWP;
 
         Package *layoutExtras = [[Package alloc] initWithIdentifier:@"com.darksword.layoutextras"
@@ -365,7 +374,7 @@ static const NSInteger kSecRepoTweaks       = 26;
                                      symbolName:@"square.dashed.inset.filled"
                                            kind:PackageInstallKindToggle
                                      enabledKey:kSettingsLayoutExtrasEnabled
-                                          isNew:YES];
+                                          isNew:NO];
         layoutExtras.settingsSection = kSecLayoutExtras;
         NSInteger iosMajor = [[NSProcessInfo processInfo] operatingSystemVersion].majorVersion;
         if (iosMajor >= 26) {
@@ -384,7 +393,7 @@ static const NSInteger kSecRepoTweaks       = 26;
                                      symbolName:@"arrow.down.circle.fill"
                                            kind:PackageInstallKindToggle
                                      enabledKey:kSettingsGravityLiteEnabled
-                                          isNew:YES];
+                                          isNew:NO];
         gravityLite.settingsSection = kSecGravityLite;
         gravityLite.unstableWarning = @"Beta: RemoteCall-only physics can be reset by SpringBoard relayouts such as page swipes, rotations, folder transitions, or resprings. Use Restore Icon Layout if icons stay displaced.";
         gravityLite.knownIssues = @[
@@ -404,7 +413,7 @@ static const NSInteger kSecRepoTweaks       = 26;
                                      symbolName:@"square.grid.2x2.fill"
                                            kind:PackageInstallKindToggle
                                      enabledKey:kSettingsAppSwitcherGridEnabled
-                                          isNew:YES];
+                                          isNew:NO];
         appSwitcherGrid.settingsSection = kSecAppSwitcherGrid;
         appSwitcherGrid.unstableWarning = @"Beta: patches SpringBoard runtime methods in memory. Respring restores stock, but unsupported builds may glitch the app switcher or crash SpringBoard. Re-run after any respring.";
 
@@ -418,7 +427,7 @@ static const NSInteger kSecRepoTweaks       = 26;
                                      symbolName:@"bolt.fill"
                                            kind:PackageInstallKindToggle
                                      enabledKey:kSettingsQuickLoaderEnabled
-                                          isNew:YES];
+                                          isNew:NO];
         quickLoader.settingsSection = kSecQuickLoader;
         quickLoader.unstableWarning = @"Runs user-selected JavaScript with access to Cyanide's RemoteCall helpers. Only use scripts you trust; bad scripts can crash SpringBoard.";
 
@@ -433,7 +442,7 @@ static const NSInteger kSecRepoTweaks       = 26;
                                      symbolName:@"lock.open.fill"
                                            kind:PackageInstallKindToggle
                                      enabledKey:kSettingsFastLockXLiteEnabled
-                                          isNew:YES];
+                                          isNew:NO];
         fastLockXLite.settingsSection = kSecFastLockXLite;
         fastLockXLite.experimental = YES;
         fastLockXLite.unstableWarning = @"Experimental: sends private SpringBoard lock-screen and biometric-resource messages. Always On runs SpringBoard timers while the device is locked, so disable it or respring if Face ID feels noisy or unstable.";
@@ -449,7 +458,7 @@ static const NSInteger kSecRepoTweaks       = 26;
                                      symbolName:@"applewatch.radiowaves.left.and.right"
                                            kind:PackageInstallKindNanoRegistry
                                      enabledKey:nil
-                                          isNew:YES];
+                                          isNew:NO];
         nanoRegistry.settingsSection = kSecNanoRegistry;
         nanoRegistry.unstableWarning = @"Warning: modifies a local NanoRegistry MobileAsset. Cyanide saves a .cyanide.bak backup beside the original, but system-file edits can fail or require a respring/reboot. Apply or remove this override at your own risk.";
 
@@ -463,7 +472,7 @@ static const NSInteger kSecRepoTweaks       = 26;
                                      symbolName:@"speaker.slash.fill"
                                            kind:PackageInstallKindCallRecordingSound
                                      enabledKey:nil
-                                          isNew:YES];
+                                          isNew:NO];
         callRecordingSound.experimental = NO;
         callRecordingSound.unstableWarning = @"Beta: persistent CallServices system-file replacement. Disclosure sounds may be legally required where you live; you are responsible for your use and apply this at your own risk. Use Restore Original Sounds before removing Cyanide if you want Cyanide's backups written back.";
 
@@ -477,7 +486,7 @@ static const NSInteger kSecRepoTweaks       = 26;
                                      symbolName:@"line.3.horizontal"
                                            kind:PackageInstallKindHideHomeBar
                                      enabledKey:nil
-                                          isNew:YES];
+                                          isNew:NO];
         hideHomeBar.unstableWarning = @"Beta: system asset page zeroing. Run by itself, then respring after hiding. To restore the home indicator, choose Restore Home Bar and respring.";
 
         Package *otaBlock = [[Package alloc] initWithIdentifier:@"com.darksword.ota-block"
@@ -575,7 +584,7 @@ static const NSInteger kSecRepoTweaks       = 26;
                                                          symbolName:@"dial.medium.fill"
                                                                kind:PackageInstallKindToggle
                                                          enabledKey:kSettingsDSDragCoefficientEnabled
-                                                              isNew:YES];
+                                                              isNew:NO];
                 drag.settingsSection = kSecDragCoefficient;
                 drag;
             }),

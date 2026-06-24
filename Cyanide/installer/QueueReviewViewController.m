@@ -4,6 +4,7 @@
 //
 
 #import "QueueReviewViewController.h"
+#import "CYIconBadge.h"
 #import "PackageQueue.h"
 #import "PackageCatalog.h"
 #import "InstallProgressViewController.h"
@@ -258,6 +259,30 @@ static BOOL QueuePackageIsHideHomeBar(Package *pkg)
         if ([q intentForPackage:p] == PackageQueueIntentUninstall) continue;
         [out addObject:p];
     }
+
+    BOOL hasRepoTweakUsingQL = NO;
+    for (Package *p in q.queuedInstalls) {
+        if (p.kind == PackageInstallKindRepoTweak && p.repoTweakUsesQuickLoader) {
+            hasRepoTweakUsingQL = YES;
+            break;
+        }
+    }
+    if (!hasRepoTweakUsingQL) {
+        for (Package *p in out) {
+            if (p.kind == PackageInstallKindRepoTweak && p.repoTweakUsesQuickLoader) {
+                hasRepoTweakUsingQL = YES;
+                break;
+            }
+        }
+    }
+    if (hasRepoTweakUsingQL) {
+        NSMutableArray<Package *> *filtered = [NSMutableArray arrayWithCapacity:out.count];
+        for (Package *p in out) {
+            if ([p.enabledKey isEqualToString:kSettingsQuickLoaderEnabled]) continue;
+            [filtered addObject:p];
+        }
+        return filtered;
+    }
     return out;
 }
 
@@ -289,54 +314,48 @@ static BOOL QueuePackageIsHideHomeBar(Package *pkg)
     return (NSInteger)[self packagesForSection:section].count;
 }
 
-- (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section
+- (NSString *)sectionLabel:(NSInteger)section
 {
     NSArray<Package *> *list = [self packagesForSection:section];
     if (list.count == 0) return nil;
     PackageInstallKind commonKind = list.firstObject.kind;
     BOOL allSameKind = YES;
     for (Package *pkg in list) {
-        if (pkg.kind != commonKind) {
-            allSameKind = NO;
-            break;
-        }
+        if (pkg.kind != commonKind) { allSameKind = NO; break; }
     }
     NSString *label;
     switch ((QueueReviewSection)section) {
         case QueueReviewSectionInstall:
-            if (allSameKind && commonKind == PackageInstallKindOTA) {
-                label = @"Disable";
-            } else if (allSameKind && commonKind == PackageInstallKindNanoRegistry) {
-                label = @"Apply";
-            } else if (allSameKind && commonKind == PackageInstallKindCallRecordingSound) {
-                label = @"Silence";
-            } else if (allSameKind && commonKind == PackageInstallKindHideHomeBar) {
-                label = @"Hide";
-            } else if (allSameKind && commonKind == PackageInstallKindRepoTweak) {
-                label = @"Install";
-            } else {
-                label = @"Activate";
-            }
+            if (allSameKind && commonKind == PackageInstallKindOTA) label = @"Disable";
+            else if (allSameKind && commonKind == PackageInstallKindNanoRegistry) label = @"Apply";
+            else if (allSameKind && commonKind == PackageInstallKindCallRecordingSound) label = @"Silence";
+            else if (allSameKind && commonKind == PackageInstallKindHideHomeBar) label = @"Hide";
+            else if (allSameKind && commonKind == PackageInstallKindRepoTweak) label = @"Install";
+            else label = @"Activate";
             break;
         case QueueReviewSectionUninstall:
-            if (allSameKind && commonKind == PackageInstallKindOTA) {
-                label = @"Enable";
-            } else if (allSameKind && commonKind == PackageInstallKindNanoRegistry) {
-                label = @"Remove";
-            } else if (allSameKind && commonKind == PackageInstallKindCallRecordingSound) {
-                label = @"Restore";
-            } else if (allSameKind && commonKind == PackageInstallKindHideHomeBar) {
-                label = @"Restore";
-            } else if (allSameKind && commonKind == PackageInstallKindRepoTweak) {
-                label = @"Remove";
-            } else {
-                label = @"Deactivate";
-            }
+            if (allSameKind && commonKind == PackageInstallKindOTA) label = @"Enable";
+            else if (allSameKind && commonKind == PackageInstallKindNanoRegistry) label = @"Remove";
+            else if (allSameKind && commonKind == PackageInstallKindCallRecordingSound) label = @"Restore";
+            else if (allSameKind && commonKind == PackageInstallKindHideHomeBar) label = @"Restore";
+            else if (allSameKind && commonKind == PackageInstallKindRepoTweak) label = @"Remove";
+            else label = @"Deactivate";
             break;
-        case QueueReviewSectionReApply:   label = @"Already Active";   break;
-        default:                          return nil;
+        case QueueReviewSectionReApply: label = @"Already Active"; break;
+        default: return nil;
     }
     return [NSString stringWithFormat:@"%@  ·  %ld", label, (long)list.count];
+}
+
+- (UIView *)tableView:(UITableView *)tableView viewForHeaderInSection:(NSInteger)section
+{
+    NSString *label = [self sectionLabel:section];
+    return label ? CYSectionHeaderView(label) : nil;
+}
+
+- (CGFloat)tableView:(UITableView *)tableView heightForHeaderInSection:(NSInteger)section
+{
+    return [self sectionLabel:section] ? 46.0 : 0.0;
 }
 
 - (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section
@@ -405,9 +424,7 @@ static BOOL QueuePackageIsHideHomeBar(Package *pkg)
                     cell.detailTextLabel.textColor = UIColor.systemOrangeColor;
                     break;
                 case PackageInstallKindRepoTweak:
-                    cell.detailTextLabel.text = pkg.repoTweakUsesQuickLoader
-                        ? @"QuickLoader install pending"
-                        : @"Native package install pending";
+                    cell.detailTextLabel.text = @"Install pending";
                     cell.detailTextLabel.textColor = UIColor.systemGreenColor;
                     break;
                 default:
@@ -435,9 +452,7 @@ static BOOL QueuePackageIsHideHomeBar(Package *pkg)
                     cell.detailTextLabel.textColor = UIColor.systemGreenColor;
                     break;
                 case PackageInstallKindRepoTweak:
-                    cell.detailTextLabel.text = pkg.repoTweakUsesQuickLoader
-                        ? @"QuickLoader removal pending"
-                        : @"Native package removal pending";
+                    cell.detailTextLabel.text = @"Removal pending";
                     cell.detailTextLabel.textColor = UIColor.systemRedColor;
                     break;
                 default:
@@ -455,10 +470,8 @@ static BOOL QueuePackageIsHideHomeBar(Package *pkg)
             break;
     }
     cell.detailTextLabel.font = [UIFont systemFontOfSize:12.0];
-    cell.imageView.image = [UIImage systemImageNamed:pkg.symbolName];
-    cell.imageView.tintColor = (s == QueueReviewSectionReApply)
-        ? UIColor.tertiaryLabelColor
-        : self.view.tintColor;
+    UIColor *queueIconColor = (s == QueueReviewSectionReApply) ? UIColor.tertiaryLabelColor : self.view.tintColor;
+    cell.imageView.image = CYIconBadgeImage(pkg.symbolName, queueIconColor, 32.0);
     cell.selectionStyle = UITableViewCellSelectionStyleNone;
     cell.accessoryView = nil;
     cell.accessoryType = UITableViewCellAccessoryNone;

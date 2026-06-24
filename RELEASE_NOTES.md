@@ -32,6 +32,16 @@ omit it.
 
 ## Released
 
+### v1.3.2 - 2026-06-24
+
+- [x] Redesigned Home, Packages, and Sources tabs with a unified visual style — gradient hero, colored icon badges, bold section headers, and compact list cells.
+- [x] Packages tab now shows a Recently Added section for new source tweaks and a flat alphabetical package list; category browser moved to Sources.
+- [x] Added per-tweak SF Symbol icons and per-tweak author to the repo JSON format.
+- [x] Added pull-to-refresh on Packages and Sources, with a green success banner after refresh.
+- [x] QuickLoader opened from Home or Sources now runs tweaks directly without going through the install queue.
+- [x] Fixed repo tweaks showing both QuickLoader and the tweak itself in the queue and installed package lists.
+- [x] Updated JS tweak repo documentation with the new symbol and author optional fields.
+
 ### v1.3.1 - 2026-06-24
 
 - [x] Improved QuickLoader UI with loaded tweak display, active status indicator, clear button, and prominent activate button.

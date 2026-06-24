@@ -4,15 +4,29 @@
 //
 
 #import "SourcesViewController.h"
+#import "CYIconBadge.h"
 #import "JSTweakDocsViewController.h"
+#import "CategoryPackagesViewController.h"
 #import "Package.h"
+#import "PackageCatalog.h"
 #import "PackageDetailViewController.h"
 #import "PackageQueue.h"
+#import "../SettingsViewController.h"
 #import "../tweaks/RepoTweaks.h"
 #import "../tweaks/QuickLoader.h"
+#import "MainTabBarController.h"
 
 static NSString * const kSourceCellID      = @"SourceCell";
 static NSString * const kSourcePkgCellID   = @"SourcePkgCell";
+static NSString * const kCategoryCellID    = @"CategoryCell";
+
+typedef NS_ENUM(NSInteger, SourcesSection) {
+    SourcesSectionRepos = 0,
+    SourcesSectionQuickLoader,
+    SourcesSectionCategories,
+    SourcesSectionDeveloper,
+    SourcesSectionCount,
+};
 
 static NSString *sources_string_or_empty(id value)
 {
@@ -107,6 +121,48 @@ static void sources_clear_repo_defaults(NSString *url)
     }
 }
 
+#pragma mark - Category icon/color helpers
+
+static NSString *category_icon(NSString *cat)
+{
+    static NSDictionary<NSString *, NSString *> *map;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        map = @{
+            @"Status Bar":          @"chart.bar.fill",
+            @"Home Screen Layout":  @"square.grid.3x3.fill",
+            @"Performance":         @"bolt.slash.fill",
+            @"SpringBoard Tweaks":  @"sparkle",
+            @"System Updates":      @"icloud.slash.fill",
+            @"System":              @"gear",
+            @"Experimental":        @"flask.fill",
+            @"In Development":      @"hammer.fill",
+            @"JavaScript Tweaks":   @"bolt.fill",
+        };
+    });
+    return map[cat] ?: @"shippingbox.fill";
+}
+
+static UIColor *category_color(NSString *cat)
+{
+    static NSDictionary<NSString *, UIColor *> *map;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        map = @{
+            @"Status Bar":          UIColor.systemTealColor,
+            @"Home Screen Layout":  UIColor.systemBlueColor,
+            @"Performance":         UIColor.systemOrangeColor,
+            @"SpringBoard Tweaks":  UIColor.systemCyanColor,
+            @"System Updates":      UIColor.systemIndigoColor,
+            @"System":              UIColor.systemGrayColor,
+            @"Experimental":        UIColor.systemRedColor,
+            @"In Development":      UIColor.systemPurpleColor,
+            @"JavaScript Tweaks":   UIColor.systemOrangeColor,
+        };
+    });
+    return map[cat] ?: UIColor.secondaryLabelColor;
+}
+
 #pragma mark - Source Packages (drill-down)
 
 @interface SourcePackagesViewController : UITableViewController
@@ -121,6 +177,7 @@ static void sources_clear_repo_defaults(NSString *url)
     NSDictionary *repo = sources_repo_for_url(self.repoURL);
     NSString *name = sources_string_or_empty(repo[@"repoName"]);
     self.title = name.length ? name : @"Source";
+    self.navigationItem.largeTitleDisplayMode = UINavigationItemLargeTitleDisplayModeAlways;
     self.tableView.rowHeight = UITableViewAutomaticDimension;
     self.tableView.estimatedRowHeight = 68.0;
 }
@@ -140,24 +197,24 @@ static void sources_clear_repo_defaults(NSString *url)
     if (indexPath.row >= (NSInteger)tweaks.count) return cell;
     NSDictionary *tweak = tweaks[indexPath.row];
 
+    NSString *sym = sources_string_or_empty(tweak[@"symbol"]);
+    if (sym.length == 0) sym = @"shippingbox.and.arrow.down.fill";
     UIListContentConfiguration *config = [UIListContentConfiguration subtitleCellConfiguration];
-    config.image = [UIImage systemImageNamed:@"bolt.fill"];
-    config.imageProperties.preferredSymbolConfiguration =
-        [UIImageSymbolConfiguration configurationWithPointSize:18.0 weight:UIImageSymbolWeightSemibold];
-    config.imageProperties.tintColor = UIColor.systemOrangeColor;
-    config.imageProperties.reservedLayoutSize = CGSizeMake(34.0, 28.0);
-    config.imageProperties.maximumSize = CGSizeMake(28.0, 28.0);
-    config.imageToTextPadding = 14.0;
+    config.image = CYIconBadgeImage(sym, UIColor.systemOrangeColor, 32.0);
+    config.imageProperties.reservedLayoutSize = CGSizeMake(32.0, 32.0);
+    config.imageProperties.maximumSize = CGSizeMake(32.0, 32.0);
+    config.imageToTextPadding = 12.0;
     config.text = sources_string_or_empty(tweak[@"name"]);
-    config.textProperties.font = [UIFont systemFontOfSize:17.0 weight:UIFontWeightSemibold];
+    config.textProperties.font = [UIFont systemFontOfSize:16.0 weight:UIFontWeightSemibold];
     NSString *version = sources_string_or_empty(tweak[@"version"]);
     NSString *desc = sources_string_or_empty(tweak[@"description"]);
     config.secondaryText = version.length ? [NSString stringWithFormat:@"v%@ · %@", version, desc] : desc;
-    config.secondaryTextProperties.color = UIColor.secondaryLabelColor;
+    config.secondaryTextProperties.color = [UIColor.labelColor colorWithAlphaComponent:0.55];
+    config.secondaryTextProperties.font = [UIFont systemFontOfSize:14.0 weight:UIFontWeightRegular];
     config.secondaryTextProperties.numberOfLines = 2;
-    config.textToSecondaryTextVerticalPadding = 3.0;
+    config.textToSecondaryTextVerticalPadding = 2.0;
     NSDirectionalEdgeInsets m = config.directionalLayoutMargins;
-    m.top = 12.0; m.bottom = 12.0;
+    m.top = 10.0; m.bottom = 10.0;
     config.directionalLayoutMargins = m;
     cell.contentConfiguration = config;
 
@@ -200,6 +257,8 @@ static void sources_clear_repo_defaults(NSString *url)
 
 @interface SourcesViewController ()
 @property (nonatomic, copy) NSArray<NSString *> *urls;
+@property (nonatomic, copy) NSArray<NSString *> *categories;
+@property (nonatomic, copy) NSDictionary<NSString *, NSArray<Package *> *> *packagesByCategory;
 @end
 
 @implementation SourcesViewController
@@ -209,6 +268,8 @@ static void sources_clear_repo_defaults(NSString *url)
     [super viewDidLoad];
     self.title = @"Sources";
     self.navigationItem.title = @"Sources";
+    self.navigationItem.largeTitleDisplayMode = UINavigationItemLargeTitleDisplayModeAlways;
+    self.navigationController.navigationBar.prefersLargeTitles = YES;
     self.tableView.rowHeight = UITableViewAutomaticDimension;
     self.tableView.estimatedRowHeight = 72.0;
 
@@ -220,6 +281,10 @@ static void sources_clear_repo_defaults(NSString *url)
                                                                              action:@selector(refreshAll)];
     self.navigationItem.rightBarButtonItems = @[add, refresh];
 
+    UIRefreshControl *rc = [[UIRefreshControl alloc] init];
+    [rc addTarget:self action:@selector(pullToRefresh) forControlEvents:UIControlEventValueChanged];
+    self.refreshControl = rc;
+
     repotweaks_seed_default_repos();
     [self reloadSources];
 
@@ -227,9 +292,44 @@ static void sources_clear_repo_defaults(NSString *url)
                                              selector:@selector(sourcesDidRefresh:)
                                                  name:RepoTweaksDidRefreshNotification
                                                object:nil];
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(sourcesDidRefresh:)
+                                                 name:PackageQueueDidChangeNotification
+                                               object:nil];
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(sourcesDidRefresh:)
+                                                 name:kSettingsActionsDidCompleteNotification
+                                               object:nil];
 }
 
 - (void)dealloc { [[NSNotificationCenter defaultCenter] removeObserver:self]; }
+
+- (void)openQuickLoader
+{
+    UITabBarController *tab = self.tabBarController;
+    if (!tab) return;
+    for (NSUInteger i = 0; i < tab.viewControllers.count; i++) {
+        UIViewController *vc = tab.viewControllers[i];
+        if ([vc.tabBarItem.title isEqualToString:@"Settings"]) {
+            UINavigationController *nav = [vc isKindOfClass:UINavigationController.class] ? (UINavigationController *)vc : nil;
+            if (!nav) return;
+            [nav popToRootViewControllerAnimated:NO];
+            SettingsViewController *ql = [[SettingsViewController alloc] initWithUnderlyingSection:25 bundleTitle:@"QuickLoader"];
+            ql.quickLoaderStandalone = YES;
+            [nav pushViewController:ql animated:NO];
+            tab.selectedIndex = i;
+            return;
+        }
+    }
+}
+
+- (void)pullToRefresh
+{
+    [self.refreshControl endRefreshing];
+    MainTabBarController *tab = (MainTabBarController *)self.tabBarController;
+    if ([tab respondsToSelector:@selector(showRefreshBanner)]) [tab showRefreshBanner];
+    repotweaks_refresh_all_sources(nil);
+}
 
 - (void)sourcesDidRefresh:(NSNotification *)note
 {
@@ -246,7 +346,26 @@ static void sources_clear_repo_defaults(NSString *url)
 - (void)reloadSources
 {
     self.urls = sources_urls();
+    [self refreshCategories];
     [self.tableView reloadData];
+}
+
+- (void)refreshCategories
+{
+    NSDictionary<NSString *, NSArray<Package *> *> *all = [PackageCatalog packagesByCategory];
+    NSMutableArray<NSString *> *cats = [NSMutableArray array];
+    NSMutableDictionary<NSString *, NSArray<Package *> *> *filtered = [NSMutableDictionary dictionary];
+
+    for (NSString *cat in [PackageCatalog categoriesInOrder]) {
+        if ([cat isEqualToString:@"Beta"]) continue;
+        NSArray<Package *> *pkgs = all[cat];
+        if (pkgs.count > 0) {
+            [cats addObject:cat];
+            filtered[cat] = pkgs;
+        }
+    }
+    self.categories = cats;
+    self.packagesByCategory = filtered;
 }
 
 - (void)showDocsForMode:(JSTweakDocsMode)mode
@@ -259,6 +378,39 @@ static void sources_clear_repo_defaults(NSString *url)
     [self presentViewController:nav animated:YES completion:nil];
 }
 
+#pragma mark - Cell renderers
+
+- (UITableViewCell *)categoryCellForRow:(NSInteger)row tableView:(UITableView *)tableView
+{
+    UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:kCategoryCellID];
+    if (!cell) {
+        cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:kCategoryCellID];
+    }
+
+    NSString *cat = self.categories[row];
+    NSUInteger count = self.packagesByCategory[cat].count;
+
+    UIListContentConfiguration *config = [UIListContentConfiguration subtitleCellConfiguration];
+    config.image = CYIconBadgeImage(category_icon(cat), category_color(cat), 32.0);
+    config.imageProperties.reservedLayoutSize = CGSizeMake(32.0, 32.0);
+    config.imageProperties.maximumSize = CGSizeMake(32.0, 32.0);
+    config.imageToTextPadding = 12.0;
+    config.text = cat;
+    config.textProperties.font = [UIFont systemFontOfSize:16.0 weight:UIFontWeightSemibold];
+    config.secondaryText = [NSString stringWithFormat:@"%lu package%@",
+                            (unsigned long)count, count == 1 ? @"" : @"s"];
+    config.secondaryTextProperties.font = [UIFont systemFontOfSize:14.0 weight:UIFontWeightRegular];
+    config.secondaryTextProperties.color = [UIColor.labelColor colorWithAlphaComponent:0.55];
+    config.textToSecondaryTextVerticalPadding = 2.0;
+    NSDirectionalEdgeInsets m = config.directionalLayoutMargins;
+    m.top = 10.0; m.bottom = 10.0;
+    config.directionalLayoutMargins = m;
+    cell.contentConfiguration = config;
+    cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+    cell.accessoryView = nil;
+    return cell;
+}
+
 - (UITableViewCell *)docCellForRow:(NSInteger)row tableView:(UITableView *)tableView
 {
     static NSString *kDocCellID = @"DocCell";
@@ -268,26 +420,23 @@ static void sources_clear_repo_defaults(NSString *url)
     }
 
     UIListContentConfiguration *config = [UIListContentConfiguration subtitleCellConfiguration];
-    config.imageProperties.preferredSymbolConfiguration =
-        [UIImageSymbolConfiguration configurationWithPointSize:18.0 weight:UIImageSymbolWeightSemibold];
-    config.imageProperties.reservedLayoutSize = CGSizeMake(34.0, 28.0);
-    config.imageProperties.maximumSize = CGSizeMake(28.0, 28.0);
-    config.imageToTextPadding = 14.0;
+    config.imageProperties.reservedLayoutSize = CGSizeMake(32.0, 32.0);
+    config.imageProperties.maximumSize = CGSizeMake(32.0, 32.0);
+    config.imageToTextPadding = 12.0;
     config.textProperties.font = [UIFont systemFontOfSize:16.0 weight:UIFontWeightSemibold];
-    config.secondaryTextProperties.color = UIColor.secondaryLabelColor;
+    config.secondaryTextProperties.font = [UIFont systemFontOfSize:14.0 weight:UIFontWeightRegular];
+    config.secondaryTextProperties.color = [UIColor.labelColor colorWithAlphaComponent:0.55];
     config.textToSecondaryTextVerticalPadding = 2.0;
     NSDirectionalEdgeInsets m = config.directionalLayoutMargins;
-    m.top = 12.0; m.bottom = 12.0;
+    m.top = 10.0; m.bottom = 10.0;
     config.directionalLayoutMargins = m;
 
     if (row == 0) {
-        config.image = [UIImage systemImageNamed:@"hammer.fill"];
-        config.imageProperties.tintColor = UIColor.systemOrangeColor;
+        config.image = CYIconBadgeImage(@"hammer.fill", UIColor.systemOrangeColor, 32.0);
         config.text = @"Build Your Own JS Tweak";
         config.secondaryText = @"Write scripts, declare parameters, use the RemoteCall API";
     } else {
-        config.image = [UIImage systemImageNamed:@"server.rack"];
-        config.imageProperties.tintColor = UIColor.systemIndigoColor;
+        config.image = CYIconBadgeImage(@"server.rack", UIColor.systemIndigoColor, 32.0);
         config.text = @"Set Up a Tweak Repository";
         config.secondaryText = @"Host a JSON feed on GitHub Pages or any HTTPS server";
     }
@@ -296,6 +445,8 @@ static void sources_clear_repo_defaults(NSString *url)
     cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
     return cell;
 }
+
+#pragma mark - Add/Refresh
 
 - (void)addSource
 {
@@ -325,10 +476,8 @@ static void sources_clear_repo_defaults(NSString *url)
     NSArray<NSString *> *urls = sources_urls();
     if (urls.count == 0) return;
 
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Refreshing Sources"
-                                                                   message:@"Downloading package lists and scripts…"
-                                                            preferredStyle:UIAlertControllerStyleAlert];
-    [self presentViewController:alert animated:YES completion:nil];
+    MainTabBarController *tab = (MainTabBarController *)self.tabBarController;
+    if ([tab respondsToSelector:@selector(showRefreshBanner)]) [tab showRefreshBanner];
 
     dispatch_group_t group = dispatch_group_create();
     __block NSString *firstError = nil;
@@ -341,11 +490,9 @@ static void sources_clear_repo_defaults(NSString *url)
     }
 
     dispatch_group_notify(group, dispatch_get_main_queue(), ^{
-        [alert dismissViewControllerAnimated:YES completion:^{
-            [self reloadSources];
-            [[NSNotificationCenter defaultCenter] postNotificationName:RepoTweaksDidRefreshNotification object:nil];
-            if (firstError.length > 0) [self presentError:firstError];
-        }];
+        [self reloadSources];
+        [[NSNotificationCenter defaultCenter] postNotificationName:RepoTweaksDidRefreshNotification object:nil];
+        if (firstError.length > 0) [self presentError:firstError];
     });
 }
 
@@ -358,20 +505,31 @@ static void sources_clear_repo_defaults(NSString *url)
     [self presentViewController:err animated:YES completion:nil];
 }
 
+#pragma mark - Table data source
+
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView
 {
-    return 2;
+    return SourcesSectionCount;
 }
 
-- (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section
+- (UIView *)tableView:(UITableView *)tableView viewForHeaderInSection:(NSInteger)section
 {
-    if (section == 0) return self.urls.count > 0 ? @"Repositories" : nil;
-    return @"Developer";
+    if (section == SourcesSectionRepos) return self.urls.count > 0 ? CYSectionHeaderView(@"Repositories") : nil;
+    if (section == SourcesSectionQuickLoader) return CYSectionHeaderView(@"QuickLoader");
+    if (section == SourcesSectionCategories) return self.categories.count > 0 ? CYSectionHeaderView(@"Categories") : nil;
+    return CYSectionHeaderView(@"Developer");
+}
+
+- (CGFloat)tableView:(UITableView *)tableView heightForHeaderInSection:(NSInteger)section
+{
+    if (section == SourcesSectionRepos && self.urls.count == 0) return 0.0;
+    if (section == SourcesSectionCategories && self.categories.count == 0) return 0.0;
+    return 46.0;
 }
 
 - (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section
 {
-    if (section == 0) {
+    if (section == SourcesSectionRepos) {
         if (self.urls.count == 0) return @"No sources added yet. Tap + to add an HTTPS RepoTweaks JSON URL.";
         return @"Swipe left to remove a source.";
     }
@@ -380,13 +538,43 @@ static void sources_clear_repo_defaults(NSString *url)
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section
 {
-    if (section == 0) return (NSInteger)self.urls.count;
+    if (section == SourcesSectionRepos) return (NSInteger)self.urls.count;
+    if (section == SourcesSectionQuickLoader) return 1;
+    if (section == SourcesSectionCategories) return (NSInteger)self.categories.count;
     return 2;
+}
+
+- (UITableViewCell *)quickLoaderCellForTableView:(UITableView *)tableView
+{
+    static NSString *kQLCellID = @"QLCell";
+    UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:kQLCellID];
+    if (!cell) {
+        cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:kQLCellID];
+    }
+    UIListContentConfiguration *config = [UIListContentConfiguration subtitleCellConfiguration];
+    config.image = CYIconBadgeImage(@"bolt.fill", UIColor.systemOrangeColor, 32.0);
+    config.imageProperties.reservedLayoutSize = CGSizeMake(32.0, 32.0);
+    config.imageProperties.maximumSize = CGSizeMake(32.0, 32.0);
+    config.imageToTextPadding = 12.0;
+    config.text = @"Open QuickLoader";
+    config.textProperties.font = [UIFont systemFontOfSize:16.0 weight:UIFontWeightSemibold];
+    config.secondaryText = @"Run a local .js tweak file";
+    config.secondaryTextProperties.font = [UIFont systemFontOfSize:14.0 weight:UIFontWeightRegular];
+    config.secondaryTextProperties.color = [UIColor.labelColor colorWithAlphaComponent:0.55];
+    config.textToSecondaryTextVerticalPadding = 2.0;
+    NSDirectionalEdgeInsets m = config.directionalLayoutMargins;
+    m.top = 10.0; m.bottom = 10.0;
+    config.directionalLayoutMargins = m;
+    cell.contentConfiguration = config;
+    cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+    return cell;
 }
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath
 {
-    if (indexPath.section == 1) return [self docCellForRow:indexPath.row tableView:tableView];
+    if (indexPath.section == SourcesSectionQuickLoader) return [self quickLoaderCellForTableView:tableView];
+    if (indexPath.section == SourcesSectionCategories) return [self categoryCellForRow:indexPath.row tableView:tableView];
+    if (indexPath.section == SourcesSectionDeveloper) return [self docCellForRow:indexPath.row tableView:tableView];
 
     UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:kSourceCellID];
     if (!cell) {
@@ -400,15 +588,12 @@ static void sources_clear_repo_defaults(NSString *url)
     NSString *author = sources_string_or_empty(repo[@"author"]);
 
     UIListContentConfiguration *config = [UIListContentConfiguration subtitleCellConfiguration];
-    config.image = [UIImage systemImageNamed:@"tray.and.arrow.down.fill"];
-    config.imageProperties.preferredSymbolConfiguration =
-        [UIImageSymbolConfiguration configurationWithPointSize:20.0 weight:UIImageSymbolWeightSemibold];
-    config.imageProperties.tintColor = UIColor.systemGreenColor;
-    config.imageProperties.reservedLayoutSize = CGSizeMake(34.0, 28.0);
-    config.imageProperties.maximumSize = CGSizeMake(28.0, 28.0);
-    config.imageToTextPadding = 14.0;
+    config.image = CYIconBadgeImage(@"tray.and.arrow.down.fill", UIColor.systemGreenColor, 32.0);
+    config.imageProperties.reservedLayoutSize = CGSizeMake(32.0, 32.0);
+    config.imageProperties.maximumSize = CGSizeMake(32.0, 32.0);
+    config.imageToTextPadding = 12.0;
     config.text = repoName.length ? repoName : @"Unknown Source";
-    config.textProperties.font = [UIFont systemFontOfSize:17.0 weight:UIFontWeightSemibold];
+    config.textProperties.font = [UIFont systemFontOfSize:16.0 weight:UIFontWeightSemibold];
 
     NSUInteger updates = sources_update_count_for_url(url);
     NSMutableString *detail = [NSMutableString string];
@@ -416,11 +601,12 @@ static void sources_clear_repo_defaults(NSString *url)
     [detail appendFormat:@"%lu package%@", (unsigned long)tweaks.count, tweaks.count == 1 ? @"" : @"s"];
     if (updates > 0) [detail appendFormat:@" · %lu update%@", (unsigned long)updates, updates == 1 ? @"" : @"s"];
     config.secondaryText = detail;
-    config.secondaryTextProperties.color = updates > 0 ? UIColor.systemBlueColor : UIColor.secondaryLabelColor;
-    config.textToSecondaryTextVerticalPadding = 3.0;
+    config.secondaryTextProperties.font = [UIFont systemFontOfSize:14.0 weight:UIFontWeightRegular];
+    config.secondaryTextProperties.color = updates > 0 ? UIColor.systemBlueColor : [UIColor.labelColor colorWithAlphaComponent:0.55];
+    config.textToSecondaryTextVerticalPadding = 2.0;
 
     NSDirectionalEdgeInsets m = config.directionalLayoutMargins;
-    m.top = 14.0; m.bottom = 14.0;
+    m.top = 10.0; m.bottom = 10.0;
     config.directionalLayoutMargins = m;
     cell.contentConfiguration = config;
     cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
@@ -430,10 +616,25 @@ static void sources_clear_repo_defaults(NSString *url)
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath
 {
     [tableView deselectRowAtIndexPath:indexPath animated:YES];
-    if (indexPath.section == 1) {
+
+    if (indexPath.section == SourcesSectionQuickLoader) {
+        [self openQuickLoader];
+        return;
+    }
+
+    if (indexPath.section == SourcesSectionCategories) {
+        NSString *cat = self.categories[indexPath.row];
+        CategoryPackagesViewController *list = [[CategoryPackagesViewController alloc] initWithStyle:UITableViewStyleInsetGrouped];
+        list.categoryName = cat;
+        [self.navigationController pushViewController:list animated:YES];
+        return;
+    }
+
+    if (indexPath.section == SourcesSectionDeveloper) {
         [self showDocsForMode:(indexPath.row == 0) ? JSTweakDocsModeWriteTweak : JSTweakDocsModeSetupRepo];
         return;
     }
+
     if (indexPath.row >= (NSInteger)self.urls.count) return;
     SourcePackagesViewController *detail = [[SourcePackagesViewController alloc] initWithStyle:UITableViewStyleInsetGrouped];
     detail.repoURL = self.urls[indexPath.row];
@@ -442,7 +643,7 @@ static void sources_clear_repo_defaults(NSString *url)
 
 - (BOOL)tableView:(UITableView *)tableView canEditRowAtIndexPath:(NSIndexPath *)indexPath
 {
-    return indexPath.section == 0;
+    return indexPath.section == SourcesSectionRepos;
 }
 
 - (void)tableView:(UITableView *)tableView commitEditingStyle:(UITableViewCellEditingStyle)editingStyle forRowAtIndexPath:(NSIndexPath *)indexPath

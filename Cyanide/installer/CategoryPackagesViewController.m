@@ -4,6 +4,7 @@
 //
 
 #import "CategoryPackagesViewController.h"
+#import "CYIconBadge.h"
 #import "PackageCatalog.h"
 #import "PackageDetailViewController.h"
 #import "PackageQueue.h"
@@ -158,24 +159,22 @@ static NSString * const kCatPkgCellID = @"CatPkgCell";
     }
     Package *pkg = self.filteredPackages[indexPath.row];
 
-    UIListContentConfiguration *config = [UIListContentConfiguration subtitleCellConfiguration];
-    config.image = [UIImage systemImageNamed:pkg.symbolName];
-    config.imageProperties.preferredSymbolConfiguration =
-        [UIImageSymbolConfiguration configurationWithPointSize:22.0 weight:UIImageSymbolWeightRegular];
     UIColor *mainColor = pkg.isInstallDisabled ? UIColor.secondaryLabelColor : self.view.tintColor;
-    config.imageProperties.tintColor = mainColor;
-    config.imageProperties.reservedLayoutSize = CGSizeMake(34.0, 28.0);
-    config.imageProperties.maximumSize = CGSizeMake(28.0, 28.0);
-    config.imageToTextPadding = 14.0;
+    UIListContentConfiguration *config = [UIListContentConfiguration subtitleCellConfiguration];
+    config.image = CYIconBadgeImage(pkg.symbolName, mainColor, 32.0);
+    config.imageProperties.reservedLayoutSize = CGSizeMake(32.0, 32.0);
+    config.imageProperties.maximumSize = CGSizeMake(32.0, 32.0);
+    config.imageToTextPadding = 12.0;
     config.text = pkg.name;
-    config.textProperties.font = [UIFont systemFontOfSize:17.0 weight:UIFontWeightSemibold];
+    config.textProperties.font = [UIFont systemFontOfSize:16.0 weight:UIFontWeightSemibold];
     if (pkg.isInstallDisabled) config.textProperties.color = UIColor.secondaryLabelColor;
     config.secondaryText = pkg.shortDescription;
-    config.secondaryTextProperties.color = pkg.isInstallDisabled ? UIColor.tertiaryLabelColor : UIColor.secondaryLabelColor;
-    config.secondaryTextProperties.numberOfLines = 2;
-    config.textToSecondaryTextVerticalPadding = 3.0;
+    config.secondaryTextProperties.font = [UIFont systemFontOfSize:14.0 weight:UIFontWeightRegular];
+    config.secondaryTextProperties.color = pkg.isInstallDisabled ? UIColor.tertiaryLabelColor : [UIColor.labelColor colorWithAlphaComponent:0.55];
+    config.secondaryTextProperties.numberOfLines = 3;
+    config.textToSecondaryTextVerticalPadding = 2.0;
     NSDirectionalEdgeInsets m = config.directionalLayoutMargins;
-    m.top = 14.0; m.bottom = 14.0;
+    m.top = 10.0; m.bottom = 10.0;
     config.directionalLayoutMargins = m;
     cell.contentConfiguration = config;
 
@@ -226,8 +225,6 @@ static NSString * const kCatPkgCellID = @"CatPkgCell";
         return [self pillWithText:@"EXPERIMENTAL" background:[[UIColor systemRedColor] colorWithAlphaComponent:0.18] textColor:UIColor.systemRedColor];
     if ([pkg.category caseInsensitiveCompare:@"Beta"] == NSOrderedSame)
         return [self pillWithText:@"BETA" background:[[UIColor systemPurpleColor] colorWithAlphaComponent:0.18] textColor:UIColor.systemPurpleColor];
-    if (pkg.isNew)
-        return [self pillWithText:@"NEW" background:[UIColor colorWithRed:0.95 green:0.55 blue:0.05 alpha:0.18] textColor:UIColor.systemOrangeColor];
     return nil;
 }
 

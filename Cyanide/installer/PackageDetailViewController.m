@@ -4,6 +4,7 @@
 //
 
 #import "PackageDetailViewController.h"
+#import "CYIconBadge.h"
 #import "PackageQueue.h"
 #import "../LogTextView.h"
 #import "../PatreonAuth.h"
@@ -531,10 +532,7 @@ typedef NS_ENUM(NSInteger, PackageDetailSection) {
     UIImageView *iconView = [[UIImageView alloc] init];
     iconView.translatesAutoresizingMaskIntoConstraints = NO;
     iconView.contentMode = UIViewContentModeScaleAspectFit;
-    iconView.image = [UIImage systemImageNamed:self.package.symbolName];
-    iconView.preferredSymbolConfiguration =
-        [UIImageSymbolConfiguration configurationWithPointSize:48.0 weight:UIImageSymbolWeightRegular];
-    iconView.tintColor = self.view.tintColor;
+    iconView.image = CYIconBadgeImage(self.package.symbolName, self.view.tintColor, 60.0);
     [header addSubview:iconView];
 
     // Name
@@ -583,10 +581,6 @@ typedef NS_ENUM(NSInteger, PackageDetailSection) {
         badge = [self badgeWithText:@"DISABLED"
                          background:[UIColor.systemRedColor colorWithAlphaComponent:0.16]
                           textColor:UIColor.systemRedColor];
-    } else if (self.package.isNew) {
-        badge = [self badgeWithText:@"NEW"
-                         background:[UIColor colorWithRed:0.95 green:0.55 blue:0.05 alpha:0.18]
-                          textColor:[UIColor systemOrangeColor]];
     }
     if (badge) {
         badge.translatesAutoresizingMaskIntoConstraints = NO;
@@ -966,19 +960,26 @@ typedef NS_ENUM(NSInteger, PackageDetailSection) {
     return 0;
 }
 
-- (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section
+- (NSString *)detailSectionTitle:(NSInteger)section
 {
     switch ([self sectionAtIndex:section]) {
-        case PackageDetailSectionWarning:      return nil;
         case PackageDetailSectionKnownIssues:  return @"Known Issues";
-        case PackageDetailSectionInfo:         return nil;
         case PackageDetailSectionAction:       return @"Configure";
         case PackageDetailSectionSettings:     return @"Current Settings";
         case PackageDetailSectionRepoOptions:  return @"Options";
-        case PackageDetailSectionDescription:  return nil;
-        case PackageDetailSectionCount:        return nil;
+        default: return nil;
     }
-    return nil;
+}
+
+- (UIView *)tableView:(UITableView *)tableView viewForHeaderInSection:(NSInteger)section
+{
+    NSString *title = [self detailSectionTitle:section];
+    return title ? CYSectionHeaderView(title) : nil;
+}
+
+- (CGFloat)tableView:(UITableView *)tableView heightForHeaderInSection:(NSInteger)section
+{
+    return [self detailSectionTitle:section] ? 46.0 : 0.0;
 }
 
 - (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section
