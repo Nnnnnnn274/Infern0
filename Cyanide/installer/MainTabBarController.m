@@ -9,6 +9,7 @@
 #import "PackageQueue.h"
 #import "HomeViewController.h"
 #import "SourcesViewController.h"
+#import "../SettingsViewController.h"
 #import "../tweaks/RepoTweaks.h"
 
 static const CGFloat kPopupHeight  = 56.0;
@@ -43,6 +44,10 @@ static NSString * const kSourcesLastRefreshKey = @"RepoTweaksLastRefreshTimestam
     [[NSNotificationCenter defaultCenter] addObserver:self
                                              selector:@selector(queueDidChange:)
                                                  name:PackageQueueDidChangeNotification
+                                               object:nil];
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(queueDidChange:)
+                                                 name:kSettingsActionsDidCompleteNotification
                                                object:nil];
     [[NSNotificationCenter defaultCenter] addObserver:self
                                              selector:@selector(sourcesDidRefresh:)

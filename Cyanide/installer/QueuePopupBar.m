@@ -5,6 +5,7 @@
 
 #import "QueuePopupBar.h"
 #import "PackageQueue.h"
+#import "../SettingsViewController.h"
 
 @interface QueuePopupBar ()
 @property (nonatomic, strong) UIVisualEffectView *blurView;
@@ -113,6 +114,10 @@
     [[NSNotificationCenter defaultCenter] addObserver:self
                                              selector:@selector(queueChanged:)
                                                  name:PackageQueueDidChangeNotification
+                                               object:nil];
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(queueChanged:)
+                                                 name:kSettingsActionsDidCompleteNotification
                                                object:nil];
 }
 

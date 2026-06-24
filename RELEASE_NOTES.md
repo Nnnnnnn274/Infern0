@@ -32,6 +32,10 @@ omit it.
 
 ## Released
 
+### v1.3.4 - 2026-06-24
+
+- [x] Fixed the queue popup staying visible after Apply Tweaks completes.
+
 ### v1.3.3 - 2026-06-24
 
 - [x] Repo tweak detail view now shows the actual tweak description instead of generic install text.
