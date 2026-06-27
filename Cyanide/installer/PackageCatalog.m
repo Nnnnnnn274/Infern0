@@ -5,7 +5,6 @@
 
 #import "PackageCatalog.h"
 #import "../SettingsViewController.h"
-#import "../PatreonAuth.h"
 #import "../tweaks/RepoTweaks.h"
 #import "../tweaks/private_compat.h"
 
@@ -131,15 +130,12 @@ static const NSInteger kSecRepoTweaks       = 26;
 + (NSArray<Package *> *)allPackages
 {
     NSArray<Package *> *full = [self allPackagesIncludingExperimental];
-    BOOL creator = cyanide_is_creator();
-    BOOL experimentalAccess = cyanide_is_patron() || creator;
     BOOL experimentalOn = [[NSUserDefaults standardUserDefaults]
-                            boolForKey:kSettingsExperimentalTweaksEnabled]
-                            && experimentalAccess;
+                            boolForKey:kSettingsExperimentalTweaksEnabled];
 
     NSMutableArray<Package *> *out = [NSMutableArray arrayWithCapacity:full.count];
     for (Package *p in full) {
-        if (p.creatorOnly && !creator) continue;
+        if (p.creatorOnly) continue;
         if (p.experimental && !experimentalOn) continue;
         [out addObject:p];
     }
@@ -152,6 +148,8 @@ static const NSInteger kSecRepoTweaks       = 26;
     static dispatch_once_t once;
     dispatch_once(&once, ^{
         NSString *version = @"1.0";
+        NSString *inDevelopmentDisabledReason =
+            @"In development — install is disabled because this tweak does not work yet. The code is left in the app/source tree for anyone who wants to pick it up.";
 
         Package *statBar = [[Package alloc] initWithIdentifier:@"com.darksword.statbar"
                                            name:@"StatBar"
@@ -205,9 +203,8 @@ static const NSInteger kSecRepoTweaks       = 26;
                                      enabledKey:kSettingsRSSIDisplayEnabled
                                           isNew:NO];
         signal.settingsSection = kSecRSSI;
-        signal.experimental = YES;
-        signal.creatorOnly = YES;
-        signal.unstableWarning = @"⚠️ In development — may not work at all. The live status-bar refresh interferes with other SpringBoard tweaks and can drop readouts entirely.";
+        signal.installDisabledReason = inDevelopmentDisabledReason;
+        signal.unstableWarning = @"⚠️ In development only — install is disabled because this does not work yet. The live status-bar refresh interferes with other SpringBoard tweaks and can drop readouts entirely.";
 #endif
 
         Package *sbc = [[Package alloc] initWithIdentifier:@"com.darksword.sbcustomizer"
@@ -261,10 +258,9 @@ static const NSInteger kSecRepoTweaks       = 26;
                                            kind:PackageInstallKindToggle
                                      enabledKey:kSettingsTypeBannerEnabled
                                           isNew:NO];
-        typeBanner.experimental = YES;
         typeBanner.settingsSection = kSecTypeBanner;
-        typeBanner.creatorOnly = YES;
-        typeBanner.unstableWarning = @"⚠️ In development — extremely unstable. Keeps an original-thread imagent RemoteCall session for live polling and may miss indicators or destabilize SpringBoard.";
+        typeBanner.installDisabledReason = inDevelopmentDisabledReason;
+        typeBanner.unstableWarning = @"⚠️ In development only — install is disabled because this does not work yet. Keeps an original-thread imagent RemoteCall session for live polling and may miss indicators or destabilize SpringBoard.";
 
         Package *notificationIsland = [[Package alloc] initWithIdentifier:@"com.darksword.notificationisland"
                                            name:@"Notification Island"
@@ -278,9 +274,8 @@ static const NSInteger kSecRepoTweaks       = 26;
                                      enabledKey:kSettingsNotificationIslandEnabled
                                           isNew:NO];
         notificationIsland.settingsSection = kSecNotificationIsland;
-        notificationIsland.experimental = YES;
-        notificationIsland.creatorOnly = YES;
-        notificationIsland.unstableWarning = @"⚠️ In development — polls SpringBoard notification state over RemoteCall and may miss banners, duplicate activity updates, or destabilize SpringBoard.";
+        notificationIsland.installDisabledReason = inDevelopmentDisabledReason;
+        notificationIsland.unstableWarning = @"⚠️ In development only — install is disabled because this does not work yet. Polls SpringBoard notification state over RemoteCall and may miss banners, duplicate activity updates, or destabilize SpringBoard.";
 
         Package *ipaDecryptor = [[Package alloc] initWithIdentifier:@"com.darksword.ipadecryptor"
                                            name:@"IPA Decryptor"
@@ -294,9 +289,8 @@ static const NSInteger kSecRepoTweaks       = 26;
                                      enabledKey:nil
                                           isNew:NO];
         ipaDecryptor.settingsSection = kSecIPADecryptor;
-        ipaDecryptor.experimental = YES;
-        ipaDecryptor.creatorOnly = YES;
-        ipaDecryptor.unstableWarning = @"⚠️ In development — encrypted IPA download is experimental. SINF/iTunesMetadata patching, task-port dump, and IPA writer stages are not finished yet.";
+        ipaDecryptor.installDisabledReason = inDevelopmentDisabledReason;
+        ipaDecryptor.unstableWarning = @"⚠️ In development only — install is disabled because this does not work yet. Encrypted IPA download is experimental. SINF/iTunesMetadata patching, task-port dump, and IPA writer stages are not finished yet.";
 
         Package *stageStrip = [[Package alloc] initWithIdentifier:@"com.darksword.stagestrip"
                                            name:@"Dynamic Stage Lite"
@@ -317,13 +311,12 @@ static const NSInteger kSecRepoTweaks       = 26;
             @"• Gestures may stutter while the App Library is still filling in."
                                         version:version
                                          author:@"zeroxjf"
-                                       category:@"Experimental"
+                                       category:@"Beta"
                                      symbolName:@"sidebar.left"
                                            kind:PackageInstallKindToggle
                                      enabledKey:kSettingsStageStripEnabled
                                           isNew:NO];
-        stageStrip.experimental = YES;
-        stageStrip.unstableWarning = @"⚠️ Early development. First Run takes 1-2 minutes because the picker enumerates every installed app and builds a tile per app. Re-Runs are fast. Touch routing into hosted windows isn't wired yet, so scrolling/typing inside a floating window may not work.";
+        stageStrip.unstableWarning = @"Beta / unstable: First Run takes 1-2 minutes because the picker enumerates every installed app and builds a tile per app. Re-Runs are fast. Touch routing into hosted windows isn't wired yet, so scrolling/typing inside a floating window may not work.";
 #endif
 
         Package *locationSim = [[Package alloc] initWithIdentifier:@"com.darksword.locationsim"
@@ -442,14 +435,13 @@ static const NSInteger kSecRepoTweaks       = 26;
                                 longDescription:@"RemoteCall-only port of the usable FastLockX primitives recovered from the iOS 15 tweak by Artem Kasper.\n\nCredits: original FastLockX by Artem Kasper; Cyanide FastLockX Lite port by zeroxjf.\n\nIt can pulse SpringBoard's biometric retry path, ask the iOS 26 biometric coordinator to start a Mesa/Face ID unlock, and send the original Lock Screen unlock request as a fallback. Installing it through Apply Tweaks keeps those retry/unlock requests armed with SpringBoard timers so pickup-to-unlock can work after Cyanide closes. The pulse loop pauses again after unlock.\n\nUse Disable, Clean Up, or a respring to stop the timers."
                                         version:version
                                          author:@"Artem Kasper / zeroxjf"
-                                       category:@"Experimental"
+                                       category:@"Beta"
                                      symbolName:@"lock.open.fill"
                                            kind:PackageInstallKindToggle
                                      enabledKey:kSettingsFastLockXLiteEnabled
                                           isNew:NO];
         fastLockXLite.settingsSection = kSecFastLockXLite;
-        fastLockXLite.experimental = YES;
-        fastLockXLite.unstableWarning = @"Experimental: sends private SpringBoard lock-screen and biometric-resource messages. Always On runs SpringBoard timers while the device is locked, so disable it or respring if Face ID feels noisy or unstable.";
+        fastLockXLite.unstableWarning = @"Beta / unstable: sends private SpringBoard lock-screen and biometric-resource messages. Always On runs SpringBoard timers while the device is locked, so disable it or respring if Face ID feels noisy or unstable.";
 #endif
 
         Package *nanoRegistry = [[Package alloc] initWithIdentifier:@"com.darksword.nanoregistry"
@@ -626,6 +618,7 @@ static const NSInteger kSecRepoTweaks       = 26;
 {
     NSArray<NSString *> *preferred = @[
         @"In Development",
+        @"Beta",
         @"Experimental",
         @"Status Bar",
         @"Home Screen",

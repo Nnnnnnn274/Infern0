@@ -7,7 +7,6 @@
 #import "CYIconBadge.h"
 #import "PackageQueue.h"
 #import "../LogTextView.h"
-#import "../PatreonAuth.h"
 #import "../SettingsViewController.h"
 #import "../tweaks/QuickLoader.h"
 #import "../tweaks/RepoTweaks.h"
@@ -569,7 +568,11 @@ typedef NS_ENUM(NSInteger, PackageDetailSection) {
 
     // Status badge (optional)
     UIView *badge = nil;
-    if ([self isDirectToolPackage]) {
+    if (self.package.isInstallDisabled && !self.package.isInstalled) {
+        badge = [self badgeWithText:@"DISABLED"
+                         background:[UIColor.systemRedColor colorWithAlphaComponent:0.16]
+                          textColor:UIColor.systemRedColor];
+    } else if ([self isDirectToolPackage]) {
         badge = [self badgeWithText:@"MANUAL"
                          background:[UIColor.secondaryLabelColor colorWithAlphaComponent:0.16]
                           textColor:UIColor.secondaryLabelColor];
@@ -585,6 +588,10 @@ typedef NS_ENUM(NSInteger, PackageDetailSection) {
                           textColor:color];
     } else if (self.package.creatorOnly) {
         badge = [self badgeWithText:@"IN DEVELOPMENT"
+                         background:[UIColor.systemPurpleColor colorWithAlphaComponent:0.16]
+                          textColor:UIColor.systemPurpleColor];
+    } else if ([self.package.category caseInsensitiveCompare:@"Beta"] == NSOrderedSame) {
+        badge = [self badgeWithText:@"BETA"
                          background:[UIColor.systemPurpleColor colorWithAlphaComponent:0.16]
                           textColor:UIColor.systemPurpleColor];
     } else if (self.package.experimental) {
@@ -678,7 +685,10 @@ typedef NS_ENUM(NSInteger, PackageDetailSection) {
     NSString *title;
     UIBarButtonItemStyle style = UIBarButtonItemStylePlain;
     UIColor *tint = nil;
-    if (directTool) {
+    if (self.package.isInstallDisabled && !installed && intent == PackageQueueIntentNone) {
+        title = @"Disabled";
+        tint = UIColor.secondaryLabelColor;
+    } else if (directTool) {
         title = @"Open Controls";
         tint = self.view.tintColor;
         style = UIBarButtonItemStyleDone;
@@ -705,7 +715,7 @@ typedef NS_ENUM(NSInteger, PackageDetailSection) {
     } else if (installed) {
         title = @"Deactivate";
         tint = UIColor.systemRedColor;
-    } else if (self.package.creatorOnly && !cyanide_is_creator()) {
+    } else if (self.package.creatorOnly) {
         title = @"In Development";
         tint = UIColor.secondaryLabelColor;
     } else if (self.package.isInstallDisabled) {
@@ -746,7 +756,7 @@ typedef NS_ENUM(NSInteger, PackageDetailSection) {
         [[PackageQueue sharedQueue] removePackage:self.package];
         return;
     }
-    if (self.package.creatorOnly && !cyanide_is_creator()) {
+    if (self.package.creatorOnly) {
         return;
     }
     if (self.package.isInstallDisabled && !self.package.isInstalled) {

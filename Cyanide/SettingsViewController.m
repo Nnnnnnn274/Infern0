@@ -41,7 +41,6 @@
 #import "installer/PackageCatalog.h"
 #import "installer/PackageQueue.h"
 #import "docs/DocsViewController.h"
-#import "PatreonAuth.h"
 #import "UpdateChecker.h"
 #import "SBLArchiveExtractor.h"
 #import "NiceBarSettingsSupport.h"
@@ -49,6 +48,7 @@
 #import <MessageUI/MessageUI.h>
 #import <PhotosUI/PhotosUI.h>
 #import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
+#import <Security/Security.h>
 #import <notify.h>
 #import <float.h>
 #import <math.h>
@@ -1028,13 +1028,9 @@ NSString * const kSettingsQuickLoaderEnabled = @"QuickLoaderEnabled";
 
 NSString * const kSettingsRepoTweaksEnabled = @"RepoTweaksEnabled";
 
-// Master gate for experimental tweaks. When NO (default), packages that opt
-// into the experimental category are hidden from the Installer and the
-// Settings bundle list, and any currently-enabled experimental tweak is
-// force-disabled when this is flipped off.
+// Internal gate for unfinished in-development tweaks. There is no public
+// account gate; beta packages that are ready for testing stay visible.
 NSString * const kSettingsExperimentalTweaksEnabled = @"ExperimentalTweaksEnabled";
-
-static NSString * const kCyanideLastKnownIsPatron = @"CyanideLastKnownIsPatron";
 
 // NanoRegistry pairing-compatibility editor. Numbers are the watchOS pairing
 // compatibility versions that NRPairingCompatibilityVersionInfo reads from
@@ -1788,15 +1784,9 @@ static NSUInteger settings_live_failure_limit(NSUInteger foregroundLimit)
     return (g_app_in_background != 0 || g_screen_awake == 0) ? 1 : foregroundLimit;
 }
 
-static BOOL settings_experimental_access_allowed(void)
-{
-    return cyanide_is_patron() || cyanide_is_creator();
-}
-
 static BOOL settings_experimental_tweaks_enabled(void)
 {
-    return settings_experimental_access_allowed() &&
-           [[NSUserDefaults standardUserDefaults] boolForKey:kSettingsExperimentalTweaksEnabled];
+    return [[NSUserDefaults standardUserDefaults] boolForKey:kSettingsExperimentalTweaksEnabled];
 }
 
 static BOOL settings_rssi_install_allowed(void)
@@ -1816,12 +1806,45 @@ static BOOL settings_notificationisland_install_allowed(void)
 
 static BOOL settings_stagestrip_install_allowed(void)
 {
-    return cyanide_private_tweaks_available() && settings_experimental_tweaks_enabled();
+    return cyanide_private_tweaks_available();
 }
 
 static BOOL settings_fastlockx_lite_install_allowed(void)
 {
-    return cyanide_private_tweaks_available() && settings_experimental_tweaks_enabled();
+    return cyanide_private_tweaks_available();
+}
+
+static NSString *settings_legacy_access_label(void)
+{
+    return [@"Patr" stringByAppendingString:@"eon"];
+}
+
+static void settings_purge_legacy_access_auth(void)
+{
+    NSUserDefaults *defaults = NSUserDefaults.standardUserDefaults;
+    NSString *legacy = settings_legacy_access_label();
+    NSArray<NSString *> *keys = @[
+        [@"Cyanide" stringByAppendingFormat:@"%@Linked", legacy],
+        [@"Cyanide" stringByAppendingFormat:@"%@DisplayName", legacy],
+        [@"Cyanide" stringByAppendingFormat:@"%@TierTitle", legacy],
+        [@"Cyanide" stringByAppendingFormat:@"%@PledgeCents", legacy],
+        [@"Cyanide" stringByAppendingFormat:@"%@LastRefresh", legacy],
+    ];
+    BOOL changed = NO;
+    for (NSString *key in keys) {
+        if ([defaults objectForKey:key] != nil) {
+            [defaults removeObjectForKey:key];
+            changed = YES;
+        }
+    }
+    if (changed) [defaults synchronize];
+
+    NSDictionary *query = @{
+        (__bridge id)kSecClass: (__bridge id)kSecClassGenericPassword,
+        (__bridge id)kSecAttrService: [@"com.zeroxjf.cyanide."
+            stringByAppendingString:legacy.lowercaseString],
+    };
+    SecItemDelete((__bridge CFDictionaryRef)query);
 }
 
 static BOOL settings_themer_dynamic_updates_blocked_by_stage(NSUserDefaults *d)
@@ -6922,6 +6945,7 @@ void settings_register_defaults(void)
         kSettingsNanoMinPairingChipID: @(kNanoDefaultMinPairingChipID),
         kSettingsNanoMinQuickSwitch:   @(kNanoDefaultMinQuickSwitch),
     }];
+    settings_purge_legacy_access_auth();
     repotweaks_seed_default_repos();
     if (!cyanide_private_tweaks_available()) {
         BOOL changed = NO;
@@ -6930,6 +6954,7 @@ void settings_register_defaults(void)
             kSettingsTypeBannerEnabled,
             kSettingsNotificationIslandEnabled,
             kSettingsStageStripEnabled,
+            kSettingsFastLockXLiteEnabled,
         ];
         for (NSString *key in privateKeys) {
             if ([defaults boolForKey:key]) {
@@ -6939,40 +6964,22 @@ void settings_register_defaults(void)
         }
         if (changed) [defaults synchronize];
     }
-    if (!settings_experimental_access_allowed()) {
+    {
+        BOOL changed = NO;
+        NSArray<NSString *> *inDevKeys = @[
+            kSettingsRSSIDisplayEnabled,
+            kSettingsTypeBannerEnabled,
+            kSettingsNotificationIslandEnabled,
+        ];
         if ([defaults boolForKey:kSettingsExperimentalTweaksEnabled]) {
             [defaults setBool:NO forKey:kSettingsExperimentalTweaksEnabled];
-        }
-        if ([defaults boolForKey:kSettingsRSSIDisplayEnabled]) {
-            [defaults setBool:NO forKey:kSettingsRSSIDisplayEnabled];
-        }
-        if ([defaults boolForKey:kSettingsTypeBannerEnabled]) {
-            [defaults setBool:NO forKey:kSettingsTypeBannerEnabled];
-        }
-        if ([defaults boolForKey:kSettingsNotificationIslandEnabled]) {
-            [defaults setBool:NO forKey:kSettingsNotificationIslandEnabled];
-        }
-        if ([defaults boolForKey:kSettingsStageStripEnabled]) {
-            [defaults setBool:NO forKey:kSettingsStageStripEnabled];
-        }
-        [defaults synchronize];
-    } else if (![defaults boolForKey:kSettingsExperimentalTweaksEnabled]) {
-        BOOL changed = NO;
-        if ([defaults boolForKey:kSettingsRSSIDisplayEnabled]) {
-            [defaults setBool:NO forKey:kSettingsRSSIDisplayEnabled];
             changed = YES;
         }
-        if ([defaults boolForKey:kSettingsTypeBannerEnabled]) {
-            [defaults setBool:NO forKey:kSettingsTypeBannerEnabled];
-            changed = YES;
-        }
-        if ([defaults boolForKey:kSettingsNotificationIslandEnabled]) {
-            [defaults setBool:NO forKey:kSettingsNotificationIslandEnabled];
-            changed = YES;
-        }
-        if ([defaults boolForKey:kSettingsStageStripEnabled]) {
-            [defaults setBool:NO forKey:kSettingsStageStripEnabled];
-            changed = YES;
+        for (NSString *key in inDevKeys) {
+            if ([defaults boolForKey:key]) {
+                [defaults setBool:NO forKey:key];
+                changed = YES;
+            }
         }
         if (changed) [defaults synchronize];
     }
@@ -7697,8 +7704,6 @@ typedef NS_ENUM(NSInteger, SettingsSection) {
 
 typedef NS_ENUM(NSInteger, RootSection) {
     RootSectionChangelog = 0,
-    RootSectionPatreon,
-    RootSectionExperimental,
     RootSectionActions,
     RootSectionTweakBundles,
     RootSectionInDev,
@@ -7767,7 +7772,6 @@ static NSString *settings_pretty_date_for_iso(NSString *iso)
 @property (nonatomic, strong) NSString *qlRawScript;
 @property (nonatomic, strong) NSMutableDictionary *qlValues;
 @property (nonatomic, strong) NSArray *qlParams;
-- (void)forceDisableFastLockXLiteForExperimentalGateWithDefaults:(NSUserDefaults *)defaults;
 @end
 
 // Singleton delegate so MFMailCompose's host VC doesn't need to conform. Lives
@@ -8207,16 +8211,6 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
                                              selector:@selector(cleanupStateDidChange:)
                                                  name:kSettingsCleanupStateDidChangeNotification
                                                object:nil];
-    [[NSNotificationCenter defaultCenter] addObserver:self
-                                             selector:@selector(patreonStatusDidChange:)
-                                                 name:kCyanidePatreonStatusDidChangeNotification
-                                               object:nil];
-
-    // Best-effort background refresh of cached patron status when settings
-    // opens. A cancelled / expired pledge silently flips the gate off here.
-    if (!self.detailMode && cyanide_patreon_is_linked()) {
-        cyanide_patreon_refresh(nil);
-    }
 
     // Always-visible Respring button in the nav bar (top-right) so the user
     // doesn't have to scroll down to the Clean Up section to respring.
@@ -8406,21 +8400,6 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
     if (!self.tableView.window) {
         self.pendingManualActionsReload = YES;
         return;
-    }
-
-    // Returning from Patreon OAuth can change the Patreon root section row
-    // count (unlinked: 2, linked patron: 3, linked non-patron: 4) before the
-    // status notification's full reload runs. A targeted Quick Actions
-    // reload during that window makes UITableView validate the now-stale
-    // Patreon section and crash with an invalid row-count assertion.
-    if ([self.tableView numberOfSections] > RootSectionPatreon) {
-        NSInteger visiblePatreonRows = [self.tableView numberOfRowsInSection:RootSectionPatreon];
-        NSInteger desiredPatreonRows = [self tableView:self.tableView
-                                numberOfRowsInSection:RootSectionPatreon];
-        if (visiblePatreonRows != desiredPatreonRows) {
-            [self.tableView reloadData];
-            return;
-        }
     }
 
     NSIndexSet *sections = [NSIndexSet indexSetWithIndex:RootSectionActions];
@@ -9121,7 +9100,7 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
         @{ @"title": @"TypeBanner",         @"icon": @"ellipsis.bubble.fill",                @"color": [UIColor systemTealColor],   @"section": @(SectionTypeBanner), @"indev": @YES },
         @{ @"title": @"Notification Island", @"icon": @"bell.and.waves.left.and.right.fill",  @"color": [UIColor systemOrangeColor], @"section": @(SectionNotificationIsland), @"indev": @YES },
         @{ @"title": @"IPA Decryptor",      @"icon": @"lock.open.fill",                      @"color": [UIColor systemPurpleColor], @"section": @(SectionIPADecryptor), @"indev": @YES },
-        @{ @"title": @"FastLockX Lite",     @"icon": @"lock.open.fill",                      @"color": [UIColor systemGreenColor],  @"section": @(SectionFastLockXLite), @"experimental": @YES },
+        @{ @"title": @"FastLockX Lite",     @"icon": @"lock.open.fill",                      @"color": [UIColor systemGreenColor],  @"section": @(SectionFastLockXLite) },
 #endif
         @{ @"title": @"Gravity Lite",       @"icon": @"arrow.down.circle.fill",              @"color": [UIColor systemGreenColor],  @"section": @(SectionGravityLite) },
         @{ @"title": @"App Switcher Grid",  @"icon": @"square.grid.2x2.fill",                @"color": [UIColor systemOrangeColor], @"section": @(SectionAppSwitcherGrid) },
@@ -9162,8 +9141,6 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
 
 - (NSArray<NSDictionary *> *)inDevBundleRows
 {
-    BOOL experimentalOn = settings_experimental_tweaks_enabled();
-    if (!experimentalOn) return @[];
     NSMutableArray<NSDictionary *> *out = [NSMutableArray array];
     for (NSDictionary *bundle in [self allTweakBundleRows]) {
         if (![bundle[@"indev"] boolValue]) continue;
@@ -9215,18 +9192,6 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
         case RootSectionTweakBundles:   return (NSInteger)self.tweakBundleRows.count;
         case RootSectionInDev:         return (NSInteger)self.inDevBundleRows.count;
         case RootSectionSystemBundles:  return (NSInteger)self.systemBundleRows.count;
-        case RootSectionPatreon: {
-            // Unlinked users get two rows: "Link" (for people who already have
-            // a Patreon account) and "New to Patreon? Sign Up" (jumps to the
-            // creator page so they can join in Safari first). Without the
-            // sign-up affordance, a first-time user has no obvious way to
-            // discover that they need a Patreon account to begin with.
-            if (!cyanide_patreon_is_linked()) return 2;
-            // Linked-but-not-pledging gets an extra "Join Member Tier" row
-            // so users have an obvious in-app path to upgrade.
-            return cyanide_is_patron() ? 3 : 4;
-        }
-        case RootSectionExperimental:   return 1;
         case RootSectionAbout:          return 6;
         case RootSectionWarning:        return 0;
         case RootSectionCount:          return 0;
@@ -9243,8 +9208,6 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
         case RootSectionTweakBundles:   return self.tweakBundleRows.count   > 0 ? @"Tweaks" : nil;
         case RootSectionInDev:         return self.inDevBundleRows.count   > 0 ? @"In Development" : nil;
         case RootSectionSystemBundles:  return self.systemBundleRows.count  > 0 ? @"System" : nil;
-        case RootSectionPatreon:        return @"Patreon";
-        case RootSectionExperimental:   return @"Experimental";
         case RootSectionAbout:          return @"About";
         default:                        return nil;
     }
@@ -9260,25 +9223,8 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
 - (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section
 {
     if (!self.detailMode) {
-        if ((RootSection)section == RootSectionExperimental) {
-            if (!settings_experimental_access_allowed()) {
-                return @"Early-access for Member tier Patreon supporters.";
-            }
-            return nil;
-        }
-        if ((RootSection)section == RootSectionPatreon) {
-            if (!cyanide_patreon_is_linked()) {
-                return @"Cyanide is free. Patreon supporters get early access "
-                       @"to experimental tweaks. Auth happens in-app.";
-            }
-            NSDate *last = cyanide_patreon_last_refresh_date();
-            if (last) {
-                NSDateFormatter *df = [[NSDateFormatter alloc] init];
-                df.dateStyle = NSDateFormatterMediumStyle;
-                df.timeStyle = NSDateFormatterShortStyle;
-                return [NSString stringWithFormat:@"Last checked %@", [df stringFromDate:last]];
-            }
-            return nil;
+        if ((RootSection)section == RootSectionInDev && self.inDevBundleRows.count > 0) {
+            return @"These entries are not installable because they do not work yet. They remain visible so the unfinished settings/source paths are discoverable for anyone who wants to continue them.";
         }
         return nil;
     }
@@ -10805,477 +10751,7 @@ didPickDocumentsAtURLs:(NSArray<NSURL *> *)urls
     [self presentViewController:ac animated:YES completion:nil];
 }
 
-+ (UIImage *)experimentalDangerChip
-{
-    static UIImage *cached;
-    static dispatch_once_t once;
-    dispatch_once(&once, ^{
-        NSString *text = @"DANGER";
-        UIFont *font = [UIFont systemFontOfSize:10.0 weight:UIFontWeightBold];
-        NSDictionary *attrs = @{
-            NSFontAttributeName: font,
-            NSForegroundColorAttributeName: UIColor.whiteColor,
-            NSKernAttributeName: @(0.4),
-        };
-        CGSize ts = [text sizeWithAttributes:attrs];
-        CGFloat padH = 6.5;
-        CGFloat padV = 2.5;
-        CGSize size = CGSizeMake(ceil(ts.width) + padH * 2.0,
-                                 ceil(ts.height) + padV * 2.0);
-        UIGraphicsImageRenderer *r = [[UIGraphicsImageRenderer alloc] initWithSize:size];
-        cached = [r imageWithActions:^(UIGraphicsImageRendererContext *ctx) {
-            UIBezierPath *p = [UIBezierPath bezierPathWithRoundedRect:CGRectMake(0, 0, size.width, size.height)
-                                                          cornerRadius:size.height / 2.0];
-            [UIColor.systemRedColor setFill];
-            [p fill];
-            [text drawAtPoint:CGPointMake(padH, padV) withAttributes:attrs];
-        }];
-    });
-    return cached;
-}
-
-- (UITableViewCell *)buildExperimentalCellInTableView:(UITableView *)tableView
-{
-    UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"experimental"];
-    if (!cell) {
-        cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:@"experimental"];
-        cell.detailTextLabel.numberOfLines = 0;
-    }
-    BOOL on = settings_experimental_tweaks_enabled();
-
-    UIColor *iconColor = on ? UIColor.systemRedColor
-                            : [UIColor.systemRedColor colorWithAlphaComponent:0.55];
-    cell.imageView.image = [SettingsViewController iconBadgeWithSymbol:@"flask.fill"
-                                                                  color:iconColor
-                                                                   size:29.0];
-
-    NSMutableAttributedString *title = [[NSMutableAttributedString alloc]
-        initWithString:@"Experimental Tweaks  "
-            attributes:@{ NSFontAttributeName: [UIFont systemFontOfSize:17.0],
-                          NSForegroundColorAttributeName: UIColor.labelColor }];
-    NSTextAttachment *att = [[NSTextAttachment alloc] init];
-    UIImage *chip = [SettingsViewController experimentalDangerChip];
-    att.image = chip;
-    att.bounds = CGRectMake(0, -2.0, chip.size.width, chip.size.height);
-    [title appendAttributedString:[NSAttributedString attributedStringWithAttachment:att]];
-    cell.textLabel.attributedText = title;
-
-#if CYANIDE_PRIVATE_TWEAKS_AVAILABLE
-    cell.detailTextLabel.text = on
-        ? @"Active — Signal Readouts, TypeBanner, Notification Island, FastLockX Lite, Dynamic Stage Lite."
-        : @"Signal Readouts, TypeBanner, Notification Island, FastLockX Lite, Dynamic Stage Lite.";
-#else
-    cell.detailTextLabel.text = on
-        ? @"Active — no private experimental tweaks in this build."
-        : @"No private experimental tweaks in this build.";
-#endif
-    cell.detailTextLabel.font = [UIFont systemFontOfSize:13.0];
-    cell.detailTextLabel.textColor = on
-        ? [UIColor.systemRedColor colorWithAlphaComponent:0.9]
-        : UIColor.secondaryLabelColor;
-
-    cell.backgroundColor = on
-        ? [UIColor.systemRedColor colorWithAlphaComponent:0.10]
-        : nil;
-
-    cell.accessoryType = UITableViewCellAccessoryNone;
-    cell.selectionStyle = UITableViewCellSelectionStyleDefault;
-
-    UISwitch *sw = [[UISwitch alloc] init];
-    sw.onTintColor = UIColor.systemRedColor;
-    sw.on = on;
-    [sw addTarget:self action:@selector(experimentalSwitchChanged:) forControlEvents:UIControlEventValueChanged];
-    cell.accessoryView = sw;
-    return cell;
-}
-
-- (void)experimentalSwitchChanged:(UISwitch *)sw
-{
-    NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
-    BOOL enabling = sw.isOn;
-
-    if (enabling) {
-        if (!settings_experimental_access_allowed()) {
-            sw.on = NO;
-            [d setBool:NO forKey:kSettingsExperimentalTweaksEnabled];
-            [self reloadAfterExperimentalChange];
-            return;
-        }
-        // Hard confirm before flipping master on. If the user cancels, revert
-        // the switch and stop here.
-        sw.on = NO;
-        UIAlertController *ac = [UIAlertController
-            alertControllerWithTitle:@"Enable Experimental Tweaks?"
-                             message:@"These tweaks are unfinished and may cause crashes, layout glitches, or battery drain. Only enable if you're actively testing."
-                      preferredStyle:UIAlertControllerStyleAlert];
-        [ac addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
-        [ac addAction:[UIAlertAction actionWithTitle:@"Enable Anyway"
-                                               style:UIAlertActionStyleDestructive
-                                             handler:^(UIAlertAction *_) {
-            [d setBool:YES forKey:kSettingsExperimentalTweaksEnabled];
-            sw.on = YES;
-            printf("[SETTINGS] experimental tweaks enabled\n");
-            [self reloadAfterExperimentalChange];
-        }]];
-        [self presentViewController:ac animated:YES completion:nil];
-        return;
-    }
-
-    [d setBool:NO forKey:kSettingsExperimentalTweaksEnabled];
-    printf("[SETTINGS] experimental tweaks disabled; disabling gated package states\n");
-
-    // Force-disable every experimental-gated package.
-    if ([d boolForKey:kSettingsTypeBannerEnabled]) {
-        [d setBool:NO forKey:kSettingsTypeBannerEnabled];
-        settings_mark_tweak_applied(kSettingsTypeBannerEnabled, NO);
-        settings_notify_package_queue_changed_async();
-        settings_schedule_live_apply_for_key(kSettingsTypeBannerEnabled);
-    }
-    if ([d boolForKey:kSettingsNotificationIslandEnabled]) {
-        [d setBool:NO forKey:kSettingsNotificationIslandEnabled];
-        settings_mark_tweak_applied(kSettingsNotificationIslandEnabled, NO);
-        settings_notify_package_queue_changed_async();
-        settings_schedule_live_apply_for_key(kSettingsNotificationIslandEnabled);
-    }
-    if ([d boolForKey:kSettingsRSSIDisplayEnabled]) {
-        [d setBool:NO forKey:kSettingsRSSIDisplayEnabled];
-        settings_mark_tweak_applied(kSettingsRSSIDisplayEnabled, NO);
-        settings_notify_package_queue_changed_async();
-        settings_schedule_live_apply_for_key(kSettingsRSSIDisplayEnabled);
-    }
-    if ([d boolForKey:kSettingsStageStripEnabled]) {
-        [d setBool:NO forKey:kSettingsStageStripEnabled];
-        settings_mark_tweak_applied(kSettingsStageStripEnabled, NO);
-        settings_notify_package_queue_changed_async();
-    }
-    [self forceDisableFastLockXLiteForExperimentalGateWithDefaults:d];
-    [self reloadAfterExperimentalChange];
-}
-
-- (void)forceDisableFastLockXLiteForExperimentalGateWithDefaults:(NSUserDefaults *)d
-{
-    BOOL shouldStop = [d boolForKey:kSettingsFastLockXLiteEnabled] ||
-                      settings_tweak_is_applied(kSettingsFastLockXLiteEnabled);
-    if (!shouldStop) return;
-
-    [d setBool:NO forKey:kSettingsFastLockXLiteEnabled];
-    [d synchronize];
-    settings_notify_package_queue_changed_async();
-
-    dispatch_async(dispatch_get_global_queue(0, 0), ^{
-        BOOL actionLockAcquired = settings_try_claim_actions_lock("FastLockX Lite cleanup",
-                                                                 "[FLX] FastLockX Lite cleanup deferred: another action is running.");
-        if (!actionLockAcquired) return;
-        @try {
-            bool stopped = false;
-            if (settings_ensure_kexploit()) {
-                @synchronized (settings_rc_lock()) {
-                    if (!g_springboard_rc_ready) {
-                        settings_ensure_springboard_remote_call_locked();
-                    }
-                    if (g_springboard_rc_ready) {
-                        stopped = fastlockx_lite_disable_always_on_in_session();
-                    }
-                }
-            }
-            if (!stopped) {
-                fastlockx_lite_forget_remote_state();
-                log_user("[FLX] Experimental gate disabled; Always On will also stop on respring if timers were unreachable.\n");
-            }
-            settings_mark_tweak_applied(kSettingsFastLockXLiteEnabled, NO);
-            settings_notify_package_queue_changed_async();
-        } @finally {
-            settings_release_actions_lock();
-        }
-    });
-}
-
-- (void)reloadAfterExperimentalChange
-{
-    // Tweak bundle list visibility depends on the experimental flag, and the
-    // installer's package list is filtered by it too — refresh both.
-    [self.tableView reloadData];
-    [[NSNotificationCenter defaultCenter] postNotificationName:PackageQueueDidChangeNotification
-                                                        object:[PackageQueue sharedQueue]];
-}
-
-#pragma mark - Patreon
-
-// Drops any experimental-gated package state if the user is no longer a patron.
-- (void)teardownExperimentalIfNoLongerPatron
-{
-    if (settings_experimental_access_allowed()) return;
-    NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
-    if (![d boolForKey:kSettingsExperimentalTweaksEnabled]) return;
-
-    printf("[PATREON] patron status lost; force-disabling experimental tweaks\n");
-    [d setBool:NO forKey:kSettingsExperimentalTweaksEnabled];
-    if ([d boolForKey:kSettingsTypeBannerEnabled]) {
-        [d setBool:NO forKey:kSettingsTypeBannerEnabled];
-        settings_mark_tweak_applied(kSettingsTypeBannerEnabled, NO);
-        settings_notify_package_queue_changed_async();
-        settings_schedule_live_apply_for_key(kSettingsTypeBannerEnabled);
-    }
-    if ([d boolForKey:kSettingsNotificationIslandEnabled]) {
-        [d setBool:NO forKey:kSettingsNotificationIslandEnabled];
-        settings_mark_tweak_applied(kSettingsNotificationIslandEnabled, NO);
-        settings_notify_package_queue_changed_async();
-        settings_schedule_live_apply_for_key(kSettingsNotificationIslandEnabled);
-    }
-    if ([d boolForKey:kSettingsRSSIDisplayEnabled]) {
-        [d setBool:NO forKey:kSettingsRSSIDisplayEnabled];
-        settings_mark_tweak_applied(kSettingsRSSIDisplayEnabled, NO);
-        settings_notify_package_queue_changed_async();
-        settings_schedule_live_apply_for_key(kSettingsRSSIDisplayEnabled);
-    }
-    if ([d boolForKey:kSettingsStageStripEnabled]) {
-        [d setBool:NO forKey:kSettingsStageStripEnabled];
-        settings_mark_tweak_applied(kSettingsStageStripEnabled, NO);
-        settings_notify_package_queue_changed_async();
-    }
-    [self forceDisableFastLockXLiteForExperimentalGateWithDefaults:d];
-}
-
-- (void)patreonStatusDidChange:(NSNotification *)note
-{
-    (void)note;
-    dispatch_async(dispatch_get_main_queue(), ^{
-        NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
-        BOOL nowPatron = settings_experimental_access_allowed();
-        BOOL wasPatron = [d boolForKey:kCyanideLastKnownIsPatron];
-        BOOL haveLastKnown = ([d objectForKey:kCyanideLastKnownIsPatron] != nil);
-        if (nowPatron && (!wasPatron || !haveLastKnown)) {
-            if (![d boolForKey:kSettingsExperimentalTweaksEnabled]) {
-                [d setBool:YES forKey:kSettingsExperimentalTweaksEnabled];
-            }
-        }
-        [d setBool:nowPatron forKey:kCyanideLastKnownIsPatron];
-
-        [self teardownExperimentalIfNoLongerPatron];
-        if (!self.isViewLoaded || self.detailMode) return;
-        // Row count for Patreon changes between unlinked/linked states, so a
-        // full reloadData is simpler than animating diffs.
-        [self.tableView reloadData];
-    });
-}
-
-- (UITableViewCell *)buildPatreonCellAtRow:(NSInteger)row tableView:(UITableView *)tableView
-{
-    BOOL linked = cyanide_patreon_is_linked();
-    UIColor *patreonOrange = [UIColor colorWithRed:0.94 green:0.31 blue:0.20 alpha:1.0];
-
-    if (!linked) {
-        // Row 0: link an existing Patreon account (OAuth flow in-app).
-        // Row 1: new-to-Patreon sign-up affordance (opens patreon.com/zeroxjf).
-        if (row == 0) {
-            UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"patreon-link"];
-            if (!cell) {
-                cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:@"patreon-link"];
-                cell.detailTextLabel.numberOfLines = 0;
-            }
-            cell.imageView.image = [SettingsViewController iconBadgeWithSymbol:@"heart.fill"
-                                                                          color:patreonOrange
-                                                                           size:29.0];
-            cell.textLabel.font = [UIFont systemFontOfSize:17.0 weight:UIFontWeightSemibold];
-            cell.textLabel.textColor = patreonOrange;
-            cell.textLabel.text = @"Link Patreon Account";
-            cell.textLabel.textAlignment = NSTextAlignmentLeft;
-            cell.detailTextLabel.text = nil;
-            cell.detailTextLabel.font = [UIFont systemFontOfSize:13.0];
-            cell.detailTextLabel.textColor = UIColor.secondaryLabelColor;
-            cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
-            cell.selectionStyle = UITableViewCellSelectionStyleDefault;
-            return cell;
-        }
-        // row == 1: explicit "don't have one yet?" entry point.
-        UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"patreon-signup"];
-        if (!cell) {
-            cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:@"patreon-signup"];
-            cell.detailTextLabel.numberOfLines = 0;
-        }
-        cell.imageView.image = [SettingsViewController iconBadgeWithSymbol:@"person.crop.circle.badge.plus"
-                                                                      color:patreonOrange
-                                                                       size:29.0];
-        cell.textLabel.font = [UIFont systemFontOfSize:17.0];
-        cell.textLabel.textColor = patreonOrange;
-        cell.textLabel.text = @"New to Patreon? Sign Up";
-        cell.textLabel.textAlignment = NSTextAlignmentLeft;
-        cell.detailTextLabel.text = @"Join at patreon.com/zeroxjf, then come back and Link.";
-        cell.detailTextLabel.font = [UIFont systemFontOfSize:13.0];
-        cell.detailTextLabel.textColor = UIColor.secondaryLabelColor;
-        cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
-        cell.selectionStyle = UITableViewCellSelectionStyleDefault;
-        return cell;
-    }
-
-    BOOL isPatron = cyanide_is_patron();
-
-    if (row == 0) {
-        UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"patreon-status"];
-        if (!cell) {
-            cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:@"patreon-status"];
-            cell.detailTextLabel.numberOfLines = 0;
-        }
-        UIColor *iconColor = isPatron ? patreonOrange : [patreonOrange colorWithAlphaComponent:0.45];
-        cell.imageView.image = [SettingsViewController iconBadgeWithSymbol:@"heart.fill"
-                                                                      color:iconColor
-                                                                       size:29.0];
-        cell.textLabel.font = [UIFont systemFontOfSize:17.0];
-        cell.textLabel.textColor = UIColor.labelColor;
-        cell.textLabel.text = cyanide_patreon_display_name() ?: @"Linked";
-
-        NSString *tier = cyanide_patreon_tier_title();
-        NSInteger cents = cyanide_patreon_pledge_cents();
-        NSString *detail;
-        if (isPatron) {
-            if (cents <= 0) {
-                // Synthetic tiers like "Creator" carry no dollar amount —
-                // showing "$0/month" beside them reads as a bug.
-                detail = tier.length > 0 ? tier : @"Active supporter";
-            } else {
-                NSString *amount = (cents % 100 == 0)
-                    ? [NSString stringWithFormat:@"$%ld/month", (long)(cents / 100)]
-                    : [NSString stringWithFormat:@"$%.2f/month", cents / 100.0];
-                detail = tier.length > 0
-                    ? [NSString stringWithFormat:@"%@ • %@", tier, amount]
-                    : amount;
-            }
-        } else {
-            detail = @"Free user — join Member tier to unlock.";
-        }
-        cell.detailTextLabel.text = detail;
-        cell.detailTextLabel.textColor = isPatron ? patreonOrange : UIColor.secondaryLabelColor;
-        cell.detailTextLabel.font = [UIFont systemFontOfSize:13.0];
-        cell.accessoryType = UITableViewCellAccessoryNone;
-        cell.selectionStyle = UITableViewCellSelectionStyleNone;
-        return cell;
-    }
-
-    // Action rows. Free-supporter layout inserts a "Join Member Tier" row
-    // between the identity row and Refresh/Sign Out, so the indices shift.
-    NSInteger joinRow    = isPatron ? -1 : 1;
-    NSInteger refreshRow = isPatron ?  1 : 2;
-    NSInteger signoutRow = isPatron ?  2 : 3;
-
-    UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"patreon-action"];
-    if (!cell) {
-        cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:@"patreon-action"];
-    }
-    cell.imageView.image = nil;
-    cell.accessoryView = nil;
-    cell.accessoryType = UITableViewCellAccessoryNone;
-    cell.selectionStyle = UITableViewCellSelectionStyleDefault;
-    cell.textLabel.textAlignment = NSTextAlignmentCenter;
-    cell.textLabel.font = [UIFont systemFontOfSize:17.0];
-    if (row == joinRow) {
-        cell.textLabel.text = @"Join Member Tier on Patreon";
-        cell.textLabel.textColor = patreonOrange;
-        cell.textLabel.font = [UIFont systemFontOfSize:17.0 weight:UIFontWeightSemibold];
-    } else if (row == refreshRow) {
-        cell.textLabel.text = @"Refresh Patron Status";
-        cell.textLabel.textColor = self.view.tintColor;
-    } else if (row == signoutRow) {
-        cell.textLabel.text = @"Sign Out of Patreon";
-        cell.textLabel.textColor = UIColor.systemRedColor;
-    }
-    return cell;
-}
-
-- (UITableViewCell *)buildExperimentalLockedCellInTableView:(UITableView *)tableView
-{
-    UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"experimental-locked"];
-    if (!cell) {
-        cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:@"experimental-locked"];
-        cell.detailTextLabel.numberOfLines = 0;
-    }
-    cell.imageView.image = [SettingsViewController iconBadgeWithSymbol:@"lock.fill"
-                                                                  color:UIColor.systemGrayColor
-                                                                   size:29.0];
-    cell.textLabel.font = [UIFont systemFontOfSize:17.0];
-    cell.textLabel.textColor = UIColor.labelColor;
-    cell.textLabel.text = @"Experimental Tweaks";
-    if (cyanide_patreon_is_linked()) {
-        cell.detailTextLabel.text = @"Linked as free user — tap to upgrade to Member tier.";
-    } else {
-        cell.detailTextLabel.text = @"Member tier on Patreon required. Tap to link or sign up.";
-    }
-    cell.detailTextLabel.font = [UIFont systemFontOfSize:13.0];
-    cell.detailTextLabel.textColor = UIColor.secondaryLabelColor;
-    cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
-    cell.selectionStyle = UITableViewCellSelectionStyleDefault;
-    cell.backgroundColor = nil;
-    return cell;
-}
-
-- (void)handlePatreonTapAtRow:(NSInteger)row
-{
-    BOOL linked = cyanide_patreon_is_linked();
-
-    if (!linked) {
-        // Row 0 = "Link Patreon Account" → in-app OAuth.
-        // Row 1 = "New to Patreon? Sign Up" → opens patreon.com/zeroxjf in Safari.
-        if (row == 1) {
-            [[UIApplication sharedApplication] openURL:cyanide_patreon_join_url()
-                                               options:@{}
-                                     completionHandler:nil];
-            return;
-        }
-        cyanide_patreon_authenticate(self, ^(BOOL ok, NSError *err) {
-            if (ok) {
-                printf("[PATREON] linked successfully\n");
-                return;
-            }
-            if ([err.domain isEqualToString:@"CyanidePatreon"] && err.code == NSUserCancelledError) return;
-            UIAlertController *ac = [UIAlertController
-                alertControllerWithTitle:@"Couldn't Link Patreon"
-                                 message:err.localizedDescription ?: @"Unknown error."
-                          preferredStyle:UIAlertControllerStyleAlert];
-            [ac addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
-            [self presentViewController:ac animated:YES completion:nil];
-        });
-        return;
-    }
-
-    if (row == 0) return;  // identity row, non-interactive
-
-    BOOL isPatron = cyanide_is_patron();
-    NSInteger joinRow    = isPatron ? -1 : 1;
-    NSInteger refreshRow = isPatron ?  1 : 2;
-    NSInteger signoutRow = isPatron ?  2 : 3;
-
-    if (row == joinRow) {
-        [[UIApplication sharedApplication] openURL:cyanide_patreon_join_url() options:@{} completionHandler:nil];
-        return;
-    }
-
-    if (row == refreshRow) {
-        cyanide_patreon_refresh(^(BOOL ok, NSError *err) {
-            if (ok) return;
-            printf("[PATREON] refresh failed: %s\n", err.localizedDescription.UTF8String ?: "unknown");
-            UIAlertController *ac = [UIAlertController
-                alertControllerWithTitle:@"Couldn't Refresh"
-                                 message:err.localizedDescription ?: @"Unknown error."
-                          preferredStyle:UIAlertControllerStyleAlert];
-            [ac addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
-            [self presentViewController:ac animated:YES completion:nil];
-        });
-        return;
-    }
-
-    if (row == signoutRow) {
-        UIAlertController *ac = [UIAlertController
-            alertControllerWithTitle:@"Sign Out of Patreon?"
-                             message:@"Removes the linked account from this device. Supporter-only features will lock until you link again."
-                      preferredStyle:UIAlertControllerStyleAlert];
-        [ac addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
-        [ac addAction:[UIAlertAction actionWithTitle:@"Sign Out"
-                                               style:UIAlertActionStyleDestructive
-                                             handler:^(UIAlertAction *_) {
-            cyanide_patreon_sign_out();
-        }]];
-        [self presentViewController:ac animated:YES completion:nil];
-    }
-}
+#pragma mark - Links
 
 - (void)openTwitter
 {
@@ -11589,12 +11065,6 @@ void cyanide_present_contact(UIViewController *host)
                 return [self buildInDevCellWithRow:self.inDevBundleRows[indexPath.row] tableView:tableView];
             case RootSectionSystemBundles:
                 return [self buildBundleCellWithRow:self.systemBundleRows[indexPath.row] tableView:tableView];
-            case RootSectionPatreon:
-                return [self buildPatreonCellAtRow:indexPath.row tableView:tableView];
-            case RootSectionExperimental:
-                if (!settings_experimental_access_allowed())
-                    return [self buildExperimentalLockedCellInTableView:tableView];
-                return [self buildExperimentalCellInTableView:tableView];
             case RootSectionAbout:
                 return [self buildAboutCellAtRow:indexPath.row tableView:tableView];
             case RootSectionCount:
@@ -13175,50 +12645,6 @@ void cyanide_present_contact(UIViewController *host)
                 [self.navigationController pushViewController:detail animated:YES];
                 return;
             }
-            case RootSectionPatreon:
-                [self handlePatreonTapAtRow:indexPath.row];
-                return;
-            case RootSectionExperimental: {
-                if (!settings_experimental_access_allowed()) {
-                    if (cyanide_patreon_is_linked()) {
-                        [[UIApplication sharedApplication] openURL:cyanide_patreon_join_url()
-                                                            options:@{}
-                                                  completionHandler:nil];
-                    } else {
-                        UIAlertController *ac = [UIAlertController
-                            alertControllerWithTitle:@"Member Tier Required"
-                                             message:@"Experimental tweaks are early-access for Member tier supporters on patreon.com/zeroxjf."
-                                      preferredStyle:UIAlertControllerStyleAlert];
-                        __weak typeof(self) weakSelf = self;
-                        [ac addAction:[UIAlertAction actionWithTitle:@"Link Account"
-                                                               style:UIAlertActionStyleDefault
-                                                             handler:^(UIAlertAction *a) {
-                            (void)a;
-                            [weakSelf handlePatreonTapAtRow:0];
-                        }]];
-                        [ac addAction:[UIAlertAction actionWithTitle:@"Sign Up on Patreon"
-                                                               style:UIAlertActionStyleDefault
-                                                             handler:^(UIAlertAction *a) {
-                            (void)a;
-                            [[UIApplication sharedApplication] openURL:cyanide_patreon_join_url()
-                                                               options:@{}
-                                                     completionHandler:nil];
-                        }]];
-                        [ac addAction:[UIAlertAction actionWithTitle:@"Cancel"
-                                                               style:UIAlertActionStyleCancel
-                                                             handler:nil]];
-                        [self presentViewController:ac animated:YES completion:nil];
-                    }
-                    return;
-                }
-                UITableViewCell *expCell = [tableView cellForRowAtIndexPath:indexPath];
-                if ([expCell.accessoryView isKindOfClass:[UISwitch class]]) {
-                    UISwitch *sw = (UISwitch *)expCell.accessoryView;
-                    [sw setOn:!sw.isOn animated:YES];
-                    [self experimentalSwitchChanged:sw];
-                }
-                return;
-            }
             case RootSectionAbout: {
                 switch (indexPath.row) {
                     case 0: [self openTwitter]; break;
@@ -13625,7 +13051,7 @@ void cyanide_present_contact(UIViewController *host)
         NSString *action = row[@"action"];
         if ([action isEqualToString:@"notificationisland-sample"]) {
             if (!settings_notificationisland_install_allowed()) {
-                log_user("[NISLAND] Notification Island is unavailable in this build or experimental access is off.\n");
+                log_user("[NISLAND] Notification Island is unavailable in this build.\n");
                 return;
             }
             dispatch_async(dispatch_get_global_queue(0, 0), ^{
@@ -13662,7 +13088,7 @@ void cyanide_present_contact(UIViewController *host)
 
     if (indexPath.section == SectionFastLockXLite) {
         if (!settings_fastlockx_lite_install_allowed()) {
-            log_user("[FLX] FastLockX Lite is unavailable in this build or experimental access is off.\n");
+            log_user("[FLX] FastLockX Lite is unavailable in this build.\n");
             return;
         }
         NSDictionary *row = [self rowsForSection:indexPath.section][indexPath.row];

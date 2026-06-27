@@ -12,8 +12,8 @@ NS_ASSUME_NONNULL_BEGIN
 
 @interface PackageCatalog : NSObject
 
-// Flat list, in display order. Filtered by the master experimental gate —
-// packages with `experimental == YES` are omitted unless
+// Flat list, in display order. In-development packages can appear here with an
+// installDisabledReason; packages with `experimental == YES` are omitted unless
 // kSettingsExperimentalTweaksEnabled is on.
 + (NSArray<Package *> *)allPackages;
 

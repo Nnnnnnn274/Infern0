@@ -17,20 +17,24 @@ changes into the same bullet.
 Avoid vague bullets like "Update settings", "Change project files", or
 "Misc fixes".
 
-It is OK to mention user-visible experimental or patron-gated tweaks when
-describing added or improved features. When announcing a new experimental
-feature, say it is available to Patrons for early access and credit original
-tweak or project authors alongside the Cyanide port author when known. Do not
-mention private submodule activity, internal/private source movement, private
-repository names, private implementation details, or commentary about which
-experimental pieces are working versus not wired. If the change cannot be
-phrased as a user-facing feature or fix without revealing private activity,
-omit it.
+It is OK to mention user-visible beta or experimental tweaks when describing
+added or improved features. Credit original tweak or project authors alongside
+the Cyanide port author when known. Do not mention private submodule activity,
+internal/private source movement, private repository names, private
+implementation details, or commentary about which experimental pieces are
+working versus not wired. If the change cannot be phrased as a user-facing
+feature or fix without revealing private activity, omit it.
 
 ## Pending
 
 
 ## Released
+
+### v1.3.6 - 2026-06-27
+
+- [x] Removed Patreon integration and ungated all installable Cyanide tweaks, with stale account-linking state cleared so beta access is the same for everyone.
+- [x] Patreon note: tweaks previously gated behind the $3/month tier are now free, $3/month members will receive refunds, and the $10/month Researcher tier is being lowered to $7/month with partial refunds for members who already paid.
+- [x] Made in-development tweaks visible but disabled, with notes that their unfinished source remains for future contributors.
 
 ### v1.3.5 - 2026-06-24
 

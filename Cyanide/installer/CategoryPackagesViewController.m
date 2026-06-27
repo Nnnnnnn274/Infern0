@@ -151,6 +151,16 @@ static NSString * const kCatPkgCellID = @"CatPkgCell";
     return (NSInteger)self.filteredPackages.count;
 }
 
+- (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section
+{
+    (void)tableView;
+    (void)section;
+    if ([self.categoryName isEqualToString:@"In Development"]) {
+        return @"These tweaks are visible for continuity only. Installing is disabled because they do not work yet; the unfinished app/source paths remain for anyone who wants to pick them up.";
+    }
+    return nil;
+}
+
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath
 {
     UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:kCatPkgCellID];
@@ -201,6 +211,9 @@ static NSString * const kCatPkgCellID = @"CatPkgCell";
 - (UIView *)accessoryViewForPackage:(Package *)pkg
 {
     PackageQueueIntent intent = [[PackageQueue sharedQueue] intentForPackage:pkg];
+    if (pkg.isInstallDisabled && !pkg.isInstalled) {
+        return [self pillWithText:@"DISABLED" background:[[UIColor systemRedColor] colorWithAlphaComponent:0.16] textColor:UIColor.systemRedColor];
+    }
     if (pkg.kind == PackageInstallKindDirectTool ||
         ((pkg.kind == PackageInstallKindOTA || pkg.kind == PackageInstallKindNanoRegistry ||
           pkg.kind == PackageInstallKindCallRecordingSound || pkg.kind == PackageInstallKindHideHomeBar))) {
@@ -277,6 +290,7 @@ static NSString * const kCatPkgCellID = @"CatPkgCell";
     PackageQueue *q = [PackageQueue sharedQueue];
     PackageQueueIntent intent = [q intentForPackage:pkg];
 
+    if (pkg.isInstallDisabled && !pkg.isInstalled && intent == PackageQueueIntentNone) return nil;
     if (pkg.kind == PackageInstallKindDirectTool) {
         UIContextualAction *open = [UIContextualAction contextualActionWithStyle:UIContextualActionStyleNormal title:@"Open" handler:^(UIContextualAction *a, UIView *v, void (^done)(BOOL)) {
             done(YES);
@@ -288,7 +302,6 @@ static NSString * const kCatPkgCellID = @"CatPkgCell";
         cfg.performsFirstActionWithFullSwipe = YES;
         return cfg;
     }
-    if (pkg.isInstallDisabled && !pkg.isInstalled && intent == PackageQueueIntentNone) return nil;
 
     NSString *title;
     UIColor *color;

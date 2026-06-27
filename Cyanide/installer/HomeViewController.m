@@ -11,7 +11,6 @@
 static NSString * const kSignalGroupURL  = @"https://signal.group/#CjQKIP0pxjc9V52ddCNk--04DosuoQl-vVOsznJfQ4GwlrlxEhCveFhBS8YdNcILpUFt7IqC";
 static NSString * const kGitHubIssuesURL = @"https://github.com/zeroxjf/cyanide/issues";
 static NSString * const kGitHubRepoURL   = @"https://github.com/zeroxjf/cyanide";
-static NSString * const kPatreonURL      = @"https://www.patreon.com/zeroxjf";
 
 static const CGFloat kMargin = 20.0;
 
@@ -375,9 +374,7 @@ static const CGFloat kMargin = 20.0;
     [s addArrangedSubview:[self linkCell:@"Report a Bug" icon:@"exclamationmark.bubble.fill"
                                   color:UIColor.systemRedColor url:kGitHubIssuesURL sep:YES]];
     [s addArrangedSubview:[self linkCell:@"GitHub" icon:@"chevron.left.forwardslash.chevron.right"
-                                  color:UIColor.systemGrayColor url:kGitHubRepoURL sep:YES]];
-    [s addArrangedSubview:[self linkCell:@"Patreon" icon:@"heart.fill"
-                                  color:UIColor.systemPinkColor url:kPatreonURL sep:NO]];
+                                  color:UIColor.systemGrayColor url:kGitHubRepoURL sep:NO]];
     return card;
 }
 

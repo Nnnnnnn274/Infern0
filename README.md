@@ -32,12 +32,11 @@ Open this page on your iPhone/iPad and tap one of the buttons below.
 - [Join the Signal group](https://signal.group/#CjQKIP0pxjc9V52ddCNk--04DosuoQl-vVOsznJfQ4GwlrlxEhCveFhBS8YdNcILpUFt7IqC) for setup help, support,
   test notes, and rough ideas before they become issues.
 
-## Patreon
+## Beta Tweaks
 
-Early access to experimental tweaks (Dynamic Stage Lite, Signal Readouts,
-TypeBanner, and future work) is
-available to [Patreon supporters](https://www.patreon.com/zeroxjf) at the
-Member tier and above.
+Beta tweaks are visible in Cyanide without account linking. They are unstable
+and intended for testers who are comfortable with SpringBoard glitches,
+crashes, or partial behavior.
 
 ## Tweaks
 
@@ -86,7 +85,8 @@ Ported from [`kolbicz/DarkSword-Tweaks`](https://github.com/kolbicz/DarkSword-Tw
 
 ### Beta
 
-> ⚠︎ Work in progress — these work but may change or need re-applying between builds.
+> ⚠︎ Work in progress — these may crash SpringBoard, glitch layout, work only
+> partially, or need re-applying between builds.
 
 - **Gravity Lite**: core port of Julio Verne's classic Gravity tweak. Applies
   UIDynamicAnimator physics to home-screen and dock icons — gravity, collisions,
@@ -94,6 +94,11 @@ Ported from [`kolbicz/DarkSword-Tweaks`](https://github.com/kolbicz/DarkSword-Tw
   button. Use Restore Icon Layout if icons stay displaced after deactivating.
 - **Axon Lite**: groups Notification Center requests by app with a SpringBoard
   overlay and dedups duplicates while the RemoteCall session is alive.
+- **Dynamic Stage Lite**: brings Stage Manager-style split-view to iPhone over
+  RemoteCall — no jailbreak required. Hosts a second app's scene alongside
+  SpringBoard using the same scene-hosting design as [`tomt000`'s Dynamic Stage](https://havoc.app/package/dynamicstage).
+- **FastLockX Lite**: keeps Face ID retry/unlock requests armed through
+  SpringBoard timers so pickup-to-unlock can work after Cyanide closes.
 - **Cyanide Themer**: per-bundle icon theme engine. Walks SpringBoard's
   SBIconView hierarchy and swaps each icon's image with a PNG matched on bundle
   ID. Ships with iOS 6 Theme; also accepts a custom folder of `<bundleID>.png`
@@ -132,20 +137,16 @@ Ported from [`kolbicz/DarkSword-Tweaks`](https://github.com/kolbicz/DarkSword-Tw
   Disable Call Recording BookRestore reference tools, and `@Little_34306` as
   credited by the original projects for the Disable Call Recording concept.
 
-### Experimental
+### In Development
 
-> ⚠︎ Unstable or in-development — require Experimental Tweaks to be enabled in Settings.
->
-> Experimental tweaks ship early to [Patreon supporters](https://www.patreon.com/zeroxjf) before public release.
+> These entries are visible but not installable because they do not work yet.
+> Their app/source paths are left in place so someone can pick them up later.
 
-- **Dynamic Stage Lite**: brings Stage Manager-style split-view to iPhone over
-  RemoteCall — no jailbreak required. Hosts a second app's scene alongside
-  SpringBoard using the same scene-hosting design as [`tomt000`'s Dynamic Stage](https://havoc.app/package/dynamicstage).
-- **Signal Readouts**: replaces the signal-strength glyphs with live numeric
-  readouts — RSRP dBm on cellular, bar count on WiFi.
-- **TypeBanner**: shows a pill banner below the Dynamic Island when the active
-  Messages conversation shows a typing indicator. Detection fires only while
-  Messages.app is running.
+- **Signal Readouts**: unfinished status-bar numeric signal readouts.
+- **TypeBanner**: unfinished iMessage typing banner experiment.
+- **Notification Island**: unfinished Dynamic Island notification mirror.
+- **IPA Decryptor**: unfinished local IPA decryptor workflow.
+
 ## Supported Targets
 
 Tested target range:
@@ -240,9 +241,11 @@ AGPL-covered public tree.
 The `Cyanide/tweaks/private/` submodule points at a separate private
 repository containing closed-source tweak implementations. Those files are
 **All Rights Reserved** and distributed in compiled form only inside official
-Cyanide releases. Experimental entries from that submodule are gated to active
-Patreon supporters at the Member tier or above. Public clones won't be able to
-fetch the submodule, and private-submodule tweaks will be absent from local
+Cyanide releases. Beta entries from that submodule are visible without account
+linking when present in an official build. In-development entries may also be
+visible, but installation is disabled because they do not work yet; the source
+paths remain as a starting point for future work. Public clones won't be able
+to fetch the submodule, and private-submodule tweaks will be absent from local
 builds unless you re-implement them. Public Beta features, including Location
 Simulator and Call Recording Sound, build from the open-source tree. The public
 app target still builds without that submodule.

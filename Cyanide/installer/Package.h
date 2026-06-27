@@ -82,13 +82,11 @@ typedef NS_ENUM(NSInteger, PackageInstallKind) {
 @property (nonatomic, copy, nullable) NSString *installDisabledReason;
 
 // YES means the package is gated behind kSettingsExperimentalTweaksEnabled.
-// When the master experimental switch is off, +[PackageCatalog allPackages]
-// filters experimental packages out entirely so they don't appear in the
-// Installer list or the Settings tweak-bundle list.
+// Prefer installDisabledReason for visible in-development packages.
 @property (nonatomic, assign) BOOL experimental;
 
-// YES means the package is only installable by the campaign creator.
-// Non-creators see the package but cannot queue it.
+// YES means the package is internal-only. Public package lists hide it, and
+// direct detail views keep the action disabled.
 @property (nonatomic, assign) BOOL creatorOnly;
 
 // Non-nil means the package detail view shows a prominent "Known Issues" card.

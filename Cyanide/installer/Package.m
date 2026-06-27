@@ -6,7 +6,6 @@
 #import "Package.h"
 #import "PackageQueue.h"
 #import "../SettingsViewController.h"
-#import "../PatreonAuth.h"
 #import "../LogTextView.h"
 #import "../tweaks/QuickLoader.h"
 #import "../tweaks/RepoTweaks.h"
@@ -213,9 +212,9 @@ static BOOL PackageRepoScriptRequiresNativeBridge(NSString *rawScript)
     if (self.installDisabledReason.length > 0) return YES;
     if (self.experimental) {
         BOOL experimentalOn = [[NSUserDefaults standardUserDefaults] boolForKey:kSettingsExperimentalTweaksEnabled];
-        if (!experimentalOn || !(cyanide_is_patron() || cyanide_is_creator())) return YES;
+        if (!experimentalOn) return YES;
     }
-    if (self.creatorOnly && !cyanide_is_creator()) return YES;
+    if (self.creatorOnly) return YES;
     return NO;
 }
 

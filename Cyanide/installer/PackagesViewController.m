@@ -289,7 +289,7 @@ typedef NS_ENUM(NSInteger, PackagesSection) {
         cell.accessoryView = pill;
     } else if (unsupported) {
         UILabel *pill = [[UILabel alloc] init];
-        pill.text = @"UNSUPPORTED";
+        pill.text = [pkg.category isEqualToString:@"In Development"] ? @"DISABLED" : @"UNSUPPORTED";
         pill.font = [UIFont systemFontOfSize:11.0 weight:UIFontWeightHeavy];
         pill.textColor = UIColor.systemOrangeColor;
         pill.backgroundColor = [UIColor.systemOrangeColor colorWithAlphaComponent:0.15];
