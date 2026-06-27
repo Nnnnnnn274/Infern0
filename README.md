@@ -1,9 +1,3 @@
-<p align="center">
-  <img src="https://raw.githubusercontent.com/zeroxjf/cyanide/main/Cyanide/Assets.xcassets/AppIcon.appiconset/icon-ios-1024x1024.png" alt="Cyanide" width="160">
-</p>
-
-<h1 align="center">Cyanide</h1>
-
 ## Project status
 
 Cyanide is no longer actively maintained by `zeroxjf`.
