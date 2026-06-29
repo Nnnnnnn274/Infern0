@@ -5357,6 +5357,125 @@ static void settings_start_notificationisland_live_loop(void)
     });
 }
 
+static void settings_start_velvet_live_loop(void)
+{
+    if (!settings_device_supported()) return;
+    if (settings_cleanup_in_progress()) return;
+
+    NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
+    if (!settings_velvet_install_allowed()) return;
+    if (![d boolForKey:kSettingsVelvetEnabled]) return;
+    if (!g_springboard_rc_ready) return;
+
+    if (__sync_lock_test_and_set(&g_velvet_live_running, 1)) {
+        static volatile int loggedAlready = 0;
+        if (__sync_bool_compare_and_swap(&loggedAlready, 0, 1)) {
+            printf("[SETTINGS] Velvet live loop already running\n");
+        }
+        return;
+    }
+
+    if (settings_cleanup_in_progress()) {
+        __sync_lock_release(&g_velvet_live_running);
+        return;
+    }
+
+    g_velvet_live_stop_requested = 0;
+    dispatch_async(dispatch_get_global_queue(0, 0), ^{
+        NSUInteger tick = 0;
+        NSUInteger failures = 0;
+        uint64_t nextTickUS = settings_now_us();
+        BOOL deferredLogged = NO;
+
+        printf("[SETTINGS] Velvet live loop started interval=%uus background=%uus max=%lu\n",
+               kVelvetLiveIntervalUS,
+               kVelvetLiveBackgroundIntervalUS,
+               (unsigned long)kVelvetLiveMaxTicks);
+        cyanide_upload_log_milestone(@"velvet-live-started");
+
+        @try {
+            while ([d boolForKey:kSettingsVelvetEnabled] &&
+                   !settings_cleanup_in_progress() &&
+                   !g_velvet_live_stop_requested &&
+                   tick < kVelvetLiveMaxTicks) {
+                useconds_t intervalUS = settings_live_interval(kVelvetLiveIntervalUS,
+                                                               kVelvetLiveBackgroundIntervalUS);
+                uint64_t tickStartUS = settings_now_us();
+                bool ok = false;
+
+                if (!g_kexploit_done || g_settings_actions_running) {
+                    if (!deferredLogged) {
+                        printf("[SETTINGS] Velvet tick deferred krw=%d actions=%d\n",
+                               g_kexploit_done, g_settings_actions_running);
+                        deferredLogged = YES;
+                    }
+                    settings_live_loop_sleep_interruptible(0,
+                                                           intervalUS,
+                                                           &g_velvet_live_stop_requested);
+                    nextTickUS = settings_now_us();
+                    continue;
+                }
+                deferredLogged = NO;
+
+                @synchronized (settings_rc_lock()) {
+                    if (g_velvet_live_stop_requested) break;
+                    if (!g_springboard_rc_ready) {
+                        printf("[SETTINGS] Velvet loop has no SpringBoard RemoteCall session\n");
+                        failures++;
+                        break;
+                    }
+                    ok = velvet_tick_in_session();
+                }
+
+                if (tick == 0) {
+                    printf("[SETTINGS] Velvet result=%d\n", ok);
+                    cyanide_upload_log_milestone(ok ? @"velvet-live-first-ok" :
+                                                     @"velvet-live-first-failed");
+                }
+                if (ok) {
+                    failures = 0;
+                } else {
+                    failures++;
+                    printf("[SETTINGS] Velvet tick failed tick=%lu failures=%lu\n",
+                           (unsigned long)tick, (unsigned long)failures);
+                    if (failures >= settings_live_failure_limit(3)) break;
+                }
+
+                tick++;
+                if (![d boolForKey:kSettingsVelvetEnabled] ||
+                    g_velvet_live_stop_requested ||
+                    tick >= kVelvetLiveMaxTicks) break;
+
+                uint64_t nowUS = settings_now_us();
+                intervalUS = settings_live_interval(kVelvetLiveIntervalUS,
+                                                    kVelvetLiveBackgroundIntervalUS);
+                nextTickUS += intervalUS;
+                if (nowUS < nextTickUS) {
+                    settings_live_loop_sleep_interruptible(nextTickUS,
+                                                           (useconds_t)(nextTickUS - nowUS),
+                                                           &g_velvet_live_stop_requested);
+                } else {
+                    nextTickUS = nowUS;
+                }
+
+                uint64_t elapsedUS = tickStartUS != 0 && nowUS >= tickStartUS ? nowUS - tickStartUS : 0;
+                if (tick == 1) {
+                    printf("[SETTINGS] Velvet tick=0 elapsed=%lluus\n", elapsedUS);
+                }
+            }
+        } @finally {
+            printf("[SETTINGS] Velvet live loop exited ticks=%lu enabled=%d failures=%lu stop=%d\n",
+                   (unsigned long)tick,
+                   [d boolForKey:kSettingsVelvetEnabled],
+                   (unsigned long)failures,
+                   g_velvet_live_stop_requested);
+            if (failures > 0)
+                cyanide_upload_log_milestone(@"velvet-live-exited-failed");
+            __sync_lock_release(&g_velvet_live_running);
+        }
+    });
+}
+
 static void settings_start_themer_live_loop(void)
 {
     if (!settings_device_supported()) return;
