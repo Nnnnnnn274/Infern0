@@ -1584,7 +1584,7 @@ static bool ipadec_launch_and_suspend_app(NSString *bundleID, pid_t *pidOut)
         id proxy = ipadec_perform0(workspace, @selector(applicationWithBundleID:));
         if (proxy) {
             NSURL *url = [NSURL URLWithString:[NSString stringWithFormat:@"%@://", bundleID]];
-            BOOL opened = [[UIApplication sharedApplication] openURL:url];
+            BOOL opened = [[UIApplication sharedApplication] openURL:url options:@{} completionHandler:nil];
             if (opened) {
                 log_user("[IPADEC] Launched app %s\n", bundleID.UTF8String);
                 // Give it time to start
@@ -1677,16 +1677,19 @@ static bool ipadec_rebuild_ipa(NSString *bundlePath,
     const char *ipaPathCStr    = ipaPath.UTF8String;
     const char *outputDirCStr  = outputDir.UTF8String;
 
-    posix_spawn_file_actions_t fileActions;
-    posix_spawn_file_actions_init(&fileActions);
-    // Change into outputDir so that "Payload" is resolved relative to it.
-    posix_spawn_file_actions_addchdir_np(&fileActions, outputDirCStr);
+    char original_cwd[1024];
+    original_cwd[0] = '\0';
+    getcwd(original_cwd, sizeof(original_cwd));
+    chdir(outputDirCStr);
 
     pid_t pid;
     const char *zipArgs[] = { "/usr/bin/zip", "-r", ipaPathCStr, "Payload", NULL };
-    int spawnErr = posix_spawn(&pid, "/usr/bin/zip", &fileActions, NULL,
+    int spawnErr = posix_spawn(&pid, "/usr/bin/zip", NULL, NULL,
                                (char * const *)zipArgs, NULL);
-    posix_spawn_file_actions_destroy(&fileActions);
+
+    if (original_cwd[0]) {
+        chdir(original_cwd);
+    }
 
     if (spawnErr != 0) {
         if (messageOut) *messageOut = [NSString stringWithFormat:@"Failed to launch zip: %s", strerror(spawnErr)];
