@@ -14,11 +14,16 @@ static bool gRealccBtDisabled = false;
 static bool realcc_kill_daemon(const char *daemonName)
 {
     if (!daemonName) return false;
-    char cmd[256];
-    snprintf(cmd, sizeof(cmd), "/usr/bin/killall %s 2>/dev/null", daemonName);
-    int ret = system(cmd);
+    pid_t pid = 0;
+    const char *argv[] = { "/usr/bin/killall", daemonName, NULL };
+    int ret = posix_spawn(&pid, "/usr/bin/killall", NULL, NULL, (char *const *)argv, NULL);
+    if (ret == 0 && pid > 0) {
+        int status = 0;
+        waitpid(pid, &status, 0);
+        ret = WIFEXITED(status) ? WEXITSTATUS(status) : -1;
+    }
     printf("[REALCC] killed %s: ret=%d\n", daemonName, ret);
-    return ret == 0 || WIFEXITED(ret);
+    return ret == 0;
 }
 
 static bool realcc_write_plist_bool(NSString *path, NSString *key, BOOL value)
