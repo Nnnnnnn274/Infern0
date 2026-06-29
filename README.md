@@ -2,6 +2,10 @@
 
 Cyanide is now actively maintained by `Nnnnnnn274` but it is no longer the original this is my fork!
 
+## Discord
+
+https://discord.gg/fx3xvuUyj 
+
 ## Goals
 
 Make tweaks more stable and continue the old unfinished tweaks.
