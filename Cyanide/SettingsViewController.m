@@ -1914,6 +1914,16 @@ static BOOL settings_velvet_install_allowed(void)
     return cyanide_experimental_tweaks_available() && settings_experimental_tweaks_enabled();
 }
 
+static BOOL settings_cleannc_install_allowed(void) { return cyanide_experimental_tweaks_available() && settings_experimental_tweaks_enabled(); }
+static BOOL settings_undertime_install_allowed(void) { return cyanide_experimental_tweaks_available() && settings_experimental_tweaks_enabled(); }
+static BOOL settings_zeppelinlite_install_allowed(void) { return cyanide_experimental_tweaks_available() && settings_experimental_tweaks_enabled(); }
+static BOOL settings_cleanhomescreen_install_allowed(void) { return cyanide_experimental_tweaks_available() && settings_experimental_tweaks_enabled(); }
+static BOOL settings_realcc_install_allowed(void) { return cyanide_experimental_tweaks_available() && settings_experimental_tweaks_enabled(); }
+static BOOL settings_hidellabels_install_allowed(void) { return cyanide_experimental_tweaks_available() && settings_experimental_tweaks_enabled(); }
+static BOOL settings_fakeclockup_install_allowed(void) { return cyanide_experimental_tweaks_available() && settings_experimental_tweaks_enabled(); }
+static BOOL settings_pancake_install_allowed(void) { return cyanide_experimental_tweaks_available() && settings_experimental_tweaks_enabled(); }
+static BOOL settings_cylinderlite_install_allowed(void) { return cyanide_experimental_tweaks_available() && settings_experimental_tweaks_enabled(); }
+
 static NSString *settings_legacy_access_label(void)
 {
     return [@"Patr" stringByAppendingString:@"eon"];
@@ -6019,6 +6029,58 @@ static BOOL settings_key_is_velvet(NSString *key)
            [key isEqualToString:kSettingsVelvetMessageColor] ||
            [key isEqualToString:kSettingsVelvetDateColor] ||
            [key isEqualToString:kSettingsVelvetCornerRadius];
+}
+
+static BOOL settings_key_is_cleannc(NSString *key)
+{
+    return [key isEqualToString:kSettingsCleanNCEnabled];
+}
+
+static BOOL settings_key_is_undertime(NSString *key)
+{
+    return [key isEqualToString:kSettingsUnderTimeEnabled];
+}
+
+static BOOL settings_key_is_zeppelinlite(NSString *key)
+{
+    return [key isEqualToString:kSettingsZeppelinLiteEnabled] ||
+           [key isEqualToString:kSettingsZeppelinLiteText];
+}
+
+static BOOL settings_key_is_cleanhomescreen(NSString *key)
+{
+    return [key isEqualToString:kSettingsCleanHomeScreenEnabled] ||
+           [key isEqualToString:kSettingsCleanHomeScreenHideBadges] ||
+           [key isEqualToString:kSettingsCleanHomeScreenHidePageDots] ||
+           [key isEqualToString:kSettingsCleanHomeScreenHideLabels];
+}
+
+static BOOL settings_key_is_realcc(NSString *key)
+{
+    return [key isEqualToString:kSettingsRealCCEnabled] ||
+           [key isEqualToString:kSettingsRealCCDisableWiFi] ||
+           [key isEqualToString:kSettingsRealCCDisableBT];
+}
+
+static BOOL settings_key_is_hidellabels(NSString *key)
+{
+    return [key isEqualToString:kSettingsHideLabelsEnabled];
+}
+
+static BOOL settings_key_is_fakeclockup(NSString *key)
+{
+    return [key isEqualToString:kSettingsFakeClockUpEnabled] ||
+           [key isEqualToString:kSettingsFakeClockUpSpeed];
+}
+
+static BOOL settings_key_is_pancake(NSString *key)
+{
+    return [key isEqualToString:kSettingsPancakeEnabled];
+}
+
+static BOOL settings_key_is_cylinderlite(NSString *key)
+{
+    return [key isEqualToString:kSettingsCylinderLiteEnabled];
 }
 
 static BOOL settings_key_is_appswitchergrid(NSString *key)
