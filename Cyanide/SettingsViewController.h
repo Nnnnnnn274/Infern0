@@ -70,6 +70,23 @@ extern NSString * const kSettingsVelvetMessageColor;
 extern NSString * const kSettingsVelvetDateColor;
 extern NSString * const kSettingsVelvetCornerRadius;
 
+extern NSString * const kSettingsCleanNCEnabled;
+extern NSString * const kSettingsUnderTimeEnabled;
+extern NSString * const kSettingsZeppelinLiteEnabled;
+extern NSString * const kSettingsZeppelinLiteText;
+extern NSString * const kSettingsCleanHomeScreenEnabled;
+extern NSString * const kSettingsCleanHomeScreenHideBadges;
+extern NSString * const kSettingsCleanHomeScreenHidePageDots;
+extern NSString * const kSettingsCleanHomeScreenHideLabels;
+extern NSString * const kSettingsRealCCEnabled;
+extern NSString * const kSettingsRealCCDisableWiFi;
+extern NSString * const kSettingsRealCCDisableBT;
+extern NSString * const kSettingsHideLabelsEnabled;
+extern NSString * const kSettingsFakeClockUpEnabled;
+extern NSString * const kSettingsFakeClockUpSpeed;
+extern NSString * const kSettingsPancakeEnabled;
+extern NSString * const kSettingsCylinderLiteEnabled;
+
 extern NSString * const kSettingsGravityLiteEnabled;
 extern NSString * const kSettingsGravityLiteDockEnabled;
 extern NSString * const kSettingsGravityLiteMagnitudePct;

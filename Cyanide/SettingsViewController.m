@@ -987,6 +987,24 @@ NSString * const kSettingsVelvetTitleColor = @"VelvetTitleColor";
 NSString * const kSettingsVelvetMessageColor = @"VelvetMessageColor";
 NSString * const kSettingsVelvetDateColor = @"VelvetDateColor";
 NSString * const kSettingsVelvetCornerRadius = @"VelvetCornerRadius";
+
+NSString * const kSettingsCleanNCEnabled = @"CleanNCEnabled";
+NSString * const kSettingsUnderTimeEnabled = @"UnderTimeEnabled";
+NSString * const kSettingsZeppelinLiteEnabled = @"ZeppelinLiteEnabled";
+NSString * const kSettingsZeppelinLiteText = @"ZeppelinLiteText";
+NSString * const kSettingsCleanHomeScreenEnabled = @"CleanHomeScreenEnabled";
+NSString * const kSettingsCleanHomeScreenHideBadges = @"CleanHomeScreenHideBadges";
+NSString * const kSettingsCleanHomeScreenHidePageDots = @"CleanHomeScreenHidePageDots";
+NSString * const kSettingsCleanHomeScreenHideLabels = @"CleanHomeScreenHideLabels";
+NSString * const kSettingsRealCCEnabled = @"RealCCEnabled";
+NSString * const kSettingsRealCCDisableWiFi = @"RealCCDisableWiFi";
+NSString * const kSettingsRealCCDisableBT = @"RealCCDisableBT";
+NSString * const kSettingsHideLabelsEnabled = @"HideLabelsEnabled";
+NSString * const kSettingsFakeClockUpEnabled = @"FakeClockUpEnabled";
+NSString * const kSettingsFakeClockUpSpeed = @"FakeClockUpSpeed";
+NSString * const kSettingsPancakeEnabled = @"PancakeEnabled";
+NSString * const kSettingsCylinderLiteEnabled = @"CylinderLiteEnabled";
+
 static NSString * const kSettingsFastLockXLiteRetryInterval = @"FastLockXLiteRetryInterval";
 static NSString * const kSettingsHideHomeBarHidden = @"HideHomeBarHidden";
 static NSString * const kSettingsHideHomeBarMaterialKitBootTime = @"HideHomeBarMaterialKitBootTime";

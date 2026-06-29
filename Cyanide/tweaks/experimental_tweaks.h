@@ -21,6 +21,15 @@
 #import "experimental/ipadecryptor.h"
 #import "experimental/fastlockx_lite.h"
 #import "experimental/velvet.h"
+#import "experimental/cleannc.h"
+#import "experimental/undertime.h"
+#import "experimental/zeppelinlite.h"
+#import "experimental/cleanhomescreen.h"
+#import "experimental/realcc.h"
+#import "experimental/hidellabels.h"
+#import "experimental/fakeclockup.h"
+#import "experimental/pancake.h"
+#import "experimental/cylinderlite.h"
 
 #define CYANIDE_EXPERIMENTAL_TWEAKS_AVAILABLE 1
 
