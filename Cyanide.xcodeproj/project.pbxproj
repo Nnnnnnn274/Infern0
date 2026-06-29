@@ -119,25 +119,13 @@
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
-/* Begin PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
-		AA794C7B2F853D1A001F0544 /* Exceptions for "Cyanide" folder in "Copy Files" phase from "Cyanide" target */ = {
-			isa = PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet;
-			attributesByRelativePath = {
-				XPF/output/ios/libxpf.dylib = (CodeSignOnCopy, );
-			};
-			buildPhase = AAA2989D2F7418CC000B5902 /* CopyFiles */;
-			membershipExceptions = (
-				XPF/output/ios/libxpf.dylib,
-			);
-		};
-/* End PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
+
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		AAA297792F72D439000B5902 /* Cyanide */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
 				AAA2978E2F72D43A000B5902 /* Exceptions for "Cyanide" folder in "Cyanide" target */,
-				AA794C7B2F853D1A001F0544 /* Exceptions for "Cyanide" folder in "Copy Files" phase from "Cyanide" target */,
 			);
 			path = Cyanide;
 			sourceTree = "<group>";
@@ -611,7 +599,7 @@
 			shellPath = /bin/sh;
 			shellScript = "if [ \"$PLATFORM_NAME\" = \"iphonesimulator\" ]; then\n    make -C \"$SRCROOT/Cyanide/XPF\" output/iphonesimulator/libxpf.dylib\nelse\n    make -C \"$SRCROOT/Cyanide/XPF\" output/ios/libxpf.dylib\nfi\n";
 		};
-		FBC0A0012FD6000000C0A001 /* Copy Simulator XPF */ = {
+		FBC0A0012FD6000000C0A001 /* Embed XPF dylib */ = {
 			isa = PBXShellScriptBuildPhase;
 			alwaysOutOfDate = 1;
 			buildActionMask = 2147483647;
@@ -620,16 +608,15 @@
 			inputFileListPaths = (
 			);
 			inputPaths = (
-				"$(SRCROOT)/Cyanide/XPF/output/iphonesimulator/libxpf.dylib",
 			);
-			name = "Copy Simulator XPF";
+			name = "Embed XPF dylib";
 			outputFileListPaths = (
 			);
 			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "if [ \"$PLATFORM_NAME\" = \"iphonesimulator\" ]; then\n    cp \"$SRCROOT/Cyanide/XPF/output/iphonesimulator/libxpf.dylib\" \"$TARGET_BUILD_DIR/$WRAPPER_NAME/libxpf.dylib\"\nfi\n";
+			shellScript = "if [ \"$PLATFORM_NAME\" = \"iphonesimulator\" ]; then\n    src=\"$SRCROOT/Cyanide/XPF/output/iphonesimulator/libxpf.dylib\"\nelse\n    src=\"$SRCROOT/Cyanide/XPF/output/ios/libxpf.dylib\"\nfi\ndst=\"$TARGET_BUILD_DIR/$WRAPPER_NAME/libxpf.dylib\"\nif [ -f \"$src\" ]; then\n    cp \"$src\" \"$dst\"\nfi\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
