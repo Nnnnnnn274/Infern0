@@ -8330,6 +8330,90 @@ static void settings_run_actions_internal(BOOL pendingOnly)
                                                          @"velvet-initial-failed");
                     }
 
+                    if (runCleanNC) {
+                        settings_progress(&step, total, "Applying CleanNC");
+                        bool ok = cleannc_apply_in_session();
+                        settings_mark_tweak_applied(kSettingsCleanNCEnabled, ok && [d boolForKey:kSettingsCleanNCEnabled]);
+                        printf("[SETTINGS] CleanNC result=%d\n", ok);
+                        log_user("%s CleanNC %s.\n", ok ? "[OK]" : "[WARN]", ok ? "active" : "did not start cleanly");
+                        cyanide_upload_log_milestone(ok ? @"cleannc-applied" : @"cleannc-failed");
+                    }
+
+                    if (runUnderTime) {
+                        settings_progress(&step, total, "Applying UnderTime");
+                        bool ok = undertime_apply_in_session();
+                        settings_mark_tweak_applied(kSettingsUnderTimeEnabled, ok && [d boolForKey:kSettingsUnderTimeEnabled]);
+                        printf("[SETTINGS] UnderTime result=%d\n", ok);
+                        log_user("%s UnderTime %s.\n", ok ? "[OK]" : "[WARN]", ok ? "active" : "did not start cleanly");
+                        cyanide_upload_log_milestone(ok ? @"undertime-applied" : @"undertime-failed");
+                    }
+
+                    if (runZeppelinLite) {
+                        settings_progress(&step, total, "Applying Zeppelin Lite");
+                        bool ok = zeppelinlite_apply_in_session([d stringForKey:kSettingsZeppelinLiteText]);
+                        settings_mark_tweak_applied(kSettingsZeppelinLiteEnabled, ok && [d boolForKey:kSettingsZeppelinLiteEnabled]);
+                        printf("[SETTINGS] Zeppelin Lite result=%d\n", ok);
+                        log_user("%s Zeppelin Lite %s.\n", ok ? "[OK]" : "[WARN]", ok ? "active" : "did not start cleanly");
+                        cyanide_upload_log_milestone(ok ? @"zeppelinlite-applied" : @"zeppelinlite-failed");
+                    }
+
+                    if (runCleanHomeScreen) {
+                        settings_progress(&step, total, "Applying CleanHomeScreen");
+                        bool ok = cleanhomescreen_apply_in_session([d boolForKey:kSettingsCleanHomeScreenHideBadges],
+                                                                    [d boolForKey:kSettingsCleanHomeScreenHidePageDots],
+                                                                    [d boolForKey:kSettingsCleanHomeScreenHideLabels]);
+                        settings_mark_tweak_applied(kSettingsCleanHomeScreenEnabled, ok && [d boolForKey:kSettingsCleanHomeScreenEnabled]);
+                        printf("[SETTINGS] CleanHomeScreen result=%d\n", ok);
+                        log_user("%s CleanHomeScreen %s.\n", ok ? "[OK]" : "[WARN]", ok ? "active" : "did not start cleanly");
+                        cyanide_upload_log_milestone(ok ? @"cleanhomescreen-applied" : @"cleanhomescreen-failed");
+                    }
+
+                    if (runRealCC) {
+                        settings_progress(&step, total, "Applying RealCC");
+                        bool ok = realcc_apply_in_session([d boolForKey:kSettingsRealCCDisableWiFi],
+                                                          [d boolForKey:kSettingsRealCCDisableBT]);
+                        settings_mark_tweak_applied(kSettingsRealCCEnabled, ok && [d boolForKey:kSettingsRealCCEnabled]);
+                        printf("[SETTINGS] RealCC result=%d\n", ok);
+                        log_user("%s RealCC %s.\n", ok ? "[OK]" : "[WARN]", ok ? "active" : "did not start cleanly");
+                        cyanide_upload_log_milestone(ok ? @"realcc-applied" : @"realcc-failed");
+                    }
+
+                    if (runHideLabels) {
+                        settings_progress(&step, total, "Applying HideLabels");
+                        bool ok = hidelabels_apply_in_session();
+                        settings_mark_tweak_applied(kSettingsHideLabelsEnabled, ok && [d boolForKey:kSettingsHideLabelsEnabled]);
+                        printf("[SETTINGS] HideLabels result=%d\n", ok);
+                        log_user("%s HideLabels %s.\n", ok ? "[OK]" : "[WARN]", ok ? "active" : "did not start cleanly");
+                        cyanide_upload_log_milestone(ok ? @"hidelabels-applied" : @"hidelabels-failed");
+                    }
+
+                    if (runFakeClockUp) {
+                        settings_progress(&step, total, "Applying FakeClockUp");
+                        bool ok = fakeclockup_apply_in_session([d floatForKey:kSettingsFakeClockUpSpeed]);
+                        settings_mark_tweak_applied(kSettingsFakeClockUpEnabled, ok && [d boolForKey:kSettingsFakeClockUpEnabled]);
+                        printf("[SETTINGS] FakeClockUp result=%d\n", ok);
+                        log_user("%s FakeClockUp %s.\n", ok ? "[OK]" : "[WARN]", ok ? "active" : "did not start cleanly");
+                        cyanide_upload_log_milestone(ok ? @"fakeclockup-applied" : @"fakeclockup-failed");
+                    }
+
+                    if (runPancake) {
+                        settings_progress(&step, total, "Applying Pancake");
+                        bool ok = pancake_apply_in_session();
+                        settings_mark_tweak_applied(kSettingsPancakeEnabled, ok && [d boolForKey:kSettingsPancakeEnabled]);
+                        printf("[SETTINGS] Pancake result=%d\n", ok);
+                        log_user("%s Pancake %s.\n", ok ? "[OK]" : "[WARN]", ok ? "active" : "did not start cleanly");
+                        cyanide_upload_log_milestone(ok ? @"pancake-applied" : @"pancake-failed");
+                    }
+
+                    if (runCylinderLite) {
+                        settings_progress(&step, total, "Applying Cylinder Lite");
+                        bool ok = cylinderlite_apply_in_session();
+                        settings_mark_tweak_applied(kSettingsCylinderLiteEnabled, ok && [d boolForKey:kSettingsCylinderLiteEnabled]);
+                        printf("[SETTINGS] Cylinder Lite result=%d\n", ok);
+                        log_user("%s Cylinder Lite %s.\n", ok ? "[OK]" : "[WARN]", ok ? "active" : "did not start cleanly");
+                        cyanide_upload_log_milestone(ok ? @"cylinderlite-applied" : @"cylinderlite-failed");
+                    }
+
                     if (runAppSwitcherGrid) {
                         settings_progress(&step, total, "Enabling App Switcher Grid");
                         bool ok = appswitchergrid_apply_in_session();
