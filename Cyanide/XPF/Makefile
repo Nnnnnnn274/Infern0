@@ -24,7 +24,7 @@ output/macos/libxpf.dylib: $(wildcard src/*.c) $(CHOMA_DEP)
 output/ios/libxpf.dylib: $(wildcard src/*.c) $(CHOMA_DEP)
 	@mkdir -p $(shell dirname $@)
 	$(CC) $(CFLAGS_IOS) $(LDFLAGS) -dynamiclib -install_name @loader_path/libxpf.dylib -o $@ $^
-	ldid -S $@
+	if command -v ldid >/dev/null 2>&1; then ldid -S $@; fi
 
 output/iphonesimulator/libxpf.dylib: $(wildcard src/*.c) $(CHOMA_DEP)
 	@mkdir -p $(shell dirname $@)
@@ -37,7 +37,7 @@ output/macos/xpf_test: $(wildcard src/cli/*.c)
 output/ios/xpf_test: $(wildcard src/cli/*.c)
 	@mkdir -p $(shell dirname $@)
 	$(CC) $(CFLAGS_IOS) $(LDFLAGS) -L$(shell dirname $@) -lxpf -o $@ $^
-	@ldid -S $@
+	@if command -v ldid >/dev/null 2>&1; then ldid -S $@; fi
 
 clean:
 	@rm -rf output
