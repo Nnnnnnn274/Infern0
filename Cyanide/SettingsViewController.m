@@ -1342,6 +1342,12 @@ static bool settings_stop_fastlockx_lite_registered(BOOL springboardWillDie)
     return ok;
 }
 
+static bool settings_stop_velvet_registered(BOOL springboardWillDie)
+{
+    (void)springboardWillDie;
+    return velvet_stop_in_session();
+}
+
 static bool settings_stop_livewp_registered(BOOL springboardWillDie)
 {
     (void)springboardWillDie;
@@ -1380,6 +1386,7 @@ static void settings_each_springboard_cleanup_entry(void (^block)(const Settings
         { kSettingsLiveWPEnabled, "LiveWP", settings_request_livewp_stop, settings_stop_livewp_registered, livewp_forget_remote_state, settings_livewp_running, YES, YES },
         { kSettingsStageStripEnabled, "Stage Strip", settings_request_stagestrip_stop, settings_stop_stagestrip_registered, stagestrip_forget_remote_state, NULL, YES, YES },
         { kSettingsFastLockXLiteEnabled, "FastLockX Lite", NULL, settings_stop_fastlockx_lite_registered, fastlockx_lite_forget_remote_state, NULL, NO, YES },
+        { kSettingsVelvetEnabled, "Velvet", settings_request_velvet_stop, settings_stop_velvet_registered, velvet_forget_remote_state, settings_velvet_running, YES, YES },
         { kSettingsQuickLoaderEnabled, "QuickLoader", NULL, settings_stop_quickloader_registered, NULL, NULL, YES, YES },
         { kSettingsRepoTweaksEnabled, "RepoTweaks", NULL, settings_stop_repotweaks_registered, NULL, NULL, YES, YES },
         { nil, "Kill All Apps", NULL, NULL, killallapps_forget_remote_state, NULL, NO, NO },
@@ -8931,13 +8938,13 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
 {
     return @[
         @{ @"kind": @"toggle", @"key": kSettingsVelvetEnabled, @"title": @"Enable Velvet" },
-        @{ @"kind": @"color",  @"key": kSettingsVelvetBgColor, @"title": @"Background Color" },
-        @{ @"kind": @"color",  @"key": kSettingsVelvetBorderColor, @"title": @"Border Color" },
+        @{ @"kind": @"info",   @"title": @"Background Color", @"subtitle": @"Customize via hex in UserDefaults key VelvetBgColor" },
+        @{ @"kind": @"info",   @"title": @"Border Color",     @"subtitle": @"Customize via hex in UserDefaults key VelvetBorderColor" },
         @{ @"kind": @"slider", @"key": kSettingsVelvetBorderWidth, @"title": @"Border Width", @"min": @0, @"max": @5, @"step": @0.5, @"default": @1.0 },
         @{ @"kind": @"slider", @"key": kSettingsVelvetCornerRadius, @"title": @"Corner Radius", @"min": @0, @"max": @25, @"step": @1, @"default": @13 },
-        @{ @"kind": @"color",  @"key": kSettingsVelvetTitleColor, @"title": @"Title Color" },
-        @{ @"kind": @"color",  @"key": kSettingsVelvetMessageColor, @"title": @"Message Color" },
-        @{ @"kind": @"color",  @"key": kSettingsVelvetDateColor, @"title": @"Date Color" },
+        @{ @"kind": @"info",   @"title": @"Title Color",      @"subtitle": @"Customize via hex in UserDefaults key VelvetTitleColor" },
+        @{ @"kind": @"info",   @"title": @"Message Color",    @"subtitle": @"Customize via hex in UserDefaults key VelvetMessageColor" },
+        @{ @"kind": @"info",   @"title": @"Date Color",       @"subtitle": @"Customize via hex in UserDefaults key VelvetDateColor" },
     ];
 }
 
