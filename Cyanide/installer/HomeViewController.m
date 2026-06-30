@@ -59,6 +59,7 @@ static const CGFloat kMargin = 20.0;
     [self.stack addArrangedSubview:[self buildHero]];
     [self.stack addArrangedSubview:[self buildQuickActions]];
     [self.stack addArrangedSubview:[self buildWhatsNew]];
+    [self.stack addArrangedSubview:[self buildExploits]];
     [self.stack addArrangedSubview:[self buildGetStarted]];
     [self.stack addArrangedSubview:[self buildCommunity]];
 }
@@ -348,6 +349,28 @@ static const CGFloat kMargin = 20.0;
     ]];
 
     return btn;
+}
+
+#pragma mark - Exploits
+
+- (UIView *)buildExploits
+{
+    UIView *card = [self card];
+    UIStackView *s = [self vstackInCard:card spacing:12.0];
+
+    [s addArrangedSubview:[self sectionHeader:@"Exploits"]];
+
+    [s addArrangedSubview:[self bigActionButton:@"Run All Exploits"
+                                          sub:@"Kernel exploit + sandbox escape + apply tweaks"
+                                         icon:@"bolt.trianglebadge.exclamationmark.fill"
+                                        color:UIColor.systemRedColor
+                                          sel:@selector(runAllExploits)]];
+    return card;
+}
+
+- (void)runAllExploits
+{
+    settings_run_actions();
 }
 
 #pragma mark - Community
