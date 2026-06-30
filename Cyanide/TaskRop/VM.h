@@ -86,3 +86,4 @@ struct vm_map_entry {
 };
 
 struct VMShmem vm_map_remote_page(uint64_t vmMap, uint64_t address);
+void vm_map_iterate_entries(uint64_t vm_map_ptr, void (^itBlock)(uint64_t start, uint64_t end, uint64_t entry, BOOL *stop));
