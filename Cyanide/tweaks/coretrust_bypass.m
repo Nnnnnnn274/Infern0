@@ -135,13 +135,6 @@ bool coretrust_amfid_nop_patch(void)
 {
     printf("[COREbreak] === [Step 2/6] Strategy 1: amfid NOP patch ===\n");
 
-    // iOS 17+: both RemoteCall exception-thread hijack and direct vm_map
-    // approaches kernel panic. Let other strategies handle the bypass.
-    if (SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(@"17.0")) {
-        printf("[COREbreak] iOS 17+: skipping amfid NOP (kernel panic)\n");
-        return false;
-    }
-
     int amfidPid = find_pid_by_name("amfid");
     if (amfidPid <= 0) {
         printf("[COREbreak] amfid not found in allproc\n");
