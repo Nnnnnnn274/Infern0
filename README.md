@@ -2,6 +2,16 @@
 
 Cyanide is now actively maintained by `Nnnnnnn274` but it is no longer the original this is my fork!
 
+## features
+AMFI bypass prob broken
+Coretrust bypass again broken
+kPAC hope it work
+
+## How to install
+Go to releases
+Download the latest ipa
+Intsall with and ipa installer not livecontainer
+
 ## Discord
 
 https://discord.gg/fx3xvuUyj 
