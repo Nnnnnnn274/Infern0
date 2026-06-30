@@ -363,76 +363,83 @@ static const CGFloat kMargin = 20.0;
 
     [s addArrangedSubview:[self sectionHeader:@"Exploits"]];
 
-    [s addArrangedSubview:[self bigActionButton:@"Run All Exploits"
-                                          sub:@"Kernel exploit + kPAC/AMFI bypass + CoreTrust bypass"
+    [s addArrangedSubview:[self bigActionButton:@"Run Kernel Exploit"
+                                          sub:@"OOB race → kernel r/w"
                                          icon:@"bolt.trianglebadge.exclamationmark.fill"
                                         color:UIColor.systemRedColor
-                                          sel:@selector(runAllExploits)]];
+                                          sel:@selector(runKernelExploit)]];
+    [s addArrangedSubview:[self bigActionButton:@"Run AMFI Bypass"
+                                          sub:@"kPAC bypass + AMFI platformize"
+                                         icon:@"lock.shield.fill"
+                                        color:UIColor.systemOrangeColor
+                                          sel:@selector(runAmfiBypass)]];
+    [s addArrangedSubview:[self bigActionButton:@"Run CoreTrust"
+                                          sub:@"amfid NOP + MSM trust cache"
+                                         icon:@"checkmark.shield.fill"
+                                        color:UIColor.systemGreenColor
+                                          sel:@selector(runCoreTrust)]];
     return card;
 }
 
-static BOOL g_run_all_exploits_running = NO;
+static BOOL g_running_flag = NO;
 
-- (void)runAllExploits
+- (void)runKernelExploit
 {
-    if (__sync_lock_test_and_set(&g_run_all_exploits_running, YES)) {
-        printf("[runAllExploits] already running\n");
+    if (__sync_lock_test_and_set(&g_running_flag, YES)) {
+        printf("[KExploit] already running\n");
         return;
     }
-
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
-        printf("[runAllExploits] ========================================\n");
-        printf("[runAllExploits]  Running all exploits\n");
-        printf("[runAllExploits] ========================================\n");
+        printf("[KExploit] === Kernel exploit (OOB race) ===\n");
 
-        // Create test binary BEFORE kernel exploit (no SPTM risk yet)
-        printf("[runAllExploits] creating test binary...\n");
-        const char *testBin = coretrust_write_test_binary();
-        if (testBin) {
-            printf("[runAllExploits] test binary: %s\n", testBin);
+        // Create test binary here while kernel is clean
+        coretrust_write_test_binary();
+
+        if (kexploit_krw_ready()) {
+            printf("[KExploit] kernel r/w already available\n");
         } else {
-            printf("[runAllExploits] WARN: test binary creation failed\n");
-        }
-
-        // ── Step 1: Kernel exploit ──
-        printf("[runAllExploits]\n");
-        printf("[runAllExploits] --- Step 1/3: Kernel exploit (OOB race) ---\n");
-        if (!kexploit_krw_ready()) {
             int r = kexploit_opa334();
             if (r != 0) {
-                printf("[runAllExploits] FAILED: kexploit_opa334 returned %d\n", r);
-                goto cleanup;
+                printf("[KExploit] FAILED: kexploit_opa334 returned %d\n", r);
+            } else {
+                printf("[KExploit] OK: kernel r/w acquired\n");
             }
-            printf("[runAllExploits] OK: kernel r/w acquired\n");
+        }
+        g_running_flag = NO;
+    });
+}
+
+- (void)runAmfiBypass
+{
+    if (__sync_lock_test_and_set(&g_running_flag, YES)) {
+        printf("[AMFI] already running\n");
+        return;
+    }
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
+        printf("[AMFI] === kPAC bypass + AMFI platformize ===\n");
+        if (kpac_platformize_self()) {
+            printf("[AMFI] OK: kPAC bypassed, process platformized\n");
         } else {
-            printf("[runAllExploits] SKIP: kernel r/w already available\n");
+            printf("[AMFI] FAILED: kpac_platformize_self\n");
         }
+        g_running_flag = NO;
+    });
+}
 
-        // ── Step 2: kPAC bypass + AMFI platformize ──
-        printf("[runAllExploits]\n");
-        printf("[runAllExploits] --- Step 2/3: kPAC bypass + AMFI platformize ---\n");
-        if (!kpac_platformize_self()) {
-            printf("[runAllExploits] FAILED: kpac_platformize_self\n");
-            goto cleanup;
+- (void)runCoreTrust
+{
+    if (__sync_lock_test_and_set(&g_running_flag, YES)) {
+        printf("[COREbreak] already running\n");
+        return;
+    }
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
+        printf("[COREbreak] === CoreTrust bypass (amfid NOP + MSM) ===\n");
+        if (coretrust_bypass_all()) {
+            printf("[COREbreak] OK: CoreTrust bypassed\n");
+        } else {
+            printf("[COREbreak] FAILED: coretrust_bypass_all\n");
         }
-        printf("[runAllExploits] OK: kPAC bypassed, process platformized\n");
-
-        // ── Step 3: CoreTrust bypass ──
-        printf("[runAllExploits]\n");
-        printf("[runAllExploits] --- Step 3/3: CoreTrust bypass (amfid NOP + MSM) ---\n");
-        if (!coretrust_bypass_all()) {
-            printf("[runAllExploits] FAILED: coretrust_bypass_all\n");
-            goto cleanup;
-        }
-        printf("[runAllExploits] OK: CoreTrust bypassed\n");
-
-        printf("[runAllExploits]\n");
-        printf("[runAllExploits] ========================================\n");
-        printf("[runAllExploits]  All exploits completed successfully\n");
-        printf("[runAllExploits] ========================================\n");
-
-    cleanup:
-        g_run_all_exploits_running = NO;
+        g_running_flag = NO;
     });
 }
 
