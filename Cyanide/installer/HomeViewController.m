@@ -371,35 +371,60 @@ static const CGFloat kMargin = 20.0;
     return card;
 }
 
+static BOOL g_run_all_exploits_running = NO;
+
 - (void)runAllExploits
 {
-    printf("[runAllExploits] === Starting exploits ===\n");
+    if (__sync_lock_test_and_set(&g_run_all_exploits_running, YES)) {
+        printf("[runAllExploits] already running\n");
+        return;
+    }
 
-    if (!kexploit_krw_ready()) {
-        printf("[runAllExploits] Step 1: Kernel exploit (OOB race)...\n");
-        int r = kexploit_opa334();
-        if (r != 0) {
-            printf("[runAllExploits] kexploit_opa334 failed (%d)\n", r);
-            return;
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
+        printf("[runAllExploits] ========================================\n");
+        printf("[runAllExploits]  Running all exploits\n");
+        printf("[runAllExploits] ========================================\n");
+
+        // ── Step 1: Kernel exploit ──
+        printf("[runAllExploits]\n");
+        printf("[runAllExploits] --- Step 1/3: Kernel exploit (OOB race) ---\n");
+        if (!kexploit_krw_ready()) {
+            int r = kexploit_opa334();
+            if (r != 0) {
+                printf("[runAllExploits] FAILED: kexploit_opa334 returned %d\n", r);
+                goto cleanup;
+            }
+            printf("[runAllExploits] OK: kernel r/w acquired\n");
+        } else {
+            printf("[runAllExploits] SKIP: kernel r/w already available\n");
         }
-        printf("[runAllExploits] Kernel r/w acquired\n");
-    } else {
-        printf("[runAllExploits] Kernel r/w already available, skipping kexploit\n");
-    }
 
-    printf("[runAllExploits] Step 2: kPAC bypass + AMFI platformize...\n");
-    if (!kpac_platformize_self()) {
-        printf("[runAllExploits] kpac_platformize_self failed\n");
-        return;
-    }
+        // ── Step 2: kPAC bypass + AMFI platformize ──
+        printf("[runAllExploits]\n");
+        printf("[runAllExploits] --- Step 2/3: kPAC bypass + AMFI platformize ---\n");
+        if (!kpac_platformize_self()) {
+            printf("[runAllExploits] FAILED: kpac_platformize_self\n");
+            goto cleanup;
+        }
+        printf("[runAllExploits] OK: kPAC bypassed, process platformized\n");
 
-    printf("[runAllExploits] Step 3: CoreTrust bypass...\n");
-    if (!coretrust_bypass_all()) {
-        printf("[runAllExploits] coretrust_bypass_all failed\n");
-        return;
-    }
+        // ── Step 3: CoreTrust bypass ──
+        printf("[runAllExploits]\n");
+        printf("[runAllExploits] --- Step 3/3: CoreTrust bypass (amfid NOP + MSM) ---\n");
+        if (!coretrust_bypass_all()) {
+            printf("[runAllExploits] FAILED: coretrust_bypass_all\n");
+            goto cleanup;
+        }
+        printf("[runAllExploits] OK: CoreTrust bypassed\n");
 
-    printf("[runAllExploits] === All exploits completed ===\n");
+        printf("[runAllExploits]\n");
+        printf("[runAllExploits] ========================================\n");
+        printf("[runAllExploits]  All exploits completed successfully\n");
+        printf("[runAllExploits] ========================================\n");
+
+    cleanup:
+        g_run_all_exploits_running = NO;
+    });
 }
 
 #pragma mark - Community
