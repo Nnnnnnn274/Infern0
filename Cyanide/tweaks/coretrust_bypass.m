@@ -409,8 +409,15 @@ bool coretrust_bypass_all(void)
     printf("[COREbreak] test binary: %s\n", testPath);
 
     // Step 2: Try Strategy 1 — amfid NOP patch
+    // SKIP on A18+ (SPTM): the RemoteCall thread hijack of amfid triggers
+    // a kernel panic via the SPTM exception thread within ~2 minutes.
     printf("\n");
-    bool nopOk = coretrust_amfid_nop_patch();
+    bool nopOk = false;
+    if (gIsA18Above) {
+        printf("[COREbreak] A18+ (SPTM): skipping amfid NOP patch to avoid kernel panic\n");
+    } else {
+        nopOk = coretrust_amfid_nop_patch();
+    }
     if (nopOk) {
         printf("[COREbreak] amfid NOP applied — testing unsigned exec...\n");
         pid_t child = 0;
