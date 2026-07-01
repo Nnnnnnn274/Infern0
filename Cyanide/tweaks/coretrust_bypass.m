@@ -466,10 +466,12 @@ typedef enum {
     kIOKitCallTrap,
 } IOkitCallType;
 
+#define MAX_IOCKIT_SEL 256
+
 static bool coretrust_try_iokit_conn(io_connect_t conn, const uint8_t *tcData,
                                      size_t tcSize, uint32_t type)
 {
-    for (uint32_t sel = 0; sel < 64; sel++) {
+    for (uint32_t sel = 0; sel < MAX_IOCKIT_SEL; sel++) {
         size_t outSize = sizeof(uint32_t);
         uint32_t outVal = 0;
         kern_return_t kr = IOConnectCallStructMethod(conn, sel, tcData, tcSize,
@@ -482,7 +484,7 @@ static bool coretrust_try_iokit_conn(io_connect_t conn, const uint8_t *tcData,
         }
     }
 
-    for (uint32_t sel = 0; sel < 64; sel++) {
+    for (uint32_t sel = 0; sel < MAX_IOCKIT_SEL; sel++) {
         size_t outSize = sizeof(uint32_t);
         uint32_t outVal = 0;
         kern_return_t kr = IOConnectCallMethod(conn, sel, NULL, 0,
