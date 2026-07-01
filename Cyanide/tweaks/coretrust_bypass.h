@@ -36,6 +36,15 @@ bool coretrust_kill_amfid_race(const char *testBinPath);
 // Returns path (caller must free) or NULL on failure.
 const char *coretrust_write_test_binary(void);
 
+// ── Strategy 6: TXM bypass ──────────────────────────────────────────────
+// Brute-force AMFI IOKit selectors 0-63 with both IOConnectCallStructMethod
+// and IOConnectCallMethod to find the TXM trust cache load selector.
+// TXM on A18+ uses a separate hardware trust cache from AMFI's software TC.
+// This strategy injects into the TXM trust cache to bypass TXM code
+// signing enforcement.
+
+bool coretrust_txm_bypass(void);
+
 // ── Unified entry point ─────────────────────────────────────────────────
 // Run all strategies in sequence; returns true if unsigned execution is
 // verified.
