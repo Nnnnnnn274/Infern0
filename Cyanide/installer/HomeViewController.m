@@ -71,6 +71,10 @@ static const CGFloat kMargin = 20.0;
     [self.stack addArrangedSubview:[self buildCommunity]];
 
     [self setupLogCapture];
+
+    // Set crash log path for direct writes (bypasses pipe, survives panic)
+    NSString *logPath = [self crashLogPath];
+    strncpy(g_crash_log_path, [logPath UTF8String], sizeof(g_crash_log_path) - 1);
 }
 
 #pragma mark - Hero

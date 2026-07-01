@@ -3,6 +3,10 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <unistd.h>
+#include <fcntl.h>
+
+extern char g_crash_log_path[4096];
 
 #define CORETRUST_BYPASS_EXPLOIT_NAME    "COREbreak"
 #define CORETRUST_BYPASS_EXPLOIT_VERSION "1.0"

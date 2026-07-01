@@ -22,6 +22,19 @@ extern void sys_cache_control(int, void *, size_t);
 #import <unistd.h>
 #import <fcntl.h>
 #import <stdlib.h>
+#import <fcntl.h>
+#import <unistd.h>
+
+char g_crash_log_path[4096] = "";
+
+static void crash_write(const char *msg)
+{
+    if (!g_crash_log_path[0]) return;
+    int fd = open(g_crash_log_path, O_WRONLY | O_CREAT | O_APPEND | O_DSYNC, 0644);
+    if (fd < 0) return;
+    write(fd, msg, strlen(msg));
+    close(fd);
+}
 
 // ===========================================================================
 // Helpers
@@ -413,6 +426,9 @@ bool coretrust_kill_amfid_race(const char *testBinPath)
 
 bool coretrust_bypass_all(void)
 {
+    crash_write("[COREbreak] === " CORETRUST_BYPASS_EXPLOIT_NAME " v"
+                CORETRUST_BYPASS_EXPLOIT_VERSION " ===\n");
+    crash_write("[COREbreak] Target: iOS 18.5 A18 (SPTM) — CoreTrust bypass\n");
     printf("[COREbreak] === " CORETRUST_BYPASS_EXPLOIT_NAME " v"
            CORETRUST_BYPASS_EXPLOIT_VERSION " ===\n");
     printf("[COREbreak] Target: iOS 18.5 A18 (SPTM) — CoreTrust bypass\n");
