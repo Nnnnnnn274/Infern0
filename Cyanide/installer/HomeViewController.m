@@ -6,6 +6,7 @@
 #import "HomeViewController.h"
 #import "SourcesViewController.h"
 #import "../SettingsViewController.h"
+#import <unistd.h>
 #import "../tweaks/RepoTweaks.h"
 #import "../kexploit/kexploit_opa334.h"
 #import "../tweaks/kpac_bypass.h"
@@ -22,6 +23,8 @@ static const CGFloat kMargin = 20.0;
 @property (nonatomic, strong) UIStackView *stack;
 @property (nonatomic, weak) UIView *heroView;
 @property (nonatomic, weak) CAGradientLayer *heroGrad;
+@property (nonatomic, strong) UITextView *logView;
+@property (nonatomic, strong) NSPipe *logPipe;
 @end
 
 @implementation HomeViewController
@@ -65,6 +68,8 @@ static const CGFloat kMargin = 20.0;
     [self.stack addArrangedSubview:[self buildExploits]];
     [self.stack addArrangedSubview:[self buildGetStarted]];
     [self.stack addArrangedSubview:[self buildCommunity]];
+
+    [self setupLogCapture];
 }
 
 #pragma mark - Hero
@@ -378,13 +383,89 @@ static const CGFloat kMargin = 20.0;
                                          icon:@"checkmark.shield.fill"
                                         color:UIColor.systemGreenColor
                                           sel:@selector(runCoreTrust)]];
+
+    // Live log output
+    UILabel *logLabel = [[UILabel alloc] init];
+    logLabel.text = @"Log";
+    logLabel.font = [UIFont systemFontOfSize:13.0 weight:UIFontWeightSemibold];
+    logLabel.textColor = UIColor.secondaryLabelColor;
+    [s addArrangedSubview:logLabel];
+
+    UITextView *lv = [[UITextView alloc] init];
+    lv.font = [UIFont fontWithName:@"Menlo" size:10.0] ?: [UIFont systemFontOfSize:10.0];
+    lv.textColor = UIColor.whiteColor;
+    lv.backgroundColor = [UIColor.blackColor colorWithAlphaComponent:0.85];
+    lv.layer.cornerRadius = 8.0;
+    lv.layer.cornerCurve = kCACornerCurveContinuous;
+    lv.clipsToBounds = YES;
+    lv.editable = NO;
+    lv.scrollEnabled = YES;
+    lv.contentInset = UIEdgeInsetsMake(4, 4, 4, 4);
+    lv.hidden = YES;
+    [lv.heightAnchor constraintEqualToConstant:240].active = YES;
+    self.logView = lv;
+    [s addArrangedSubview:lv];
+
     return card;
 }
 
 static BOOL g_running_flag = NO;
 
+#pragma mark - Live Log
+
+- (void)setupLogCapture
+{
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        int origStdout = dup(STDOUT_FILENO);
+
+        self.logPipe = [NSPipe pipe];
+        int writeFD = [[self.logPipe fileHandleForWriting] fileDescriptor];
+        int readFD = [[self.logPipe fileHandleForReading] fileDescriptor];
+
+        dup2(writeFD, STDOUT_FILENO);
+        setvbuf(stdout, NULL, _IONBF, 0);
+
+        dispatch_source_t source = dispatch_source_create(
+            DISPATCH_SOURCE_TYPE_READ, readFD, 0,
+            dispatch_get_main_queue());
+
+        __weak typeof(self) weakSelf = self;
+        dispatch_source_set_event_handler(source, ^{
+            typeof(self) strongSelf = weakSelf;
+            if (!strongSelf) return;
+
+            char buf[4096];
+            ssize_t n = read(readFD, buf, sizeof(buf) - 1);
+            if (n > 0) {
+                if (origStdout >= 0)
+                    write(origStdout, buf, (size_t)n);
+
+                buf[n] = '\0';
+                NSString *text = [NSString stringWithUTF8String:buf];
+                if (text && strongSelf.logView && !strongSelf.logView.isHidden) {
+                    strongSelf.logView.text = [strongSelf.logView.text stringByAppendingString:text];
+                    if (strongSelf.logView.text.length > 0) {
+                        NSRange range = NSMakeRange(strongSelf.logView.text.length - 1, 1);
+                        [strongSelf.logView scrollRangeToVisible:range];
+                    }
+                }
+            }
+        });
+
+        dispatch_resume(source);
+    });
+}
+
+- (void)showLog
+{
+    self.logView.hidden = NO;
+    self.logView.text = @"";
+}
+
 - (void)runKernelExploit
 {
+    [self showLog];
     if (__sync_lock_test_and_set(&g_running_flag, YES)) {
         printf("[KExploit] already running\n");
         return;
@@ -411,6 +492,7 @@ static BOOL g_running_flag = NO;
 
 - (void)runAmfiBypass
 {
+    [self showLog];
     if (__sync_lock_test_and_set(&g_running_flag, YES)) {
         printf("[AMFI] already running\n");
         return;
@@ -428,6 +510,7 @@ static BOOL g_running_flag = NO;
 
 - (void)runCoreTrust
 {
+    [self showLog];
     if (__sync_lock_test_and_set(&g_running_flag, YES)) {
         printf("[COREbreak] already running\n");
         return;
