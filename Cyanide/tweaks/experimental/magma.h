@@ -1,0 +1,10 @@
+#ifndef magma_h
+#define magma_h
+
+#include <stdbool.h>
+
+bool magma_apply_in_session(void);
+bool magma_stop_in_session(void);
+void magma_forget_remote_state(void);
+
+#endif

@@ -124,18 +124,35 @@ static const NSInteger kSecGravityLite      = 21;
 static const NSInteger kSecAppSwitcherGrid  = 22;
 static const NSInteger kSecIPADecryptor     = 23;
 static const NSInteger kSecFastLockXLite    = 24;
+static const NSInteger kSecVelvet           = 25;
 static const NSInteger kSecCleanNC          = 26;
 static const NSInteger kSecUnderTime        = 27;
 static const NSInteger kSecZeppelinLite     = 28;
 static const NSInteger kSecCleanHomeScreen  = 29;
 static const NSInteger kSecRealCC           = 30;
-static const NSInteger kSecHideLabels       = 31;
-static const NSInteger kSecFakeClockUp      = 32;
-static const NSInteger kSecPancake          = 33;
-static const NSInteger kSecCylinderLite     = 34;
-static const NSInteger kSecTweakLoader      = 35;
-static const NSInteger kSecQuickLoader      = 36;
-static const NSInteger kSecRepoTweaks       = 37;
+static const NSInteger kSecCleanCC          = 31;
+static const NSInteger kSecFUGap            = 32;
+static const NSInteger kSecModuleSpacing    = 33;
+static const NSInteger kSecSugarCane        = 34;
+static const NSInteger kSecBetterCCXI       = 35;
+static const NSInteger kSecMagma            = 36;
+static const NSInteger kSecBetterCCIcons    = 37;
+static const NSInteger kSecCCNoPlatterDim   = 38;
+static const NSInteger kSecCCStatus         = 39;
+static const NSInteger kSecHapticCC         = 40;
+static const NSInteger kSecSecureCC         = 41;
+static const NSInteger kSecHideLabels       = 42;
+static const NSInteger kSecFakeClockUp      = 43;
+static const NSInteger kSecPancake          = 44;
+static const NSInteger kSecCylinderLite     = 45;
+static const NSInteger kSecBarmoji          = 46;
+static const NSInteger kSecBlurryBadges     = 47;
+static const NSInteger kSecSnapper          = 48;
+static const NSInteger kSecPullOver         = 49;
+static const NSInteger kSecAlkaline         = 50;
+static const NSInteger kSecTweakLoader      = 51;
+static const NSInteger kSecQuickLoader      = 52;
+static const NSInteger kSecRepoTweaks       = 53;
 
 + (NSArray<Package *> *)allPackages
 {
@@ -449,6 +466,20 @@ static const NSInteger kSecRepoTweaks       = 37;
         fastLockXLite.settingsSection = kSecFastLockXLite;
         fastLockXLite.unstableWarning = @"Beta / unstable: sends private SpringBoard lock-screen and biometric-resource messages. Always On runs SpringBoard timers while the device is locked, so disable it or respring if Face ID feels noisy or unstable.";
 
+        Package *velvet = [[Package alloc] initWithIdentifier:@"com.darksword.velvet"
+                                           name:@"Velvet"
+                               shortDescription:@"Custom compact notification banners"
+                                longDescription:@"Velvet/TinyBanners-style notification styling. Applies custom banner and Notification Center cell backgrounds, borders, corner radius, and text colors through SpringBoard's RemoteCall session.\n\nConfigure the colors and shape in Settings. The live scanner reapplies styles while Cyanide is active."
+                                        version:version
+                                         author:@"zeroxjf"
+                                       category:@"SpringBoard"
+                                     symbolName:@"rectangle.3.group.fill"
+                                           kind:PackageInstallKindToggle
+                                     enabledKey:kSettingsVelvetEnabled
+                                          isNew:YES];
+        velvet.settingsSection = kSecVelvet;
+        velvet.unstableWarning = @"Beta: live notification styling depends on SpringBoard view hierarchy names and may need reapply after respring or OS updates.";
+
         Package *cleanNC = [[Package alloc] initWithIdentifier:@"com.darksword.cleannc"
                                            name:@"CleanNC"
                                shortDescription:@"Hide Notification Center clutter"
@@ -514,6 +545,149 @@ static const NSInteger kSecRepoTweaks       = 37;
                                           isNew:NO];
         realCC.settingsSection = kSecRealCC;
 
+        Package *cleanCC = [[Package alloc] initWithIdentifier:@"com.darksword.cleancc"
+                                           name:@"CleanCC"
+                               shortDescription:@"Cleaner Control Center material"
+                                longDescription:@"First-pass CleanCC/Glacier-style port. Adjusts visible Control Center material alpha and background tint while Cyanide is active."
+                                        version:version
+                                         author:@"zeroxjf"
+                                       category:@"Control Center"
+                                     symbolName:@"square.stack.3d.down.right.fill"
+                                           kind:PackageInstallKindToggle
+                                     enabledKey:kSettingsCleanCCEnabled
+                                          isNew:YES];
+        cleanCC.settingsSection = kSecCleanCC;
+
+        Package *fuGap = [[Package alloc] initWithIdentifier:@"com.darksword.fugap"
+                                           name:@"FUGap"
+                               shortDescription:@"Reduce Control Center top gap"
+                                longDescription:@"First-pass FUGap-style port. Applies an upward transform to visible Control Center containers to reduce the top presentation gap."
+                                        version:version
+                                         author:@"zeroxjf"
+                                       category:@"Control Center"
+                                     symbolName:@"arrow.up.to.line.compact"
+                                           kind:PackageInstallKindToggle
+                                     enabledKey:kSettingsFUGapEnabled
+                                          isNew:YES];
+        fuGap.settingsSection = kSecFUGap;
+
+        Package *moduleSpacing = [[Package alloc] initWithIdentifier:@"com.darksword.modulespacing"
+                                           name:@"ModuleSpacing"
+                               shortDescription:@"Compact Control Center modules"
+                                longDescription:@"First-pass ModuleSpacing port. Applies a compact styling pass to visible Control Center module layers."
+                                        version:version
+                                         author:@"zeroxjf"
+                                       category:@"Control Center"
+                                     symbolName:@"rectangle.grid.2x2"
+                                           kind:PackageInstallKindToggle
+                                     enabledKey:kSettingsModuleSpacingEnabled
+                                          isNew:YES];
+        moduleSpacing.settingsSection = kSecModuleSpacing;
+
+        Package *sugarCane = [[Package alloc] initWithIdentifier:@"com.darksword.sugarcane"
+                                           name:@"SugarCane"
+                               shortDescription:@"Brightness and volume percentages"
+                                longDescription:@"First-pass SugarCane-style port. Adds a lightweight numeric percentage overlay for Control Center brightness and volume style modules."
+                                        version:version
+                                         author:@"zeroxjf"
+                                       category:@"Control Center"
+                                     symbolName:@"percent"
+                                           kind:PackageInstallKindToggle
+                                     enabledKey:kSettingsSugarCaneEnabled
+                                          isNew:YES];
+        sugarCane.settingsSection = kSecSugarCane;
+
+        Package *betterCCXI = [[Package alloc] initWithIdentifier:@"com.darksword.betterccxi"
+                                           name:@"BetterCCXI"
+                               shortDescription:@"Larger Control Center module emphasis"
+                                longDescription:@"First-pass BetterCCXI/MissionControl-style port. Applies a visible layout emphasis pass for Control Center modules while Cyanide is active."
+                                        version:version
+                                         author:@"zeroxjf"
+                                       category:@"Control Center"
+                                     symbolName:@"rectangle.grid.3x2.fill"
+                                           kind:PackageInstallKindToggle
+                                     enabledKey:kSettingsBetterCCXIEnabled
+                                          isNew:YES];
+        betterCCXI.settingsSection = kSecBetterCCXI;
+
+        Package *magma = [[Package alloc] initWithIdentifier:@"com.darksword.magma"
+                                           name:@"Magma"
+                               shortDescription:@"Tint Control Center glyphs"
+                                longDescription:@"First-pass Magma/Rainbow-style port. Tints visible Control Center glyphs and labels with a warm active color."
+                                        version:version
+                                         author:@"zeroxjf"
+                                       category:@"Control Center"
+                                     symbolName:@"flame.fill"
+                                           kind:PackageInstallKindToggle
+                                     enabledKey:kSettingsMagmaEnabled
+                                          isNew:YES];
+        magma.settingsSection = kSecMagma;
+
+        Package *betterCCIcons = [[Package alloc] initWithIdentifier:@"com.darksword.betterccicons"
+                                           name:@"BetterCCIcons"
+                               shortDescription:@"Round Control Center module icons"
+                                longDescription:@"First-pass BetterCCIcons/Polus-style port. Applies rounded corner styling to visible Control Center module and icon layers."
+                                        version:version
+                                         author:@"zeroxjf"
+                                       category:@"Control Center"
+                                     symbolName:@"circle.grid.2x2.fill"
+                                           kind:PackageInstallKindToggle
+                                     enabledKey:kSettingsBetterCCIconsEnabled
+                                          isNew:YES];
+        betterCCIcons.settingsSection = kSecBetterCCIcons;
+
+        Package *ccNoPlatterDim = [[Package alloc] initWithIdentifier:@"com.darksword.ccnoplatterdim"
+                                           name:@"CCNoPlatterDim"
+                               shortDescription:@"Keep expanded Control Center bright"
+                                longDescription:@"First-pass CCNoPlatterDim port. Reduces visible Control Center dimming so expanded modules keep the background clearer."
+                                        version:version
+                                         author:@"zeroxjf"
+                                       category:@"Control Center"
+                                     symbolName:@"sun.max.fill"
+                                           kind:PackageInstallKindToggle
+                                     enabledKey:kSettingsCCNoPlatterDimEnabled
+                                          isNew:YES];
+        ccNoPlatterDim.settingsSection = kSecCCNoPlatterDim;
+
+        Package *ccStatus = [[Package alloc] initWithIdentifier:@"com.darksword.ccstatus"
+                                           name:@"CCStatus"
+                               shortDescription:@"Control Center status header"
+                                longDescription:@"First-pass CCStatus port. Adds a lightweight status text overlay near the Control Center header while Cyanide is active."
+                                        version:version
+                                         author:@"zeroxjf"
+                                       category:@"Control Center"
+                                     symbolName:@"info.circle.fill"
+                                           kind:PackageInstallKindToggle
+                                     enabledKey:kSettingsCCStatusEnabled
+                                          isNew:YES];
+        ccStatus.settingsSection = kSecCCStatus;
+
+        Package *hapticCC = [[Package alloc] initWithIdentifier:@"com.darksword.hapticcc"
+                                           name:@"HapticCC"
+                               shortDescription:@"Control Center haptic feedback"
+                                longDescription:@"First-pass HapticCC port. Primes native haptic feedback for Control Center interactions during the active Cyanide session."
+                                        version:version
+                                         author:@"zeroxjf"
+                                       category:@"Control Center"
+                                     symbolName:@"waveform.path"
+                                           kind:PackageInstallKindToggle
+                                     enabledKey:kSettingsHapticCCEnabled
+                                          isNew:YES];
+        hapticCC.settingsSection = kSecHapticCC;
+
+        Package *secureCC = [[Package alloc] initWithIdentifier:@"com.darksword.securecc"
+                                           name:@"SecureCC"
+                               shortDescription:@"Control Center lockscreen guard"
+                                longDescription:@"First-pass SecureCC/CCDelay port. Adds an active-session SecureCC indicator as groundwork for locked-screen Control Center protections."
+                                        version:version
+                                         author:@"zeroxjf"
+                                       category:@"Control Center"
+                                     symbolName:@"lock.shield.fill"
+                                           kind:PackageInstallKindToggle
+                                     enabledKey:kSettingsSecureCCEnabled
+                                          isNew:YES];
+        secureCC.settingsSection = kSecSecureCC;
+
         Package *hideLabels = [[Package alloc] initWithIdentifier:@"com.darksword.hidellabels"
                                            name:@"HideLabels"
                                shortDescription:@"Hide all icon labels on the home screen"
@@ -565,6 +739,74 @@ static const NSInteger kSecRepoTweaks       = 37;
                                      enabledKey:kSettingsCylinderLiteEnabled
                                           isNew:NO];
         cylinderLite.settingsSection = kSecCylinderLite;
+
+        Package *barmoji = [[Package alloc] initWithIdentifier:@"com.darksword.barmoji"
+                                           name:@"Barmoji"
+                               shortDescription:@"Emoji strip overlay"
+                                longDescription:@"First-pass Barmoji port. Adds a lightweight most-used emoji strip overlay near the bottom of SpringBoard while Cyanide is active.\n\nThis version is a SpringBoard overlay shell; deeper keyboard-host integration will come later."
+                                        version:version
+                                         author:@"zeroxjf"
+                                       category:@"SpringBoard"
+                                     symbolName:@"face.smiling.fill"
+                                           kind:PackageInstallKindToggle
+                                     enabledKey:kSettingsBarmojiEnabled
+                                          isNew:YES];
+        barmoji.settingsSection = kSecBarmoji;
+        barmoji.unstableWarning = @"Beta: overlay-only first pass. It does not yet inject into every app keyboard host.";
+
+        Package *blurryBadges = [[Package alloc] initWithIdentifier:@"com.darksword.blurrybadges"
+                                           name:@"BlurryBadges"
+                               shortDescription:@"Colorized notification badges"
+                                longDescription:@"First-pass BlurryBadges port. Tints visible SpringBoard badge views for a softer colorized look.\n\nDominant app-icon color extraction is planned; this version applies a stable badge tint pass."
+                                        version:version
+                                         author:@"zeroxjf"
+                                       category:@"Home Screen"
+                                     symbolName:@"app.badge.fill"
+                                           kind:PackageInstallKindToggle
+                                     enabledKey:kSettingsBlurryBadgesEnabled
+                                          isNew:YES];
+        blurryBadges.settingsSection = kSecBlurryBadges;
+
+        Package *snapper = [[Package alloc] initWithIdentifier:@"com.darksword.snapper"
+                                           name:@"Snapper"
+                               shortDescription:@"Crop frame overlay"
+                                longDescription:@"First-pass Snapper-style overlay. Shows a crop frame on SpringBoard while Cyanide is active.\n\nActual screenshot capture, pinning, and drag handles are planned next."
+                                        version:version
+                                         author:@"zeroxjf"
+                                       category:@"SpringBoard"
+                                     symbolName:@"crop"
+                                           kind:PackageInstallKindToggle
+                                     enabledKey:kSettingsSnapperEnabled
+                                          isNew:YES];
+        snapper.settingsSection = kSecSnapper;
+        snapper.unstableWarning = @"Prototype: frame overlay only. Capture/pin workflow is not implemented yet.";
+
+        Package *pullOver = [[Package alloc] initWithIdentifier:@"com.darksword.pullover"
+                                           name:@"PullOver"
+                               shortDescription:@"Pinned slide-over tray"
+                                longDescription:@"First-pass PullOver Pro-style tray. Adds a pinned slide-over shell on SpringBoard while Cyanide is active.\n\nApp/widget hosting is planned; this version establishes the stable tray surface."
+                                        version:version
+                                         author:@"zeroxjf"
+                                       category:@"SpringBoard"
+                                     symbolName:@"sidebar.right"
+                                           kind:PackageInstallKindToggle
+                                     enabledKey:kSettingsPullOverEnabled
+                                          isNew:YES];
+        pullOver.settingsSection = kSecPullOver;
+        pullOver.unstableWarning = @"Prototype: tray shell only. App/widget hosting is not implemented yet.";
+
+        Package *alkaline = [[Package alloc] initWithIdentifier:@"com.darksword.alkaline"
+                                           name:@"Alkaline"
+                               shortDescription:@"Battery tint theme"
+                                longDescription:@"First-pass Alkaline/Lithium Ion-style battery theming. Tints visible battery views in SpringBoard while Cyanide is active.\n\nCustom image themes are planned; this version starts with a stable color pass."
+                                        version:version
+                                         author:@"zeroxjf"
+                                       category:@"Status Bar"
+                                     symbolName:@"battery.100.bolt"
+                                           kind:PackageInstallKindToggle
+                                     enabledKey:kSettingsAlkalineEnabled
+                                          isNew:YES];
+        alkaline.settingsSection = kSecAlkaline;
 
         Package *tweakLoader = [[Package alloc] initWithIdentifier:@"com.darksword.tweakloader"
                                            name:@"TweakLoader"
@@ -737,15 +979,32 @@ static const NSInteger kSecRepoTweaks       = 37;
             ipaDecryptor,
             stageStrip,
             fastLockXLite,
+            velvet,
             cleanNC,
             underTime,
             zeppelinLite,
             cleanHomeScreen,
             realCC,
+            cleanCC,
+            fuGap,
+            moduleSpacing,
+            sugarCane,
+            betterCCXI,
+            magma,
+            betterCCIcons,
+            ccNoPlatterDim,
+            ccStatus,
+            hapticCC,
+            secureCC,
             hideLabels,
             fakeClockUp,
             pancake,
             cylinderLite,
+            barmoji,
+            blurryBadges,
+            snapper,
+            pullOver,
+            alkaline,
             tweakLoader,
 #endif
             locationSim,

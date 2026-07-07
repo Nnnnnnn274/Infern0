@@ -999,11 +999,27 @@ NSString * const kSettingsCleanHomeScreenHideLabels = @"CleanHomeScreenHideLabel
 NSString * const kSettingsRealCCEnabled = @"RealCCEnabled";
 NSString * const kSettingsRealCCDisableWiFi = @"RealCCDisableWiFi";
 NSString * const kSettingsRealCCDisableBT = @"RealCCDisableBT";
+NSString * const kSettingsCleanCCEnabled = @"CleanCCEnabled";
+NSString * const kSettingsFUGapEnabled = @"FUGapEnabled";
+NSString * const kSettingsModuleSpacingEnabled = @"ModuleSpacingEnabled";
+NSString * const kSettingsSugarCaneEnabled = @"SugarCaneEnabled";
+NSString * const kSettingsBetterCCXIEnabled = @"BetterCCXIEnabled";
+NSString * const kSettingsMagmaEnabled = @"MagmaEnabled";
+NSString * const kSettingsBetterCCIconsEnabled = @"BetterCCIconsEnabled";
+NSString * const kSettingsCCNoPlatterDimEnabled = @"CCNoPlatterDimEnabled";
+NSString * const kSettingsCCStatusEnabled = @"CCStatusEnabled";
+NSString * const kSettingsHapticCCEnabled = @"HapticCCEnabled";
+NSString * const kSettingsSecureCCEnabled = @"SecureCCEnabled";
 NSString * const kSettingsHideLabelsEnabled = @"HideLabelsEnabled";
 NSString * const kSettingsFakeClockUpEnabled = @"FakeClockUpEnabled";
 NSString * const kSettingsFakeClockUpSpeed = @"FakeClockUpSpeed";
 NSString * const kSettingsPancakeEnabled = @"PancakeEnabled";
 NSString * const kSettingsCylinderLiteEnabled = @"CylinderLiteEnabled";
+NSString * const kSettingsBarmojiEnabled = @"BarmojiEnabled";
+NSString * const kSettingsBlurryBadgesEnabled = @"BlurryBadgesEnabled";
+NSString * const kSettingsSnapperEnabled = @"SnapperEnabled";
+NSString * const kSettingsPullOverEnabled = @"PullOverEnabled";
+NSString * const kSettingsAlkalineEnabled = @"AlkalineEnabled";
 NSString * const kSettingsTweakLoaderEnabled = @"TweakLoaderEnabled";
 
 static NSString * const kSettingsFastLockXLiteRetryInterval = @"FastLockXLiteRetryInterval";
@@ -1397,6 +1413,72 @@ static bool settings_stop_realcc_registered(BOOL springboardWillDie)
     return realcc_restore();
 }
 
+static bool settings_stop_cleancc_registered(BOOL springboardWillDie)
+{
+    (void)springboardWillDie;
+    return cleancc_stop_in_session();
+}
+
+static bool settings_stop_fugap_registered(BOOL springboardWillDie)
+{
+    (void)springboardWillDie;
+    return fugap_stop_in_session();
+}
+
+static bool settings_stop_modulespacing_registered(BOOL springboardWillDie)
+{
+    (void)springboardWillDie;
+    return modulespacing_stop_in_session();
+}
+
+static bool settings_stop_sugarcane_registered(BOOL springboardWillDie)
+{
+    (void)springboardWillDie;
+    return sugarcane_stop_in_session();
+}
+
+static bool settings_stop_betterccxi_registered(BOOL springboardWillDie)
+{
+    (void)springboardWillDie;
+    return betterccxi_stop_in_session();
+}
+
+static bool settings_stop_magma_registered(BOOL springboardWillDie)
+{
+    (void)springboardWillDie;
+    return magma_stop_in_session();
+}
+
+static bool settings_stop_betterccicons_registered(BOOL springboardWillDie)
+{
+    (void)springboardWillDie;
+    return betterccicons_stop_in_session();
+}
+
+static bool settings_stop_ccnoplatterdim_registered(BOOL springboardWillDie)
+{
+    (void)springboardWillDie;
+    return ccnoplatterdim_stop_in_session();
+}
+
+static bool settings_stop_ccstatus_registered(BOOL springboardWillDie)
+{
+    (void)springboardWillDie;
+    return ccstatus_stop_in_session();
+}
+
+static bool settings_stop_hapticcc_registered(BOOL springboardWillDie)
+{
+    (void)springboardWillDie;
+    return hapticcc_stop_in_session();
+}
+
+static bool settings_stop_securecc_registered(BOOL springboardWillDie)
+{
+    (void)springboardWillDie;
+    return securecc_stop_in_session();
+}
+
 static bool settings_stop_hidellabels_registered(BOOL springboardWillDie)
 {
     (void)springboardWillDie;
@@ -1419,6 +1501,36 @@ static bool settings_stop_cylinderlite_registered(BOOL springboardWillDie)
 {
     (void)springboardWillDie;
     return cylinderlite_stop_in_session();
+}
+
+static bool settings_stop_barmoji_registered(BOOL springboardWillDie)
+{
+    (void)springboardWillDie;
+    return barmoji_stop_in_session();
+}
+
+static bool settings_stop_blurrybadges_registered(BOOL springboardWillDie)
+{
+    (void)springboardWillDie;
+    return blurrybadges_stop_in_session();
+}
+
+static bool settings_stop_snapper_registered(BOOL springboardWillDie)
+{
+    (void)springboardWillDie;
+    return snapper_stop_in_session();
+}
+
+static bool settings_stop_pullover_registered(BOOL springboardWillDie)
+{
+    (void)springboardWillDie;
+    return pullover_stop_in_session();
+}
+
+static bool settings_stop_alkaline_registered(BOOL springboardWillDie)
+{
+    (void)springboardWillDie;
+    return alkaline_stop_in_session();
 }
 
 static bool settings_stop_tweakloader_registered(BOOL springboardWillDie)
@@ -1471,10 +1583,26 @@ static void settings_each_springboard_cleanup_entry(void (^block)(const Settings
         { kSettingsZeppelinLiteEnabled, "Zeppelin Lite", NULL, settings_stop_zeppelinlite_registered, zeppelinlite_forget_remote_state, NULL, YES, YES },
         { kSettingsCleanHomeScreenEnabled, "CleanHomeScreen", NULL, settings_stop_cleanhomescreen_registered, cleanhomescreen_forget_remote_state, NULL, YES, YES },
         { kSettingsRealCCEnabled, "RealCC", NULL, settings_stop_realcc_registered, NULL, NULL, YES, YES },
+        { kSettingsCleanCCEnabled, "CleanCC", NULL, settings_stop_cleancc_registered, cleancc_forget_remote_state, NULL, YES, YES },
+        { kSettingsFUGapEnabled, "FUGap", NULL, settings_stop_fugap_registered, fugap_forget_remote_state, NULL, YES, YES },
+        { kSettingsModuleSpacingEnabled, "ModuleSpacing", NULL, settings_stop_modulespacing_registered, modulespacing_forget_remote_state, NULL, YES, YES },
+        { kSettingsSugarCaneEnabled, "SugarCane", NULL, settings_stop_sugarcane_registered, sugarcane_forget_remote_state, NULL, YES, YES },
+        { kSettingsBetterCCXIEnabled, "BetterCCXI", NULL, settings_stop_betterccxi_registered, betterccxi_forget_remote_state, NULL, YES, YES },
+        { kSettingsMagmaEnabled, "Magma", NULL, settings_stop_magma_registered, magma_forget_remote_state, NULL, YES, YES },
+        { kSettingsBetterCCIconsEnabled, "BetterCCIcons", NULL, settings_stop_betterccicons_registered, betterccicons_forget_remote_state, NULL, YES, YES },
+        { kSettingsCCNoPlatterDimEnabled, "CCNoPlatterDim", NULL, settings_stop_ccnoplatterdim_registered, ccnoplatterdim_forget_remote_state, NULL, YES, YES },
+        { kSettingsCCStatusEnabled, "CCStatus", NULL, settings_stop_ccstatus_registered, ccstatus_forget_remote_state, NULL, YES, YES },
+        { kSettingsHapticCCEnabled, "HapticCC", NULL, settings_stop_hapticcc_registered, hapticcc_forget_remote_state, NULL, YES, YES },
+        { kSettingsSecureCCEnabled, "SecureCC", NULL, settings_stop_securecc_registered, securecc_forget_remote_state, NULL, YES, YES },
         { kSettingsHideLabelsEnabled, "HideLabels", NULL, settings_stop_hidellabels_registered, hidellabels_forget_remote_state, NULL, YES, YES },
         { kSettingsFakeClockUpEnabled, "FakeClockUp", NULL, settings_stop_fakeclockup_registered, fakeclockup_forget_remote_state, NULL, YES, YES },
         { kSettingsPancakeEnabled, "Pancake", NULL, settings_stop_pancake_registered, pancake_forget_remote_state, NULL, YES, YES },
         { kSettingsCylinderLiteEnabled, "Cylinder Lite", NULL, settings_stop_cylinderlite_registered, cylinderlite_forget_remote_state, NULL, YES, YES },
+        { kSettingsBarmojiEnabled, "Barmoji", NULL, settings_stop_barmoji_registered, barmoji_forget_remote_state, NULL, YES, YES },
+        { kSettingsBlurryBadgesEnabled, "BlurryBadges", NULL, settings_stop_blurrybadges_registered, blurrybadges_forget_remote_state, NULL, YES, YES },
+        { kSettingsSnapperEnabled, "Snapper", NULL, settings_stop_snapper_registered, snapper_forget_remote_state, NULL, YES, YES },
+        { kSettingsPullOverEnabled, "PullOver", NULL, settings_stop_pullover_registered, pullover_forget_remote_state, NULL, YES, YES },
+        { kSettingsAlkalineEnabled, "Alkaline", NULL, settings_stop_alkaline_registered, alkaline_forget_remote_state, NULL, YES, YES },
         { kSettingsTweakLoaderEnabled, "TweakLoader", NULL, settings_stop_tweakloader_registered, tweakloader_forget_remote_state, NULL, YES, YES },
         { kSettingsQuickLoaderEnabled, "QuickLoader", NULL, settings_stop_quickloader_registered, NULL, NULL, YES, YES },
         { kSettingsRepoTweaksEnabled, "RepoTweaks", NULL, settings_stop_repotweaks_registered, NULL, NULL, YES, YES },
@@ -1936,10 +2064,26 @@ static BOOL settings_undertime_install_allowed(void) { return cyanide_experiment
 static BOOL settings_zeppelinlite_install_allowed(void) { return cyanide_experimental_tweaks_available(); }
 static BOOL settings_cleanhomescreen_install_allowed(void) { return cyanide_experimental_tweaks_available(); }
 static BOOL settings_realcc_install_allowed(void) { return cyanide_experimental_tweaks_available(); }
+static BOOL settings_cleancc_install_allowed(void) { return cyanide_experimental_tweaks_available(); }
+static BOOL settings_fugap_install_allowed(void) { return cyanide_experimental_tweaks_available(); }
+static BOOL settings_modulespacing_install_allowed(void) { return cyanide_experimental_tweaks_available(); }
+static BOOL settings_sugarcane_install_allowed(void) { return cyanide_experimental_tweaks_available(); }
+static BOOL settings_betterccxi_install_allowed(void) { return cyanide_experimental_tweaks_available(); }
+static BOOL settings_magma_install_allowed(void) { return cyanide_experimental_tweaks_available(); }
+static BOOL settings_betterccicons_install_allowed(void) { return cyanide_experimental_tweaks_available(); }
+static BOOL settings_ccnoplatterdim_install_allowed(void) { return cyanide_experimental_tweaks_available(); }
+static BOOL settings_ccstatus_install_allowed(void) { return cyanide_experimental_tweaks_available(); }
+static BOOL settings_hapticcc_install_allowed(void) { return cyanide_experimental_tweaks_available(); }
+static BOOL settings_securecc_install_allowed(void) { return cyanide_experimental_tweaks_available(); }
 static BOOL settings_hidellabels_install_allowed(void) { return cyanide_experimental_tweaks_available(); }
 static BOOL settings_fakeclockup_install_allowed(void) { return cyanide_experimental_tweaks_available(); }
 static BOOL settings_pancake_install_allowed(void) { return cyanide_experimental_tweaks_available(); }
 static BOOL settings_cylinderlite_install_allowed(void) { return cyanide_experimental_tweaks_available(); }
+static BOOL settings_barmoji_install_allowed(void) { return cyanide_experimental_tweaks_available(); }
+static BOOL settings_blurrybadges_install_allowed(void) { return cyanide_experimental_tweaks_available(); }
+static BOOL settings_snapper_install_allowed(void) { return cyanide_experimental_tweaks_available(); }
+static BOOL settings_pullover_install_allowed(void) { return cyanide_experimental_tweaks_available(); }
+static BOOL settings_alkaline_install_allowed(void) { return cyanide_experimental_tweaks_available(); }
 static BOOL settings_tweakloader_install_allowed(void) { return cyanide_experimental_tweaks_available(); }
 
 static NSString *settings_legacy_access_label(void)
@@ -6101,6 +6245,26 @@ static BOOL settings_key_is_cylinderlite(NSString *key)
     return [key isEqualToString:kSettingsCylinderLiteEnabled];
 }
 
+static BOOL settings_key_is_split_experimental_tweak(NSString *key)
+{
+    return [key isEqualToString:kSettingsCleanCCEnabled] ||
+           [key isEqualToString:kSettingsFUGapEnabled] ||
+           [key isEqualToString:kSettingsModuleSpacingEnabled] ||
+           [key isEqualToString:kSettingsSugarCaneEnabled] ||
+           [key isEqualToString:kSettingsBetterCCXIEnabled] ||
+           [key isEqualToString:kSettingsMagmaEnabled] ||
+           [key isEqualToString:kSettingsBetterCCIconsEnabled] ||
+           [key isEqualToString:kSettingsCCNoPlatterDimEnabled] ||
+           [key isEqualToString:kSettingsCCStatusEnabled] ||
+           [key isEqualToString:kSettingsHapticCCEnabled] ||
+           [key isEqualToString:kSettingsSecureCCEnabled] ||
+           [key isEqualToString:kSettingsBarmojiEnabled] ||
+           [key isEqualToString:kSettingsBlurryBadgesEnabled] ||
+           [key isEqualToString:kSettingsSnapperEnabled] ||
+           [key isEqualToString:kSettingsPullOverEnabled] ||
+           [key isEqualToString:kSettingsAlkalineEnabled];
+}
+
 static BOOL settings_key_is_tweakloader(NSString *key)
 {
     return [key isEqualToString:kSettingsTweakLoaderEnabled];
@@ -7115,11 +7279,77 @@ static void settings_schedule_live_apply_for_key(NSString *key)
                         }
                     });
                 }
-            }
-            return;
         }
+        return;
+    }
 
-        if (settings_key_is_tweakloader(key)) {
+    if (settings_key_is_split_experimental_tweak(key)) {
+        if (g_springboard_rc_ready) {
+            dispatch_async(dispatch_get_global_queue(0, 0), ^{
+                @synchronized (settings_rc_lock()) {
+                    if (settings_cleanup_in_progress() || !g_springboard_rc_ready) return;
+                    bool ok = true;
+                    if ([key isEqualToString:kSettingsCleanCCEnabled]) {
+                        ok = [d boolForKey:kSettingsCleanCCEnabled] ? cleancc_apply_in_session() : cleancc_stop_in_session();
+                        settings_mark_tweak_applied(kSettingsCleanCCEnabled, ok && [d boolForKey:kSettingsCleanCCEnabled]);
+                    } else if ([key isEqualToString:kSettingsFUGapEnabled]) {
+                        ok = [d boolForKey:kSettingsFUGapEnabled] ? fugap_apply_in_session() : fugap_stop_in_session();
+                        settings_mark_tweak_applied(kSettingsFUGapEnabled, ok && [d boolForKey:kSettingsFUGapEnabled]);
+                    } else if ([key isEqualToString:kSettingsModuleSpacingEnabled]) {
+                        ok = [d boolForKey:kSettingsModuleSpacingEnabled] ? modulespacing_apply_in_session() : modulespacing_stop_in_session();
+                        settings_mark_tweak_applied(kSettingsModuleSpacingEnabled, ok && [d boolForKey:kSettingsModuleSpacingEnabled]);
+                    } else if ([key isEqualToString:kSettingsSugarCaneEnabled]) {
+                        ok = [d boolForKey:kSettingsSugarCaneEnabled] ? sugarcane_apply_in_session() : sugarcane_stop_in_session();
+                        settings_mark_tweak_applied(kSettingsSugarCaneEnabled, ok && [d boolForKey:kSettingsSugarCaneEnabled]);
+                    } else if ([key isEqualToString:kSettingsBetterCCXIEnabled]) {
+                        ok = [d boolForKey:kSettingsBetterCCXIEnabled] ? betterccxi_apply_in_session() : betterccxi_stop_in_session();
+                        settings_mark_tweak_applied(kSettingsBetterCCXIEnabled, ok && [d boolForKey:kSettingsBetterCCXIEnabled]);
+                    } else if ([key isEqualToString:kSettingsMagmaEnabled]) {
+                        ok = [d boolForKey:kSettingsMagmaEnabled] ? magma_apply_in_session() : magma_stop_in_session();
+                        settings_mark_tweak_applied(kSettingsMagmaEnabled, ok && [d boolForKey:kSettingsMagmaEnabled]);
+                    } else if ([key isEqualToString:kSettingsBetterCCIconsEnabled]) {
+                        ok = [d boolForKey:kSettingsBetterCCIconsEnabled] ? betterccicons_apply_in_session() : betterccicons_stop_in_session();
+                        settings_mark_tweak_applied(kSettingsBetterCCIconsEnabled, ok && [d boolForKey:kSettingsBetterCCIconsEnabled]);
+                    } else if ([key isEqualToString:kSettingsCCNoPlatterDimEnabled]) {
+                        ok = [d boolForKey:kSettingsCCNoPlatterDimEnabled] ? ccnoplatterdim_apply_in_session() : ccnoplatterdim_stop_in_session();
+                        settings_mark_tweak_applied(kSettingsCCNoPlatterDimEnabled, ok && [d boolForKey:kSettingsCCNoPlatterDimEnabled]);
+                    } else if ([key isEqualToString:kSettingsCCStatusEnabled]) {
+                        ok = [d boolForKey:kSettingsCCStatusEnabled] ? ccstatus_apply_in_session() : ccstatus_stop_in_session();
+                        settings_mark_tweak_applied(kSettingsCCStatusEnabled, ok && [d boolForKey:kSettingsCCStatusEnabled]);
+                    } else if ([key isEqualToString:kSettingsHapticCCEnabled]) {
+                        ok = [d boolForKey:kSettingsHapticCCEnabled] ? hapticcc_apply_in_session() : hapticcc_stop_in_session();
+                        settings_mark_tweak_applied(kSettingsHapticCCEnabled, ok && [d boolForKey:kSettingsHapticCCEnabled]);
+                    } else if ([key isEqualToString:kSettingsSecureCCEnabled]) {
+                        ok = [d boolForKey:kSettingsSecureCCEnabled] ? securecc_apply_in_session() : securecc_stop_in_session();
+                        settings_mark_tweak_applied(kSettingsSecureCCEnabled, ok && [d boolForKey:kSettingsSecureCCEnabled]);
+                    } else if ([key isEqualToString:kSettingsBarmojiEnabled]) {
+                        ok = [d boolForKey:kSettingsBarmojiEnabled] ? barmoji_apply_in_session() : barmoji_stop_in_session();
+                        settings_mark_tweak_applied(kSettingsBarmojiEnabled, ok && [d boolForKey:kSettingsBarmojiEnabled]);
+                    } else if ([key isEqualToString:kSettingsBlurryBadgesEnabled]) {
+                        ok = [d boolForKey:kSettingsBlurryBadgesEnabled] ? blurrybadges_apply_in_session() : blurrybadges_stop_in_session();
+                        settings_mark_tweak_applied(kSettingsBlurryBadgesEnabled, ok && [d boolForKey:kSettingsBlurryBadgesEnabled]);
+                    } else if ([key isEqualToString:kSettingsSnapperEnabled]) {
+                        ok = [d boolForKey:kSettingsSnapperEnabled] ? snapper_apply_in_session() : snapper_stop_in_session();
+                        settings_mark_tweak_applied(kSettingsSnapperEnabled, ok && [d boolForKey:kSettingsSnapperEnabled]);
+                    } else if ([key isEqualToString:kSettingsPullOverEnabled]) {
+                        ok = [d boolForKey:kSettingsPullOverEnabled] ? pullover_apply_in_session() : pullover_stop_in_session();
+                        settings_mark_tweak_applied(kSettingsPullOverEnabled, ok && [d boolForKey:kSettingsPullOverEnabled]);
+                    } else if ([key isEqualToString:kSettingsAlkalineEnabled]) {
+                        ok = [d boolForKey:kSettingsAlkalineEnabled] ? alkaline_apply_in_session() : alkaline_stop_in_session();
+                        settings_mark_tweak_applied(kSettingsAlkalineEnabled, ok && [d boolForKey:kSettingsAlkalineEnabled]);
+                    }
+                    printf("[SETTINGS] live split tweak %s result=%d\n", key.UTF8String, ok);
+                }
+                settings_notify_package_queue_changed_async();
+            });
+        } else {
+            settings_mark_tweak_applied(key, NO);
+            settings_notify_package_queue_changed_async();
+        }
+        return;
+    }
+
+    if (settings_key_is_tweakloader(key)) {
             if (!settings_tweakloader_install_allowed()) {
                 if ([d boolForKey:kSettingsTweakLoaderEnabled]) {
                     [d setBool:NO forKey:kSettingsTweakLoaderEnabled];
@@ -7664,11 +7894,27 @@ void settings_register_defaults(void)
         kSettingsRealCCEnabled: @NO,
         kSettingsRealCCDisableWiFi: @YES,
         kSettingsRealCCDisableBT: @YES,
+        kSettingsCleanCCEnabled: @NO,
+        kSettingsFUGapEnabled: @NO,
+        kSettingsModuleSpacingEnabled: @NO,
+        kSettingsSugarCaneEnabled: @NO,
+        kSettingsBetterCCXIEnabled: @NO,
+        kSettingsMagmaEnabled: @NO,
+        kSettingsBetterCCIconsEnabled: @NO,
+        kSettingsCCNoPlatterDimEnabled: @NO,
+        kSettingsCCStatusEnabled: @NO,
+        kSettingsHapticCCEnabled: @NO,
+        kSettingsSecureCCEnabled: @NO,
         kSettingsHideLabelsEnabled: @NO,
         kSettingsFakeClockUpEnabled: @NO,
         kSettingsFakeClockUpSpeed: @2.0,
         kSettingsPancakeEnabled: @NO,
         kSettingsCylinderLiteEnabled: @NO,
+        kSettingsBarmojiEnabled: @NO,
+        kSettingsBlurryBadgesEnabled: @NO,
+        kSettingsSnapperEnabled: @NO,
+        kSettingsPullOverEnabled: @NO,
+        kSettingsAlkalineEnabled: @NO,
         kSettingsTweakLoaderEnabled: @NO,
 
         kSettingsGravityLiteEnabled: @NO,
@@ -7736,10 +7982,26 @@ void settings_register_defaults(void)
             kSettingsZeppelinLiteEnabled,
             kSettingsCleanHomeScreenEnabled,
             kSettingsRealCCEnabled,
+            kSettingsCleanCCEnabled,
+            kSettingsFUGapEnabled,
+            kSettingsModuleSpacingEnabled,
+            kSettingsSugarCaneEnabled,
+            kSettingsBetterCCXIEnabled,
+            kSettingsMagmaEnabled,
+            kSettingsBetterCCIconsEnabled,
+            kSettingsCCNoPlatterDimEnabled,
+            kSettingsCCStatusEnabled,
+            kSettingsHapticCCEnabled,
+            kSettingsSecureCCEnabled,
             kSettingsHideLabelsEnabled,
             kSettingsFakeClockUpEnabled,
             kSettingsPancakeEnabled,
             kSettingsCylinderLiteEnabled,
+            kSettingsBarmojiEnabled,
+            kSettingsBlurryBadgesEnabled,
+            kSettingsSnapperEnabled,
+            kSettingsPullOverEnabled,
+            kSettingsAlkalineEnabled,
             kSettingsTweakLoaderEnabled,
         ];
         for (NSString *key in privateKeys) {
@@ -7843,10 +8105,26 @@ static void settings_run_actions_internal(BOOL pendingOnly)
             BOOL runZeppelinLite = settings_zeppelinlite_install_allowed() && settings_enabled_tweak_should_run(d, kSettingsZeppelinLiteEnabled, springBoardPendingOnly);
             BOOL runCleanHomeScreen = settings_cleanhomescreen_install_allowed() && settings_enabled_tweak_should_run(d, kSettingsCleanHomeScreenEnabled, springBoardPendingOnly);
             BOOL runRealCC = settings_realcc_install_allowed() && settings_enabled_tweak_should_run(d, kSettingsRealCCEnabled, springBoardPendingOnly);
+            BOOL runCleanCC = settings_cleancc_install_allowed() && settings_enabled_tweak_should_run(d, kSettingsCleanCCEnabled, springBoardPendingOnly);
+            BOOL runFUGap = settings_fugap_install_allowed() && settings_enabled_tweak_should_run(d, kSettingsFUGapEnabled, springBoardPendingOnly);
+            BOOL runModuleSpacing = settings_modulespacing_install_allowed() && settings_enabled_tweak_should_run(d, kSettingsModuleSpacingEnabled, springBoardPendingOnly);
+            BOOL runSugarCane = settings_sugarcane_install_allowed() && settings_enabled_tweak_should_run(d, kSettingsSugarCaneEnabled, springBoardPendingOnly);
+            BOOL runBetterCCXI = settings_betterccxi_install_allowed() && settings_enabled_tweak_should_run(d, kSettingsBetterCCXIEnabled, springBoardPendingOnly);
+            BOOL runMagma = settings_magma_install_allowed() && settings_enabled_tweak_should_run(d, kSettingsMagmaEnabled, springBoardPendingOnly);
+            BOOL runBetterCCIcons = settings_betterccicons_install_allowed() && settings_enabled_tweak_should_run(d, kSettingsBetterCCIconsEnabled, springBoardPendingOnly);
+            BOOL runCCNoPlatterDim = settings_ccnoplatterdim_install_allowed() && settings_enabled_tweak_should_run(d, kSettingsCCNoPlatterDimEnabled, springBoardPendingOnly);
+            BOOL runCCStatus = settings_ccstatus_install_allowed() && settings_enabled_tweak_should_run(d, kSettingsCCStatusEnabled, springBoardPendingOnly);
+            BOOL runHapticCC = settings_hapticcc_install_allowed() && settings_enabled_tweak_should_run(d, kSettingsHapticCCEnabled, springBoardPendingOnly);
+            BOOL runSecureCC = settings_securecc_install_allowed() && settings_enabled_tweak_should_run(d, kSettingsSecureCCEnabled, springBoardPendingOnly);
             BOOL runHideLabels = settings_hidellabels_install_allowed() && settings_enabled_tweak_should_run(d, kSettingsHideLabelsEnabled, springBoardPendingOnly);
             BOOL runFakeClockUp = settings_fakeclockup_install_allowed() && settings_enabled_tweak_should_run(d, kSettingsFakeClockUpEnabled, springBoardPendingOnly);
             BOOL runPancake = settings_pancake_install_allowed() && settings_enabled_tweak_should_run(d, kSettingsPancakeEnabled, springBoardPendingOnly);
             BOOL runCylinderLite = settings_cylinderlite_install_allowed() && settings_enabled_tweak_should_run(d, kSettingsCylinderLiteEnabled, springBoardPendingOnly);
+            BOOL runBarmoji = settings_barmoji_install_allowed() && settings_enabled_tweak_should_run(d, kSettingsBarmojiEnabled, springBoardPendingOnly);
+            BOOL runBlurryBadges = settings_blurrybadges_install_allowed() && settings_enabled_tweak_should_run(d, kSettingsBlurryBadgesEnabled, springBoardPendingOnly);
+            BOOL runSnapper = settings_snapper_install_allowed() && settings_enabled_tweak_should_run(d, kSettingsSnapperEnabled, springBoardPendingOnly);
+            BOOL runPullOver = settings_pullover_install_allowed() && settings_enabled_tweak_should_run(d, kSettingsPullOverEnabled, springBoardPendingOnly);
+            BOOL runAlkaline = settings_alkaline_install_allowed() && settings_enabled_tweak_should_run(d, kSettingsAlkalineEnabled, springBoardPendingOnly);
             BOOL runTweakLoader = settings_tweakloader_install_allowed() && settings_enabled_tweak_should_run(d, kSettingsTweakLoaderEnabled, springBoardPendingOnly);
             BOOL runAppSwitcherGrid = settings_enabled_tweak_should_run(d, kSettingsAppSwitcherGridEnabled, springBoardPendingOnly);
             BOOL runThemer = settings_enabled_tweak_should_run(d, kSettingsThemerEnabled, springBoardPendingOnly);
@@ -7863,7 +8141,7 @@ static void settings_run_actions_internal(BOOL pendingOnly)
                 settings_note_themer_stage_conflict(YES);
             }
             BOOL cleanupDisabledSpringBoardTweaks = settings_disabled_applied_springboard_cleanup_needed(d);
-            BOOL needsSpringBoardWork = runSBC || runDarkTweaks || runStatBar || runNSBar || runNiceBarLite || runRSSI || runAxonLite || runGravityLite || runLayoutExtras || runTypeBanner || runNotificationIsland || runVelvet || runCleanNC || runUnderTime || runZeppelinLite || runCleanHomeScreen || runRealCC || runHideLabels || runFakeClockUp || runPancake || runCylinderLite || runTweakLoader || runAppSwitcherGrid || runThemer || runSnowBoardLite || runLiveWP || runStageStrip || runFastLockXLite || runQuickLoader || runRepoTweaks || cleanupDisabledSpringBoardTweaks;
+            BOOL needsSpringBoardWork = runSBC || runDarkTweaks || runStatBar || runNSBar || runNiceBarLite || runRSSI || runAxonLite || runGravityLite || runLayoutExtras || runTypeBanner || runNotificationIsland || runVelvet || runCleanNC || runUnderTime || runZeppelinLite || runCleanHomeScreen || runRealCC || runCleanCC || runFUGap || runModuleSpacing || runSugarCane || runBetterCCXI || runMagma || runBetterCCIcons || runCCNoPlatterDim || runCCStatus || runHapticCC || runSecureCC || runHideLabels || runFakeClockUp || runPancake || runCylinderLite || runBarmoji || runBlurryBadges || runSnapper || runPullOver || runAlkaline || runTweakLoader || runAppSwitcherGrid || runThemer || runSnowBoardLite || runLiveWP || runStageStrip || runFastLockXLite || runQuickLoader || runRepoTweaks || cleanupDisabledSpringBoardTweaks;
             BOOL runSandboxEscape = [d boolForKey:kSettingsRunSandboxEscape] && (!pendingOnly || needsSpringBoardWork);
             // TypeBanner prewarms its hidden SpringBoard window during Apply
             // and reuses the open SpringBoard session for text-only updates.
@@ -7901,10 +8179,26 @@ static void settings_run_actions_internal(BOOL pendingOnly)
             if (runZeppelinLite) total++;
             if (runCleanHomeScreen) total++;
             if (runRealCC) total++;
+            if (runCleanCC) total++;
+            if (runFUGap) total++;
+            if (runModuleSpacing) total++;
+            if (runSugarCane) total++;
+            if (runBetterCCXI) total++;
+            if (runMagma) total++;
+            if (runBetterCCIcons) total++;
+            if (runCCNoPlatterDim) total++;
+            if (runCCStatus) total++;
+            if (runHapticCC) total++;
+            if (runSecureCC) total++;
             if (runHideLabels) total++;
             if (runFakeClockUp) total++;
             if (runPancake) total++;
             if (runCylinderLite) total++;
+            if (runBarmoji) total++;
+            if (runBlurryBadges) total++;
+            if (runSnapper) total++;
+            if (runPullOver) total++;
+            if (runAlkaline) total++;
             if (runTweakLoader) total++;
             if (runAppSwitcherGrid) total++;
             if (runStageStrip) total++;
@@ -7931,10 +8225,26 @@ static void settings_run_actions_internal(BOOL pendingOnly)
             if (runZeppelinLite) [enabledTweaks addObject:@"zeppelinlite"];
             if (runCleanHomeScreen) [enabledTweaks addObject:@"cleanhomescreen"];
             if (runRealCC) [enabledTweaks addObject:@"realcc"];
+            if (runCleanCC) [enabledTweaks addObject:@"cleancc"];
+            if (runFUGap) [enabledTweaks addObject:@"fugap"];
+            if (runModuleSpacing) [enabledTweaks addObject:@"modulespacing"];
+            if (runSugarCane) [enabledTweaks addObject:@"sugarcane"];
+            if (runBetterCCXI) [enabledTweaks addObject:@"betterccxi"];
+            if (runMagma) [enabledTweaks addObject:@"magma"];
+            if (runBetterCCIcons) [enabledTweaks addObject:@"betterccicons"];
+            if (runCCNoPlatterDim) [enabledTweaks addObject:@"ccnoplatterdim"];
+            if (runCCStatus) [enabledTweaks addObject:@"ccstatus"];
+            if (runHapticCC) [enabledTweaks addObject:@"hapticcc"];
+            if (runSecureCC) [enabledTweaks addObject:@"securecc"];
             if (runHideLabels) [enabledTweaks addObject:@"hidelabels"];
             if (runFakeClockUp) [enabledTweaks addObject:@"fakeclockup"];
             if (runPancake) [enabledTweaks addObject:@"pancake"];
             if (runCylinderLite) [enabledTweaks addObject:@"cylinderlite"];
+            if (runBarmoji) [enabledTweaks addObject:@"barmoji"];
+            if (runBlurryBadges) [enabledTweaks addObject:@"blurrybadges"];
+            if (runSnapper) [enabledTweaks addObject:@"snapper"];
+            if (runPullOver) [enabledTweaks addObject:@"pullover"];
+            if (runAlkaline) [enabledTweaks addObject:@"alkaline"];
             if (runTweakLoader) [enabledTweaks addObject:@"tweakloader"];
             if (runAppSwitcherGrid) [enabledTweaks addObject:@"app-switcher-grid"];
             if (runGravityLite) [enabledTweaks addObject:[NSString stringWithFormat:@"gravity(%ld%%)", (long)[d integerForKey:kSettingsGravityLiteMagnitudePct]]];
@@ -8353,6 +8663,105 @@ static void settings_run_actions_internal(BOOL pendingOnly)
                         cyanide_upload_log_milestone(ok ? @"realcc-applied" : @"realcc-failed");
                     }
 
+                    if (runCleanCC) {
+                        settings_progress(&step, total, "Applying CleanCC");
+                        bool ok = cleancc_apply_in_session();
+                        settings_mark_tweak_applied(kSettingsCleanCCEnabled, ok && [d boolForKey:kSettingsCleanCCEnabled]);
+                        printf("[SETTINGS] CleanCC result=%d\n", ok);
+                        log_user("%s CleanCC %s.\n", ok ? "[OK]" : "[WARN]", ok ? "active" : "did not find CC views yet");
+                        cyanide_upload_log_milestone(ok ? @"cleancc-applied" : @"cleancc-failed");
+                    }
+
+                    if (runFUGap) {
+                        settings_progress(&step, total, "Applying FUGap");
+                        bool ok = fugap_apply_in_session();
+                        settings_mark_tweak_applied(kSettingsFUGapEnabled, ok && [d boolForKey:kSettingsFUGapEnabled]);
+                        printf("[SETTINGS] FUGap result=%d\n", ok);
+                        log_user("%s FUGap %s.\n", ok ? "[OK]" : "[WARN]", ok ? "active" : "did not find CC views yet");
+                        cyanide_upload_log_milestone(ok ? @"fugap-applied" : @"fugap-failed");
+                    }
+
+                    if (runModuleSpacing) {
+                        settings_progress(&step, total, "Applying ModuleSpacing");
+                        bool ok = modulespacing_apply_in_session();
+                        settings_mark_tweak_applied(kSettingsModuleSpacingEnabled, ok && [d boolForKey:kSettingsModuleSpacingEnabled]);
+                        printf("[SETTINGS] ModuleSpacing result=%d\n", ok);
+                        log_user("%s ModuleSpacing %s.\n", ok ? "[OK]" : "[WARN]", ok ? "active" : "did not find CC views yet");
+                        cyanide_upload_log_milestone(ok ? @"modulespacing-applied" : @"modulespacing-failed");
+                    }
+
+                    if (runSugarCane) {
+                        settings_progress(&step, total, "Applying SugarCane");
+                        bool ok = sugarcane_apply_in_session();
+                        settings_mark_tweak_applied(kSettingsSugarCaneEnabled, ok && [d boolForKey:kSettingsSugarCaneEnabled]);
+                        printf("[SETTINGS] SugarCane result=%d\n", ok);
+                        log_user("%s SugarCane %s.\n", ok ? "[OK]" : "[WARN]", ok ? "overlay active" : "did not start cleanly");
+                        cyanide_upload_log_milestone(ok ? @"sugarcane-applied" : @"sugarcane-failed");
+                    }
+
+                    if (runBetterCCXI) {
+                        settings_progress(&step, total, "Applying BetterCCXI");
+                        bool ok = betterccxi_apply_in_session();
+                        settings_mark_tweak_applied(kSettingsBetterCCXIEnabled, ok && [d boolForKey:kSettingsBetterCCXIEnabled]);
+                        printf("[SETTINGS] BetterCCXI result=%d\n", ok);
+                        log_user("%s BetterCCXI %s.\n", ok ? "[OK]" : "[WARN]", ok ? "active" : "did not start cleanly");
+                        cyanide_upload_log_milestone(ok ? @"betterccxi-applied" : @"betterccxi-failed");
+                    }
+
+                    if (runMagma) {
+                        settings_progress(&step, total, "Applying Magma");
+                        bool ok = magma_apply_in_session();
+                        settings_mark_tweak_applied(kSettingsMagmaEnabled, ok && [d boolForKey:kSettingsMagmaEnabled]);
+                        printf("[SETTINGS] Magma result=%d\n", ok);
+                        log_user("%s Magma %s.\n", ok ? "[OK]" : "[WARN]", ok ? "active" : "did not start cleanly");
+                        cyanide_upload_log_milestone(ok ? @"magma-applied" : @"magma-failed");
+                    }
+
+                    if (runBetterCCIcons) {
+                        settings_progress(&step, total, "Applying BetterCCIcons");
+                        bool ok = betterccicons_apply_in_session();
+                        settings_mark_tweak_applied(kSettingsBetterCCIconsEnabled, ok && [d boolForKey:kSettingsBetterCCIconsEnabled]);
+                        printf("[SETTINGS] BetterCCIcons result=%d\n", ok);
+                        log_user("%s BetterCCIcons %s.\n", ok ? "[OK]" : "[WARN]", ok ? "active" : "did not start cleanly");
+                        cyanide_upload_log_milestone(ok ? @"betterccicons-applied" : @"betterccicons-failed");
+                    }
+
+                    if (runCCNoPlatterDim) {
+                        settings_progress(&step, total, "Applying CCNoPlatterDim");
+                        bool ok = ccnoplatterdim_apply_in_session();
+                        settings_mark_tweak_applied(kSettingsCCNoPlatterDimEnabled, ok && [d boolForKey:kSettingsCCNoPlatterDimEnabled]);
+                        printf("[SETTINGS] CCNoPlatterDim result=%d\n", ok);
+                        log_user("%s CCNoPlatterDim %s.\n", ok ? "[OK]" : "[WARN]", ok ? "active" : "did not start cleanly");
+                        cyanide_upload_log_milestone(ok ? @"ccnoplatterdim-applied" : @"ccnoplatterdim-failed");
+                    }
+
+                    if (runCCStatus) {
+                        settings_progress(&step, total, "Applying CCStatus");
+                        bool ok = ccstatus_apply_in_session();
+                        settings_mark_tweak_applied(kSettingsCCStatusEnabled, ok && [d boolForKey:kSettingsCCStatusEnabled]);
+                        printf("[SETTINGS] CCStatus result=%d\n", ok);
+                        log_user("%s CCStatus %s.\n", ok ? "[OK]" : "[WARN]", ok ? "overlay active" : "did not start cleanly");
+                        cyanide_upload_log_milestone(ok ? @"ccstatus-applied" : @"ccstatus-failed");
+                    }
+
+                    if (runHapticCC) {
+                        settings_progress(&step, total, "Applying HapticCC");
+                        bool ok = hapticcc_apply_in_session();
+                        settings_mark_tweak_applied(kSettingsHapticCCEnabled, ok && [d boolForKey:kSettingsHapticCCEnabled]);
+                        printf("[SETTINGS] HapticCC result=%d\n", ok);
+                        log_user("%s HapticCC %s.\n", ok ? "[OK]" : "[WARN]", ok ? "feedback primed" : "did not start cleanly");
+                        cyanide_upload_log_milestone(ok ? @"hapticcc-applied" : @"hapticcc-failed");
+                    }
+
+                    if (runSecureCC) {
+                        settings_progress(&step, total, "Applying SecureCC");
+                        bool ok = securecc_apply_in_session();
+                        settings_mark_tweak_applied(kSettingsSecureCCEnabled, ok && [d boolForKey:kSettingsSecureCCEnabled]);
+                        printf("[SETTINGS] SecureCC result=%d\n", ok);
+                        log_user("%s SecureCC %s.\n", ok ? "[OK]" : "[WARN]", ok ? "armed" : "did not start cleanly");
+                        cyanide_upload_log_milestone(ok ? @"securecc-applied" : @"securecc-failed");
+                    }
+
                     if (runHideLabels) {
                         settings_progress(&step, total, "Applying HideLabels");
                         bool ok = hidellabels_apply_in_session();
@@ -8387,6 +8796,51 @@ static void settings_run_actions_internal(BOOL pendingOnly)
                         printf("[SETTINGS] Cylinder Lite result=%d\n", ok);
                         log_user("%s Cylinder Lite %s.\n", ok ? "[OK]" : "[WARN]", ok ? "active" : "did not start cleanly");
                         cyanide_upload_log_milestone(ok ? @"cylinderlite-applied" : @"cylinderlite-failed");
+                    }
+
+                    if (runBarmoji) {
+                        settings_progress(&step, total, "Applying Barmoji");
+                        bool ok = barmoji_apply_in_session();
+                        settings_mark_tweak_applied(kSettingsBarmojiEnabled, ok && [d boolForKey:kSettingsBarmojiEnabled]);
+                        printf("[SETTINGS] Barmoji result=%d\n", ok);
+                        log_user("%s Barmoji %s.\n", ok ? "[OK]" : "[WARN]", ok ? "active" : "did not start cleanly");
+                        cyanide_upload_log_milestone(ok ? @"barmoji-applied" : @"barmoji-failed");
+                    }
+
+                    if (runBlurryBadges) {
+                        settings_progress(&step, total, "Applying BlurryBadges");
+                        bool ok = blurrybadges_apply_in_session();
+                        settings_mark_tweak_applied(kSettingsBlurryBadgesEnabled, ok && [d boolForKey:kSettingsBlurryBadgesEnabled]);
+                        printf("[SETTINGS] BlurryBadges result=%d\n", ok);
+                        log_user("%s BlurryBadges %s.\n", ok ? "[OK]" : "[WARN]", ok ? "active" : "did not find badge views yet");
+                        cyanide_upload_log_milestone(ok ? @"blurrybadges-applied" : @"blurrybadges-failed");
+                    }
+
+                    if (runSnapper) {
+                        settings_progress(&step, total, "Applying Snapper");
+                        bool ok = snapper_apply_in_session();
+                        settings_mark_tweak_applied(kSettingsSnapperEnabled, ok && [d boolForKey:kSettingsSnapperEnabled]);
+                        printf("[SETTINGS] Snapper result=%d\n", ok);
+                        log_user("%s Snapper %s.\n", ok ? "[OK]" : "[WARN]", ok ? "overlay active" : "did not start cleanly");
+                        cyanide_upload_log_milestone(ok ? @"snapper-applied" : @"snapper-failed");
+                    }
+
+                    if (runPullOver) {
+                        settings_progress(&step, total, "Applying PullOver");
+                        bool ok = pullover_apply_in_session();
+                        settings_mark_tweak_applied(kSettingsPullOverEnabled, ok && [d boolForKey:kSettingsPullOverEnabled]);
+                        printf("[SETTINGS] PullOver result=%d\n", ok);
+                        log_user("%s PullOver %s.\n", ok ? "[OK]" : "[WARN]", ok ? "tray active" : "did not start cleanly");
+                        cyanide_upload_log_milestone(ok ? @"pullover-applied" : @"pullover-failed");
+                    }
+
+                    if (runAlkaline) {
+                        settings_progress(&step, total, "Applying Alkaline");
+                        bool ok = alkaline_apply_in_session();
+                        settings_mark_tweak_applied(kSettingsAlkalineEnabled, ok && [d boolForKey:kSettingsAlkalineEnabled]);
+                        printf("[SETTINGS] Alkaline result=%d\n", ok);
+                        log_user("%s Alkaline %s.\n", ok ? "[OK]" : "[WARN]", ok ? "battery tint active" : "did not find battery views yet");
+                        cyanide_upload_log_milestone(ok ? @"alkaline-applied" : @"alkaline-failed");
                     }
 
                     if (runTweakLoader) {
@@ -8632,10 +9086,26 @@ typedef NS_ENUM(NSInteger, SettingsSection) {
     SectionZeppelinLite,
     SectionCleanHomeScreen,
     SectionRealCC,
+    SectionCleanCC,
+    SectionFUGap,
+    SectionModuleSpacing,
+    SectionSugarCane,
+    SectionBetterCCXI,
+    SectionMagma,
+    SectionBetterCCIcons,
+    SectionCCNoPlatterDim,
+    SectionCCStatus,
+    SectionHapticCC,
+    SectionSecureCC,
     SectionHideLabels,
     SectionFakeClockUp,
     SectionPancake,
     SectionCylinderLite,
+    SectionBarmoji,
+    SectionBlurryBadges,
+    SectionSnapper,
+    SectionPullOver,
+    SectionAlkaline,
     SectionTweakLoader,
     SectionQuickLoader,
     SectionRepoTweaks,
@@ -9644,6 +10114,61 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
     ];
 }
 
+- (NSArray<NSDictionary *> *)cleanccRows
+{
+    return @[ @{ @"kind": @"toggle", @"key": kSettingsCleanCCEnabled, @"title": @"Enable CleanCC" } ];
+}
+
+- (NSArray<NSDictionary *> *)fugapRows
+{
+    return @[ @{ @"kind": @"toggle", @"key": kSettingsFUGapEnabled, @"title": @"Enable FUGap" } ];
+}
+
+- (NSArray<NSDictionary *> *)modulespacingRows
+{
+    return @[ @{ @"kind": @"toggle", @"key": kSettingsModuleSpacingEnabled, @"title": @"Enable ModuleSpacing" } ];
+}
+
+- (NSArray<NSDictionary *> *)sugarcaneRows
+{
+    return @[ @{ @"kind": @"toggle", @"key": kSettingsSugarCaneEnabled, @"title": @"Enable SugarCane" } ];
+}
+
+- (NSArray<NSDictionary *> *)betterccxiRows
+{
+    return @[ @{ @"kind": @"toggle", @"key": kSettingsBetterCCXIEnabled, @"title": @"Enable BetterCCXI" } ];
+}
+
+- (NSArray<NSDictionary *> *)magmaRows
+{
+    return @[ @{ @"kind": @"toggle", @"key": kSettingsMagmaEnabled, @"title": @"Enable Magma" } ];
+}
+
+- (NSArray<NSDictionary *> *)bettercciconsRows
+{
+    return @[ @{ @"kind": @"toggle", @"key": kSettingsBetterCCIconsEnabled, @"title": @"Enable BetterCCIcons" } ];
+}
+
+- (NSArray<NSDictionary *> *)ccnoplatterdimRows
+{
+    return @[ @{ @"kind": @"toggle", @"key": kSettingsCCNoPlatterDimEnabled, @"title": @"Enable CCNoPlatterDim" } ];
+}
+
+- (NSArray<NSDictionary *> *)ccstatusRows
+{
+    return @[ @{ @"kind": @"toggle", @"key": kSettingsCCStatusEnabled, @"title": @"Enable CCStatus" } ];
+}
+
+- (NSArray<NSDictionary *> *)hapticccRows
+{
+    return @[ @{ @"kind": @"toggle", @"key": kSettingsHapticCCEnabled, @"title": @"Enable HapticCC" } ];
+}
+
+- (NSArray<NSDictionary *> *)secureccRows
+{
+    return @[ @{ @"kind": @"toggle", @"key": kSettingsSecureCCEnabled, @"title": @"Enable SecureCC" } ];
+}
+
 - (NSArray<NSDictionary *> *)hidellabelsRows
 {
     return @[
@@ -9670,6 +10195,41 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
 {
     return @[
         @{ @"kind": @"toggle", @"key": kSettingsCylinderLiteEnabled, @"title": @"Enable Cylinder Lite" },
+    ];
+}
+
+- (NSArray<NSDictionary *> *)barmojiRows
+{
+    return @[
+        @{ @"kind": @"toggle", @"key": kSettingsBarmojiEnabled, @"title": @"Enable Barmoji" },
+    ];
+}
+
+- (NSArray<NSDictionary *> *)blurrybadgesRows
+{
+    return @[
+        @{ @"kind": @"toggle", @"key": kSettingsBlurryBadgesEnabled, @"title": @"Enable BlurryBadges" },
+    ];
+}
+
+- (NSArray<NSDictionary *> *)snapperRows
+{
+    return @[
+        @{ @"kind": @"toggle", @"key": kSettingsSnapperEnabled, @"title": @"Enable Snapper" },
+    ];
+}
+
+- (NSArray<NSDictionary *> *)pulloverRows
+{
+    return @[
+        @{ @"kind": @"toggle", @"key": kSettingsPullOverEnabled, @"title": @"Enable PullOver" },
+    ];
+}
+
+- (NSArray<NSDictionary *> *)alkalineRows
+{
+    return @[
+        @{ @"kind": @"toggle", @"key": kSettingsAlkalineEnabled, @"title": @"Enable Alkaline" },
     ];
 }
 
@@ -10010,6 +10570,12 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
 {
     NSUserDefaults *d = NSUserDefaults.standardUserDefaults;
     NSMutableArray *out = [NSMutableArray array];
+    void (^addSimpleSummary)(NSString *, NSString *) = ^(NSString *title, NSString *key) {
+        BOOL intent = [d boolForKey:key];
+        BOOL applied = settings_tweak_is_applied(key);
+        [out addObject:@{@"title": title,
+                         @"value": applied ? @"Active" : (intent ? @"Queued" : @"Off")}];
+    };
     if (section == SectionSBC) {
         [out addObject:@{@"title": @"Dock icons",       @"value": [@([d integerForKey:kSettingsSBCDockIcons])  stringValue]}];
         [out addObject:@{@"title": @"Home columns",     @"value": [@([d integerForKey:kSettingsSBCCols])        stringValue]}];
@@ -10086,6 +10652,28 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
         BOOL applied = settings_tweak_is_applied(kSettingsRealCCEnabled);
         [out addObject:@{@"title": @"RealCC",
                          @"value": applied ? @"Active" : (intent ? @"Queued" : @"Off")}];
+    } else if (section == SectionCleanCC) {
+        addSimpleSummary(@"CleanCC", kSettingsCleanCCEnabled);
+    } else if (section == SectionFUGap) {
+        addSimpleSummary(@"FUGap", kSettingsFUGapEnabled);
+    } else if (section == SectionModuleSpacing) {
+        addSimpleSummary(@"ModuleSpacing", kSettingsModuleSpacingEnabled);
+    } else if (section == SectionSugarCane) {
+        addSimpleSummary(@"SugarCane", kSettingsSugarCaneEnabled);
+    } else if (section == SectionBetterCCXI) {
+        addSimpleSummary(@"BetterCCXI", kSettingsBetterCCXIEnabled);
+    } else if (section == SectionMagma) {
+        addSimpleSummary(@"Magma", kSettingsMagmaEnabled);
+    } else if (section == SectionBetterCCIcons) {
+        addSimpleSummary(@"BetterCCIcons", kSettingsBetterCCIconsEnabled);
+    } else if (section == SectionCCNoPlatterDim) {
+        addSimpleSummary(@"CCNoPlatterDim", kSettingsCCNoPlatterDimEnabled);
+    } else if (section == SectionCCStatus) {
+        addSimpleSummary(@"CCStatus", kSettingsCCStatusEnabled);
+    } else if (section == SectionHapticCC) {
+        addSimpleSummary(@"HapticCC", kSettingsHapticCCEnabled);
+    } else if (section == SectionSecureCC) {
+        addSimpleSummary(@"SecureCC", kSettingsSecureCCEnabled);
     } else if (section == SectionHideLabels) {
         BOOL intent = [d boolForKey:kSettingsHideLabelsEnabled];
         BOOL applied = settings_tweak_is_applied(kSettingsHideLabelsEnabled);
@@ -10105,6 +10693,31 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
         BOOL intent = [d boolForKey:kSettingsCylinderLiteEnabled];
         BOOL applied = settings_tweak_is_applied(kSettingsCylinderLiteEnabled);
         [out addObject:@{@"title": @"Cylinder Lite",
+                         @"value": applied ? @"Active" : (intent ? @"Queued" : @"Off")}];
+    } else if (section == SectionBarmoji) {
+        BOOL intent = [d boolForKey:kSettingsBarmojiEnabled];
+        BOOL applied = settings_tweak_is_applied(kSettingsBarmojiEnabled);
+        [out addObject:@{@"title": @"Barmoji",
+                         @"value": applied ? @"Active" : (intent ? @"Queued" : @"Off")}];
+    } else if (section == SectionBlurryBadges) {
+        BOOL intent = [d boolForKey:kSettingsBlurryBadgesEnabled];
+        BOOL applied = settings_tweak_is_applied(kSettingsBlurryBadgesEnabled);
+        [out addObject:@{@"title": @"BlurryBadges",
+                         @"value": applied ? @"Active" : (intent ? @"Queued" : @"Off")}];
+    } else if (section == SectionSnapper) {
+        BOOL intent = [d boolForKey:kSettingsSnapperEnabled];
+        BOOL applied = settings_tweak_is_applied(kSettingsSnapperEnabled);
+        [out addObject:@{@"title": @"Snapper",
+                         @"value": applied ? @"Active" : (intent ? @"Queued" : @"Off")}];
+    } else if (section == SectionPullOver) {
+        BOOL intent = [d boolForKey:kSettingsPullOverEnabled];
+        BOOL applied = settings_tweak_is_applied(kSettingsPullOverEnabled);
+        [out addObject:@{@"title": @"PullOver",
+                         @"value": applied ? @"Active" : (intent ? @"Queued" : @"Off")}];
+    } else if (section == SectionAlkaline) {
+        BOOL intent = [d boolForKey:kSettingsAlkalineEnabled];
+        BOOL applied = settings_tweak_is_applied(kSettingsAlkalineEnabled);
+        [out addObject:@{@"title": @"Alkaline",
                          @"value": applied ? @"Active" : (intent ? @"Queued" : @"Off")}];
     } else if (section == SectionTweakLoader) {
         BOOL intent = [d boolForKey:kSettingsTweakLoaderEnabled];
@@ -10169,10 +10782,26 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
         case SectionZeppelinLite: return settings_zeppelinlite_install_allowed() ? self.zeppelinliteRows : @[];
         case SectionCleanHomeScreen: return settings_cleanhomescreen_install_allowed() ? self.cleanhomescreenRows : @[];
         case SectionRealCC: return settings_realcc_install_allowed() ? self.realccRows : @[];
+        case SectionCleanCC: return settings_cleancc_install_allowed() ? self.cleanccRows : @[];
+        case SectionFUGap: return settings_fugap_install_allowed() ? self.fugapRows : @[];
+        case SectionModuleSpacing: return settings_modulespacing_install_allowed() ? self.modulespacingRows : @[];
+        case SectionSugarCane: return settings_sugarcane_install_allowed() ? self.sugarcaneRows : @[];
+        case SectionBetterCCXI: return settings_betterccxi_install_allowed() ? self.betterccxiRows : @[];
+        case SectionMagma: return settings_magma_install_allowed() ? self.magmaRows : @[];
+        case SectionBetterCCIcons: return settings_betterccicons_install_allowed() ? self.bettercciconsRows : @[];
+        case SectionCCNoPlatterDim: return settings_ccnoplatterdim_install_allowed() ? self.ccnoplatterdimRows : @[];
+        case SectionCCStatus: return settings_ccstatus_install_allowed() ? self.ccstatusRows : @[];
+        case SectionHapticCC: return settings_hapticcc_install_allowed() ? self.hapticccRows : @[];
+        case SectionSecureCC: return settings_securecc_install_allowed() ? self.secureccRows : @[];
         case SectionHideLabels: return settings_hidellabels_install_allowed() ? self.hidellabelsRows : @[];
         case SectionFakeClockUp: return settings_fakeclockup_install_allowed() ? self.fakeclockupRows : @[];
         case SectionPancake: return settings_pancake_install_allowed() ? self.pancakeRows : @[];
         case SectionCylinderLite: return settings_cylinderlite_install_allowed() ? self.cylinderliteRows : @[];
+        case SectionBarmoji: return settings_barmoji_install_allowed() ? self.barmojiRows : @[];
+        case SectionBlurryBadges: return settings_blurrybadges_install_allowed() ? self.blurrybadgesRows : @[];
+        case SectionSnapper: return settings_snapper_install_allowed() ? self.snapperRows : @[];
+        case SectionPullOver: return settings_pullover_install_allowed() ? self.pulloverRows : @[];
+        case SectionAlkaline: return settings_alkaline_install_allowed() ? self.alkalineRows : @[];
         case SectionTweakLoader: return settings_tweakloader_install_allowed() ? self.tweakloaderRows : @[];
         case SectionAppSwitcherGrid: return self.appSwitcherGridRows;
         case SectionFastLockXLite: return settings_fastlockx_lite_install_allowed() ? self.fastLockXLiteRows : @[];
@@ -10215,10 +10844,26 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
         @{ @"title": @"Zeppelin Lite",      @"icon": @"textformat.alt",                      @"color": [UIColor systemOrangeColor], @"section": @(SectionZeppelinLite) },
         @{ @"title": @"CleanHomeScreen",    @"icon": @"square.dashed",                       @"color": [UIColor systemGreenColor],  @"section": @(SectionCleanHomeScreen) },
         @{ @"title": @"RealCC",             @"icon": @"wifi.slash",                          @"color": [UIColor systemRedColor],    @"section": @(SectionRealCC) },
+        @{ @"title": @"CleanCC",            @"icon": @"square.stack.3d.down.right.fill",      @"color": [UIColor systemTealColor],   @"section": @(SectionCleanCC) },
+        @{ @"title": @"FUGap",              @"icon": @"arrow.up.to.line.compact",             @"color": [UIColor systemBlueColor],   @"section": @(SectionFUGap) },
+        @{ @"title": @"ModuleSpacing",      @"icon": @"rectangle.grid.2x2",                  @"color": [UIColor systemIndigoColor], @"section": @(SectionModuleSpacing) },
+        @{ @"title": @"SugarCane",          @"icon": @"percent",                              @"color": [UIColor systemYellowColor], @"section": @(SectionSugarCane) },
+        @{ @"title": @"BetterCCXI",         @"icon": @"rectangle.grid.3x2.fill",             @"color": [UIColor systemPurpleColor], @"section": @(SectionBetterCCXI) },
+        @{ @"title": @"Magma",              @"icon": @"flame.fill",                           @"color": [UIColor systemOrangeColor], @"section": @(SectionMagma) },
+        @{ @"title": @"BetterCCIcons",      @"icon": @"circle.grid.2x2.fill",                @"color": [UIColor systemCyanColor],   @"section": @(SectionBetterCCIcons) },
+        @{ @"title": @"CCNoPlatterDim",     @"icon": @"sun.max.fill",                         @"color": [UIColor systemGreenColor],  @"section": @(SectionCCNoPlatterDim) },
+        @{ @"title": @"CCStatus",           @"icon": @"info.circle.fill",                     @"color": [UIColor systemBlueColor],   @"section": @(SectionCCStatus) },
+        @{ @"title": @"HapticCC",           @"icon": @"waveform.path",                        @"color": [UIColor systemPinkColor],   @"section": @(SectionHapticCC) },
+        @{ @"title": @"SecureCC",           @"icon": @"lock.shield.fill",                     @"color": [UIColor systemRedColor],    @"section": @(SectionSecureCC) },
         @{ @"title": @"HideLabels",         @"icon": @"eye.slash",                           @"color": [UIColor systemGrayColor],   @"section": @(SectionHideLabels) },
         @{ @"title": @"FakeClockUp",        @"icon": @"forward.fill",                        @"color": [UIColor systemYellowColor], @"section": @(SectionFakeClockUp) },
         @{ @"title": @"Pancake",            @"icon": @"hand.point.left.fill",                @"color": [UIColor systemIndigoColor], @"section": @(SectionPancake) },
         @{ @"title": @"Cylinder Lite",      @"icon": @"perspective",                         @"color": [UIColor systemTealColor],   @"section": @(SectionCylinderLite) },
+        @{ @"title": @"Barmoji",            @"icon": @"face.smiling.fill",                   @"color": [UIColor systemPinkColor],   @"section": @(SectionBarmoji) },
+        @{ @"title": @"BlurryBadges",       @"icon": @"app.badge.fill",                      @"color": [UIColor systemBlueColor],   @"section": @(SectionBlurryBadges) },
+        @{ @"title": @"Snapper",            @"icon": @"crop",                                @"color": [UIColor systemCyanColor],   @"section": @(SectionSnapper) },
+        @{ @"title": @"PullOver",           @"icon": @"sidebar.right",                       @"color": [UIColor systemIndigoColor], @"section": @(SectionPullOver) },
+        @{ @"title": @"Alkaline",           @"icon": @"battery.100.bolt",                    @"color": [UIColor systemGreenColor],  @"section": @(SectionAlkaline) },
         @{ @"title": @"TweakLoader",        @"icon": @"arrow.down.circle.dotted",            @"color": [UIColor systemOrangeColor], @"section": @(SectionTweakLoader) },
         @{ @"title": @"Velvet",             @"icon": @"rectangle.3.group.fill",              @"color": [UIColor systemPurpleColor], @"section": @(SectionVelvet), @"indev": @YES },
 #endif
@@ -10421,6 +11066,39 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
     if (s == SectionRealCC) {
         return @"Disables the WiFi and Bluetooth toggles in Control Center to prevent accidental disconnections.";
     }
+    if (s == SectionCleanCC) {
+        return @"Adjusts visible Control Center background alpha and material tint for a cleaner glass-like look.";
+    }
+    if (s == SectionFUGap) {
+        return @"Moves visible Control Center containers upward to reduce the top presentation gap.";
+    }
+    if (s == SectionModuleSpacing) {
+        return @"Tightens the visible module styling pass to make Control Center feel more compact.";
+    }
+    if (s == SectionSugarCane) {
+        return @"Adds a first-pass percentage text overlay for brightness and volume style modules.";
+    }
+    if (s == SectionBetterCCXI) {
+        return @"Applies a first-pass layout emphasis pass for larger Control Center module presentation.";
+    }
+    if (s == SectionMagma) {
+        return @"Tints visible Control Center glyphs with a Magma-style active color.";
+    }
+    if (s == SectionBetterCCIcons) {
+        return @"Rounds visible Control Center module/icon layers for a softer icon style.";
+    }
+    if (s == SectionCCNoPlatterDim) {
+        return @"Keeps expanded Control Center platter presentation brighter by reducing dimming.";
+    }
+    if (s == SectionCCStatus) {
+        return @"Adds a first-pass Control Center status header overlay.";
+    }
+    if (s == SectionHapticCC) {
+        return @"Primes native haptic feedback for Control Center interactions in the active session.";
+    }
+    if (s == SectionSecureCC) {
+        return @"Adds a first-pass SecureCC armed indicator for future locked-screen toggle protection.";
+    }
     if (s == SectionHideLabels) {
         return @"Hides all icon labels on the home screen.";
     }
@@ -10432,6 +11110,21 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
     }
     if (s == SectionCylinderLite) {
         return @"Adds perspective-based icon animations to the home screen when tilting the device.";
+    }
+    if (s == SectionBarmoji) {
+        return @"Adds a lightweight emoji strip overlay near the bottom of SpringBoard.";
+    }
+    if (s == SectionBlurryBadges) {
+        return @"Tints visible notification badge views for a softer, colorized badge look.";
+    }
+    if (s == SectionSnapper) {
+        return @"Shows a first-pass crop frame overlay for Snapper-style pinned screenshots.";
+    }
+    if (s == SectionPullOver) {
+        return @"Shows a first-pass slide-over tray shell for future pinned app/widget hosting.";
+    }
+    if (s == SectionAlkaline) {
+        return @"Applies an Alkaline-style tint pass to visible battery views.";
     }
     if (s == SectionTweakLoader) {
         return @"Hosts precompiled .m/.h tweaks that use RemoteCall. Add new tweaks by registering in tweakloader_register_builtins(). Supports dynamic dylib loading when the AMFI+kPAC bypass is active.";

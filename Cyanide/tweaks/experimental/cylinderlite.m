@@ -5,8 +5,37 @@
 
 #import <Foundation/Foundation.h>
 #import <math.h>
+#import <string.h>
 
 static bool gCyApplied = false;
+static uint64_t gCyLastIconListView = 0;
+
+typedef struct {
+    double m11, m12, m13, m14;
+    double m21, m22, m23, m24;
+    double m31, m32, m33, m34;
+    double m41, m42, m43, m44;
+} CYRemoteCATransform3D;
+
+static CYRemoteCATransform3D cy_identity_transform(void)
+{
+    CYRemoteCATransform3D t;
+    memset(&t, 0, sizeof(t));
+    t.m11 = 1.0;
+    t.m22 = 1.0;
+    t.m33 = 1.0;
+    t.m44 = 1.0;
+    return t;
+}
+
+static void cy_apply_perspective_to_layer(uint64_t layer, bool enabled)
+{
+    if (!r_is_objc_ptr(layer)) return;
+    CYRemoteCATransform3D t = cy_identity_transform();
+    if (enabled) t.m34 = -1.0 / 650.0;
+    r_msg2_main_raw(layer, "setSublayerTransform:",
+                    &t, sizeof(t), NULL, 0, NULL, 0, NULL, 0);
+}
 
 bool cylinderlite_apply_in_session(void)
 {
@@ -66,6 +95,7 @@ bool cylinderlite_apply_in_session(void)
         printf("[CYLINDER] no icon list view found\n");
         return false;
     }
+    gCyLastIconListView = iconListView;
 
     uint64_t subviews = r_msg2_main(iconListView, "subviews", 0, 0, 0, 0);
     if (!r_is_objc_ptr(subviews)) return false;
@@ -101,14 +131,10 @@ bool cylinderlite_apply_in_session(void)
 
     printf("[CYLINDER] applied depth transforms to %llu icon views\n", iconCount);
 
-    uint64_t CATransform3D = r_class("CATransform3D");
-    if (r_is_objc_ptr(CATransform3D)) {
-        double angle = 0.1;
-        uint64_t layer = r_msg2_main(iconListView, "layer", 0, 0, 0, 0);
-        if (r_is_objc_ptr(layer)) {
-            r_msg2_main_raw(layer, "setSublayerTransform:", &angle, sizeof(angle), NULL, 0, NULL, 0, NULL, 0);
-            printf("[CYLINDER] set perspective transform on list view\n");
-        }
+    uint64_t layer = r_msg2_main(iconListView, "layer", 0, 0, 0, 0);
+    if (r_is_objc_ptr(layer)) {
+        cy_apply_perspective_to_layer(layer, true);
+        printf("[CYLINDER] set perspective transform on list view\n");
     }
 
     gCyApplied = true;
@@ -118,6 +144,10 @@ bool cylinderlite_apply_in_session(void)
 bool cylinderlite_stop_in_session(void)
 {
     printf("[CYLINDER] stop\n");
+    if (r_is_objc_ptr(gCyLastIconListView)) {
+        uint64_t layer = r_msg2_main(gCyLastIconListView, "layer", 0, 0, 0, 0);
+        cy_apply_perspective_to_layer(layer, false);
+    }
     gCyApplied = false;
     return true;
 }
@@ -125,4 +155,5 @@ bool cylinderlite_stop_in_session(void)
 void cylinderlite_forget_remote_state(void)
 {
     gCyApplied = false;
+    gCyLastIconListView = 0;
 }

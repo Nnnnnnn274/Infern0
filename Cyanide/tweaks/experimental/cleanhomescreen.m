@@ -11,6 +11,12 @@ static bool gChsBadgeHidden = false;
 static bool gChsDotHidden = false;
 static bool gChsLabelHidden = false;
 
+static void chs_set_alpha(uint64_t view, double alpha)
+{
+    if (!r_is_objc_ptr(view)) return;
+    r_msg2_main_raw(view, "setAlpha:", &alpha, sizeof(alpha), NULL, 0, NULL, 0, NULL, 0);
+}
+
 static void chs_scan_views(uint64_t parent, int depth)
 {
     if (!r_is_objc_ptr(parent) || depth > 12) return;
@@ -37,20 +43,19 @@ static void chs_scan_views(uint64_t parent, int depth)
             }
         }
 
-        if (gChsBadgeHidden && strstr(cls, "Badge") && !strstr(cls, "Label")) {
-            r_msg2_main(sv, "setAlpha:", 0, 0, 0, 0);
+        if (strstr(cls, "Badge") && !strstr(cls, "Label")) {
+            chs_set_alpha(sv, gChsBadgeHidden ? 0.0 : 1.0);
             printf("[CHS] hid badge: 0x%llx\n", sv);
         }
 
-        if (gChsDotHidden && (strstr(cls, "PageControl") || strstr(cls, "PageDot") ||
-                              strstr(cls, "PageIndicator"))) {
-            r_msg2_main(sv, "setHidden:", 1, 0, 0, 0);
+        if (strstr(cls, "PageControl") || strstr(cls, "PageDot") ||
+            strstr(cls, "PageIndicator")) {
+            r_msg2_main(sv, "setHidden:", gChsDotHidden ? 1 : 0, 0, 0, 0);
             printf("[CHS] hid page dot: 0x%llx\n", sv);
         }
 
-        if (gChsLabelHidden && (strstr(cls, "Label") || strstr(cls, "label"))) {
-            double zero = 0.0;
-            r_msg2_main_raw(sv, "setAlpha:", &zero, sizeof(zero), NULL, 0, NULL, 0, NULL, 0);
+        if (strstr(cls, "Label") || strstr(cls, "label")) {
+            chs_set_alpha(sv, gChsLabelHidden ? 0.0 : 1.0);
             printf("[CHS] hid label: 0x%llx\n", sv);
         }
 
@@ -79,9 +84,10 @@ bool cleanhomescreen_apply_in_session(bool hideBadges, bool hidePageDots, bool h
     for (uint64_t i = 0; i < winCount; i++) {
         uint64_t win = r_msg2_main(windows, "objectAtIndex:", i, 0, 0, 0);
         if (!r_is_objc_ptr(win)) continue;
+        chs_scan_views(win, 0);
+
         uint64_t root = r_msg2_main(win, "rootViewController", 0, 0, 0, 0);
         if (!r_is_objc_ptr(root)) continue;
-
         char cls[128] = {0};
         uint64_t rCls = r_dlsym_call(R_TIMEOUT, "object_getClass", root, 0, 0, 0, 0, 0, 0, 0);
         if (r_is_objc_ptr(rCls)) {
@@ -98,7 +104,8 @@ bool cleanhomescreen_apply_in_session(bool hideBadges, bool hidePageDots, bool h
         if (strstr(cls, "SBIconController") || strstr(cls, "SBRootFolder") ||
             strstr(cls, "SBIconListView") || strstr(cls, "SBFolderView") ||
             strstr(cls, "SBHomeScreen")) {
-            chs_scan_views(root, 0);
+            uint64_t rootView = r_msg2_main(root, "view", 0, 0, 0, 0);
+            if (r_is_objc_ptr(rootView)) chs_scan_views(rootView, 0);
         }
     }
 
@@ -109,6 +116,10 @@ bool cleanhomescreen_apply_in_session(bool hideBadges, bool hidePageDots, bool h
 bool cleanhomescreen_stop_in_session(void)
 {
     printf("[CHS] stop\n");
+    gChsBadgeHidden = false;
+    gChsDotHidden = false;
+    gChsLabelHidden = false;
+    cleanhomescreen_apply_in_session(false, false, false);
     gChsApplied = false;
     return true;
 }
