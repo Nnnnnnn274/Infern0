@@ -6,6 +6,8 @@
 #import <string.h>
 
 static uint64_t gCleanCCTint = 0;
+static int gCleanCCMaterialAlphaPercent = 78;
+static int gCleanCCGlassTintPercent = 10;
 
 static uint64_t cleancc_color(double red, double green, double blue, double alpha)
 {
@@ -67,9 +69,13 @@ bool cleancc_apply_in_session(void)
     printf("[CLEANCC] apply\n");
     uint64_t win = cleancc_key_window();
     if (!r_is_objc_ptr(win)) return false;
-    gCleanCCTint = cleancc_color(1, 1, 1, 0.10);
+    double tintAlpha = (double)gCleanCCGlassTintPercent / 100.0;
+    double materialAlpha = (double)gCleanCCMaterialAlphaPercent / 100.0;
+    if (materialAlpha < 0.05) materialAlpha = 0.05;
+    if (materialAlpha > 1.0) materialAlpha = 1.0;
+    gCleanCCTint = cleancc_color(1, 1, 1, tintAlpha);
     int hits = 0;
-    cleancc_scan(win, gCleanCCTint, 0.78, 0, &hits);
+    cleancc_scan(win, gCleanCCTint, materialAlpha, 0, &hits);
     printf("[CLEANCC] adjusted %d CC views\n", hits);
     return hits > 0;
 }
@@ -83,6 +89,16 @@ bool cleancc_stop_in_session(void)
     if (r_is_objc_ptr(win)) cleancc_scan(win, clear, 1.0, 0, &hits);
     gCleanCCTint = 0;
     return true;
+}
+
+void cleancc_configure(int materialAlphaPercent, int glassTintPercent)
+{
+    if (materialAlphaPercent < 5) materialAlphaPercent = 5;
+    if (materialAlphaPercent > 100) materialAlphaPercent = 100;
+    if (glassTintPercent < 0) glassTintPercent = 0;
+    if (glassTintPercent > 80) glassTintPercent = 80;
+    gCleanCCMaterialAlphaPercent = materialAlphaPercent;
+    gCleanCCGlassTintPercent = glassTintPercent;
 }
 
 void cleancc_forget_remote_state(void) { gCleanCCTint = 0; }

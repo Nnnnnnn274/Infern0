@@ -6,6 +6,7 @@
 #import <string.h>
 
 static bool gModuleSpacingApplied = false;
+static int gModuleSpacingCornerRadius = 8;
 
 static uint64_t modulespacing_key_window(void)
 {
@@ -58,7 +59,7 @@ bool modulespacing_apply_in_session(void)
     uint64_t win = modulespacing_key_window();
     if (!r_is_objc_ptr(win)) return false;
     int hits = 0;
-    modulespacing_scan(win, 8.0, 0, &hits);
+    modulespacing_scan(win, (double)gModuleSpacingCornerRadius, 0, &hits);
     gModuleSpacingApplied = hits > 0;
     return gModuleSpacingApplied;
 }
@@ -71,6 +72,13 @@ bool modulespacing_stop_in_session(void)
     if (r_is_objc_ptr(win)) modulespacing_scan(win, 18.0, 0, &hits);
     gModuleSpacingApplied = false;
     return true;
+}
+
+void modulespacing_configure(int cornerRadius)
+{
+    if (cornerRadius < 0) cornerRadius = 0;
+    if (cornerRadius > 40) cornerRadius = 40;
+    gModuleSpacingCornerRadius = cornerRadius;
 }
 
 void modulespacing_forget_remote_state(void) { gModuleSpacingApplied = false; }

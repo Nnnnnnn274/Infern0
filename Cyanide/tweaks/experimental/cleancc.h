@@ -5,6 +5,7 @@
 
 bool cleancc_apply_in_session(void);
 bool cleancc_stop_in_session(void);
+void cleancc_configure(int materialAlphaPercent, int glassTintPercent);
 void cleancc_forget_remote_state(void);
 
 #endif

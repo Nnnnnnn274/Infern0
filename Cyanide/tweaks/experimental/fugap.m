@@ -8,6 +8,7 @@
 typedef struct { double a; double b; double c; double d; double tx; double ty; } FUGapAffineTransform;
 
 static bool gFUGapApplied = false;
+static int gFUGapYOffset = -24;
 
 static uint64_t fugap_key_window(void)
 {
@@ -57,7 +58,7 @@ bool fugap_apply_in_session(void)
     uint64_t win = fugap_key_window();
     if (!r_is_objc_ptr(win)) return false;
     int hits = 0;
-    fugap_scan(win, -24.0, 0, &hits);
+    fugap_scan(win, (double)gFUGapYOffset, 0, &hits);
     gFUGapApplied = hits > 0;
     return gFUGapApplied;
 }
@@ -70,6 +71,13 @@ bool fugap_stop_in_session(void)
     if (r_is_objc_ptr(win)) fugap_scan(win, 0.0, 0, &hits);
     gFUGapApplied = false;
     return true;
+}
+
+void fugap_configure(int yOffset)
+{
+    if (yOffset < -80) yOffset = -80;
+    if (yOffset > 40) yOffset = 40;
+    gFUGapYOffset = yOffset;
 }
 
 void fugap_forget_remote_state(void) { gFUGapApplied = false; }

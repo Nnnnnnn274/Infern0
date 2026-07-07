@@ -6,6 +6,7 @@
 #import <string.h>
 
 static bool gCCNoPlatterDimApplied = false;
+static int gCCNoPlatterDimVisibleAlphaPercent = 96;
 
 static uint64_t ccnoplatterdim_key_window(void)
 {
@@ -33,7 +34,7 @@ bool ccnoplatterdim_apply_in_session(void)
     uint64_t win = ccnoplatterdim_key_window();
     if (!r_is_objc_ptr(win)) return false;
     int hits = 0;
-    ccnoplatterdim_scan(win, 0.96, 0, &hits);
+    ccnoplatterdim_scan(win, (double)gCCNoPlatterDimVisibleAlphaPercent / 100.0, 0, &hits);
     gCCNoPlatterDimApplied = hits > 0;
     return gCCNoPlatterDimApplied;
 }
@@ -46,6 +47,13 @@ bool ccnoplatterdim_stop_in_session(void)
     if (r_is_objc_ptr(win)) ccnoplatterdim_scan(win, 1.0, 0, &hits);
     gCCNoPlatterDimApplied = false;
     return true;
+}
+
+void ccnoplatterdim_configure(int visibleAlphaPercent)
+{
+    if (visibleAlphaPercent < 40) visibleAlphaPercent = 40;
+    if (visibleAlphaPercent > 100) visibleAlphaPercent = 100;
+    gCCNoPlatterDimVisibleAlphaPercent = visibleAlphaPercent;
 }
 
 void ccnoplatterdim_forget_remote_state(void) { gCCNoPlatterDimApplied = false; }

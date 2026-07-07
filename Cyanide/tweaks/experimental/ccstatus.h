@@ -5,6 +5,7 @@
 
 bool ccstatus_apply_in_session(void);
 bool ccstatus_stop_in_session(void);
+void ccstatus_configure(bool showWifi, bool showIP, int yOffset);
 void ccstatus_forget_remote_state(void);
 
 #endif

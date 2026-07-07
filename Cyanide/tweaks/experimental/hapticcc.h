@@ -5,6 +5,7 @@
 
 bool hapticcc_apply_in_session(void);
 bool hapticcc_stop_in_session(void);
+void hapticcc_configure(int feedbackStyle);
 void hapticcc_forget_remote_state(void);
 
 #endif

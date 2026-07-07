@@ -1000,16 +1000,37 @@ NSString * const kSettingsRealCCEnabled = @"RealCCEnabled";
 NSString * const kSettingsRealCCDisableWiFi = @"RealCCDisableWiFi";
 NSString * const kSettingsRealCCDisableBT = @"RealCCDisableBT";
 NSString * const kSettingsCleanCCEnabled = @"CleanCCEnabled";
+static NSString * const kSettingsCleanCCMaterialAlphaPct = @"CleanCCMaterialAlphaPct";
+static NSString * const kSettingsCleanCCGlassTintPct = @"CleanCCGlassTintPct";
 NSString * const kSettingsFUGapEnabled = @"FUGapEnabled";
+static NSString * const kSettingsFUGapYOffset = @"FUGapYOffset";
 NSString * const kSettingsModuleSpacingEnabled = @"ModuleSpacingEnabled";
+static NSString * const kSettingsModuleSpacingCornerRadius = @"ModuleSpacingCornerRadius";
 NSString * const kSettingsSugarCaneEnabled = @"SugarCaneEnabled";
+static NSString * const kSettingsSugarCaneShowBrightness = @"SugarCaneShowBrightness";
+static NSString * const kSettingsSugarCaneShowVolume = @"SugarCaneShowVolume";
+static NSString * const kSettingsSugarCaneFontSize = @"SugarCaneFontSize";
 NSString * const kSettingsBetterCCXIEnabled = @"BetterCCXIEnabled";
+static NSString * const kSettingsBetterCCXIZLift = @"BetterCCXIZLift";
+static NSString * const kSettingsBetterCCXIDepthLimit = @"BetterCCXIDepthLimit";
 NSString * const kSettingsMagmaEnabled = @"MagmaEnabled";
+static NSString * const kSettingsMagmaRed = @"MagmaRed";
+static NSString * const kSettingsMagmaGreen = @"MagmaGreen";
+static NSString * const kSettingsMagmaBlue = @"MagmaBlue";
+static NSString * const kSettingsMagmaAlphaPct = @"MagmaAlphaPct";
 NSString * const kSettingsBetterCCIconsEnabled = @"BetterCCIconsEnabled";
+static NSString * const kSettingsBetterCCIconsCornerRadius = @"BetterCCIconsCornerRadius";
 NSString * const kSettingsCCNoPlatterDimEnabled = @"CCNoPlatterDimEnabled";
+static NSString * const kSettingsCCNoPlatterDimVisibleAlphaPct = @"CCNoPlatterDimVisibleAlphaPct";
 NSString * const kSettingsCCStatusEnabled = @"CCStatusEnabled";
+static NSString * const kSettingsCCStatusShowWifi = @"CCStatusShowWifi";
+static NSString * const kSettingsCCStatusShowIP = @"CCStatusShowIP";
+static NSString * const kSettingsCCStatusYOffset = @"CCStatusYOffset";
 NSString * const kSettingsHapticCCEnabled = @"HapticCCEnabled";
+static NSString * const kSettingsHapticCCFeedbackStyle = @"HapticCCFeedbackStyle";
 NSString * const kSettingsSecureCCEnabled = @"SecureCCEnabled";
+static NSString * const kSettingsSecureCCShowIndicator = @"SecureCCShowIndicator";
+static NSString * const kSettingsSecureCCDelayMs = @"SecureCCDelayMs";
 NSString * const kSettingsHideLabelsEnabled = @"HideLabelsEnabled";
 NSString * const kSettingsFakeClockUpEnabled = @"FakeClockUpEnabled";
 NSString * const kSettingsFakeClockUpSpeed = @"FakeClockUpSpeed";
@@ -6245,24 +6266,76 @@ static BOOL settings_key_is_cylinderlite(NSString *key)
     return [key isEqualToString:kSettingsCylinderLiteEnabled];
 }
 
+static void settings_configure_control_center_tweaks(NSUserDefaults *d)
+{
+    cleancc_configure((int)[d integerForKey:kSettingsCleanCCMaterialAlphaPct],
+                      (int)[d integerForKey:kSettingsCleanCCGlassTintPct]);
+    fugap_configure((int)[d integerForKey:kSettingsFUGapYOffset]);
+    modulespacing_configure((int)[d integerForKey:kSettingsModuleSpacingCornerRadius]);
+    sugarcane_configure([d boolForKey:kSettingsSugarCaneShowBrightness],
+                        [d boolForKey:kSettingsSugarCaneShowVolume],
+                        (int)[d integerForKey:kSettingsSugarCaneFontSize]);
+    betterccxi_configure((int)[d integerForKey:kSettingsBetterCCXIZLift],
+                         (int)[d integerForKey:kSettingsBetterCCXIDepthLimit]);
+    magma_configure((int)[d integerForKey:kSettingsMagmaRed],
+                    (int)[d integerForKey:kSettingsMagmaGreen],
+                    (int)[d integerForKey:kSettingsMagmaBlue],
+                    (int)[d integerForKey:kSettingsMagmaAlphaPct]);
+    betterccicons_configure((int)[d integerForKey:kSettingsBetterCCIconsCornerRadius]);
+    ccnoplatterdim_configure((int)[d integerForKey:kSettingsCCNoPlatterDimVisibleAlphaPct]);
+    ccstatus_configure([d boolForKey:kSettingsCCStatusShowWifi],
+                       [d boolForKey:kSettingsCCStatusShowIP],
+                       (int)[d integerForKey:kSettingsCCStatusYOffset]);
+    hapticcc_configure((int)[d integerForKey:kSettingsHapticCCFeedbackStyle]);
+    securecc_configure([d boolForKey:kSettingsSecureCCShowIndicator],
+                       (int)[d integerForKey:kSettingsSecureCCDelayMs]);
+}
+
+static NSString *settings_split_tweak_master_key_for_key(NSString *key)
+{
+    if ([key isEqualToString:kSettingsCleanCCEnabled] ||
+        [key isEqualToString:kSettingsCleanCCMaterialAlphaPct] ||
+        [key isEqualToString:kSettingsCleanCCGlassTintPct]) return kSettingsCleanCCEnabled;
+    if ([key isEqualToString:kSettingsFUGapEnabled] ||
+        [key isEqualToString:kSettingsFUGapYOffset]) return kSettingsFUGapEnabled;
+    if ([key isEqualToString:kSettingsModuleSpacingEnabled] ||
+        [key isEqualToString:kSettingsModuleSpacingCornerRadius]) return kSettingsModuleSpacingEnabled;
+    if ([key isEqualToString:kSettingsSugarCaneEnabled] ||
+        [key isEqualToString:kSettingsSugarCaneShowBrightness] ||
+        [key isEqualToString:kSettingsSugarCaneShowVolume] ||
+        [key isEqualToString:kSettingsSugarCaneFontSize]) return kSettingsSugarCaneEnabled;
+    if ([key isEqualToString:kSettingsBetterCCXIEnabled] ||
+        [key isEqualToString:kSettingsBetterCCXIZLift] ||
+        [key isEqualToString:kSettingsBetterCCXIDepthLimit]) return kSettingsBetterCCXIEnabled;
+    if ([key isEqualToString:kSettingsMagmaEnabled] ||
+        [key isEqualToString:kSettingsMagmaRed] ||
+        [key isEqualToString:kSettingsMagmaGreen] ||
+        [key isEqualToString:kSettingsMagmaBlue] ||
+        [key isEqualToString:kSettingsMagmaAlphaPct]) return kSettingsMagmaEnabled;
+    if ([key isEqualToString:kSettingsBetterCCIconsEnabled] ||
+        [key isEqualToString:kSettingsBetterCCIconsCornerRadius]) return kSettingsBetterCCIconsEnabled;
+    if ([key isEqualToString:kSettingsCCNoPlatterDimEnabled] ||
+        [key isEqualToString:kSettingsCCNoPlatterDimVisibleAlphaPct]) return kSettingsCCNoPlatterDimEnabled;
+    if ([key isEqualToString:kSettingsCCStatusEnabled] ||
+        [key isEqualToString:kSettingsCCStatusShowWifi] ||
+        [key isEqualToString:kSettingsCCStatusShowIP] ||
+        [key isEqualToString:kSettingsCCStatusYOffset]) return kSettingsCCStatusEnabled;
+    if ([key isEqualToString:kSettingsHapticCCEnabled] ||
+        [key isEqualToString:kSettingsHapticCCFeedbackStyle]) return kSettingsHapticCCEnabled;
+    if ([key isEqualToString:kSettingsSecureCCEnabled] ||
+        [key isEqualToString:kSettingsSecureCCShowIndicator] ||
+        [key isEqualToString:kSettingsSecureCCDelayMs]) return kSettingsSecureCCEnabled;
+    if ([key isEqualToString:kSettingsBarmojiEnabled]) return kSettingsBarmojiEnabled;
+    if ([key isEqualToString:kSettingsBlurryBadgesEnabled]) return kSettingsBlurryBadgesEnabled;
+    if ([key isEqualToString:kSettingsSnapperEnabled]) return kSettingsSnapperEnabled;
+    if ([key isEqualToString:kSettingsPullOverEnabled]) return kSettingsPullOverEnabled;
+    if ([key isEqualToString:kSettingsAlkalineEnabled]) return kSettingsAlkalineEnabled;
+    return nil;
+}
+
 static BOOL settings_key_is_split_experimental_tweak(NSString *key)
 {
-    return [key isEqualToString:kSettingsCleanCCEnabled] ||
-           [key isEqualToString:kSettingsFUGapEnabled] ||
-           [key isEqualToString:kSettingsModuleSpacingEnabled] ||
-           [key isEqualToString:kSettingsSugarCaneEnabled] ||
-           [key isEqualToString:kSettingsBetterCCXIEnabled] ||
-           [key isEqualToString:kSettingsMagmaEnabled] ||
-           [key isEqualToString:kSettingsBetterCCIconsEnabled] ||
-           [key isEqualToString:kSettingsCCNoPlatterDimEnabled] ||
-           [key isEqualToString:kSettingsCCStatusEnabled] ||
-           [key isEqualToString:kSettingsHapticCCEnabled] ||
-           [key isEqualToString:kSettingsSecureCCEnabled] ||
-           [key isEqualToString:kSettingsBarmojiEnabled] ||
-           [key isEqualToString:kSettingsBlurryBadgesEnabled] ||
-           [key isEqualToString:kSettingsSnapperEnabled] ||
-           [key isEqualToString:kSettingsPullOverEnabled] ||
-           [key isEqualToString:kSettingsAlkalineEnabled];
+    return settings_split_tweak_master_key_for_key(key) != nil;
 }
 
 static BOOL settings_key_is_tweakloader(NSString *key)
@@ -7284,66 +7357,68 @@ static void settings_schedule_live_apply_for_key(NSString *key)
     }
 
     if (settings_key_is_split_experimental_tweak(key)) {
+        NSString *masterKey = settings_split_tweak_master_key_for_key(key);
         if (g_springboard_rc_ready) {
             dispatch_async(dispatch_get_global_queue(0, 0), ^{
                 @synchronized (settings_rc_lock()) {
                     if (settings_cleanup_in_progress() || !g_springboard_rc_ready) return;
+                    settings_configure_control_center_tweaks(d);
                     bool ok = true;
-                    if ([key isEqualToString:kSettingsCleanCCEnabled]) {
+                    if ([masterKey isEqualToString:kSettingsCleanCCEnabled]) {
                         ok = [d boolForKey:kSettingsCleanCCEnabled] ? cleancc_apply_in_session() : cleancc_stop_in_session();
                         settings_mark_tweak_applied(kSettingsCleanCCEnabled, ok && [d boolForKey:kSettingsCleanCCEnabled]);
-                    } else if ([key isEqualToString:kSettingsFUGapEnabled]) {
+                    } else if ([masterKey isEqualToString:kSettingsFUGapEnabled]) {
                         ok = [d boolForKey:kSettingsFUGapEnabled] ? fugap_apply_in_session() : fugap_stop_in_session();
                         settings_mark_tweak_applied(kSettingsFUGapEnabled, ok && [d boolForKey:kSettingsFUGapEnabled]);
-                    } else if ([key isEqualToString:kSettingsModuleSpacingEnabled]) {
+                    } else if ([masterKey isEqualToString:kSettingsModuleSpacingEnabled]) {
                         ok = [d boolForKey:kSettingsModuleSpacingEnabled] ? modulespacing_apply_in_session() : modulespacing_stop_in_session();
                         settings_mark_tweak_applied(kSettingsModuleSpacingEnabled, ok && [d boolForKey:kSettingsModuleSpacingEnabled]);
-                    } else if ([key isEqualToString:kSettingsSugarCaneEnabled]) {
+                    } else if ([masterKey isEqualToString:kSettingsSugarCaneEnabled]) {
                         ok = [d boolForKey:kSettingsSugarCaneEnabled] ? sugarcane_apply_in_session() : sugarcane_stop_in_session();
                         settings_mark_tweak_applied(kSettingsSugarCaneEnabled, ok && [d boolForKey:kSettingsSugarCaneEnabled]);
-                    } else if ([key isEqualToString:kSettingsBetterCCXIEnabled]) {
+                    } else if ([masterKey isEqualToString:kSettingsBetterCCXIEnabled]) {
                         ok = [d boolForKey:kSettingsBetterCCXIEnabled] ? betterccxi_apply_in_session() : betterccxi_stop_in_session();
                         settings_mark_tweak_applied(kSettingsBetterCCXIEnabled, ok && [d boolForKey:kSettingsBetterCCXIEnabled]);
-                    } else if ([key isEqualToString:kSettingsMagmaEnabled]) {
+                    } else if ([masterKey isEqualToString:kSettingsMagmaEnabled]) {
                         ok = [d boolForKey:kSettingsMagmaEnabled] ? magma_apply_in_session() : magma_stop_in_session();
                         settings_mark_tweak_applied(kSettingsMagmaEnabled, ok && [d boolForKey:kSettingsMagmaEnabled]);
-                    } else if ([key isEqualToString:kSettingsBetterCCIconsEnabled]) {
+                    } else if ([masterKey isEqualToString:kSettingsBetterCCIconsEnabled]) {
                         ok = [d boolForKey:kSettingsBetterCCIconsEnabled] ? betterccicons_apply_in_session() : betterccicons_stop_in_session();
                         settings_mark_tweak_applied(kSettingsBetterCCIconsEnabled, ok && [d boolForKey:kSettingsBetterCCIconsEnabled]);
-                    } else if ([key isEqualToString:kSettingsCCNoPlatterDimEnabled]) {
+                    } else if ([masterKey isEqualToString:kSettingsCCNoPlatterDimEnabled]) {
                         ok = [d boolForKey:kSettingsCCNoPlatterDimEnabled] ? ccnoplatterdim_apply_in_session() : ccnoplatterdim_stop_in_session();
                         settings_mark_tweak_applied(kSettingsCCNoPlatterDimEnabled, ok && [d boolForKey:kSettingsCCNoPlatterDimEnabled]);
-                    } else if ([key isEqualToString:kSettingsCCStatusEnabled]) {
+                    } else if ([masterKey isEqualToString:kSettingsCCStatusEnabled]) {
                         ok = [d boolForKey:kSettingsCCStatusEnabled] ? ccstatus_apply_in_session() : ccstatus_stop_in_session();
                         settings_mark_tweak_applied(kSettingsCCStatusEnabled, ok && [d boolForKey:kSettingsCCStatusEnabled]);
-                    } else if ([key isEqualToString:kSettingsHapticCCEnabled]) {
+                    } else if ([masterKey isEqualToString:kSettingsHapticCCEnabled]) {
                         ok = [d boolForKey:kSettingsHapticCCEnabled] ? hapticcc_apply_in_session() : hapticcc_stop_in_session();
                         settings_mark_tweak_applied(kSettingsHapticCCEnabled, ok && [d boolForKey:kSettingsHapticCCEnabled]);
-                    } else if ([key isEqualToString:kSettingsSecureCCEnabled]) {
+                    } else if ([masterKey isEqualToString:kSettingsSecureCCEnabled]) {
                         ok = [d boolForKey:kSettingsSecureCCEnabled] ? securecc_apply_in_session() : securecc_stop_in_session();
                         settings_mark_tweak_applied(kSettingsSecureCCEnabled, ok && [d boolForKey:kSettingsSecureCCEnabled]);
-                    } else if ([key isEqualToString:kSettingsBarmojiEnabled]) {
+                    } else if ([masterKey isEqualToString:kSettingsBarmojiEnabled]) {
                         ok = [d boolForKey:kSettingsBarmojiEnabled] ? barmoji_apply_in_session() : barmoji_stop_in_session();
                         settings_mark_tweak_applied(kSettingsBarmojiEnabled, ok && [d boolForKey:kSettingsBarmojiEnabled]);
-                    } else if ([key isEqualToString:kSettingsBlurryBadgesEnabled]) {
+                    } else if ([masterKey isEqualToString:kSettingsBlurryBadgesEnabled]) {
                         ok = [d boolForKey:kSettingsBlurryBadgesEnabled] ? blurrybadges_apply_in_session() : blurrybadges_stop_in_session();
                         settings_mark_tweak_applied(kSettingsBlurryBadgesEnabled, ok && [d boolForKey:kSettingsBlurryBadgesEnabled]);
-                    } else if ([key isEqualToString:kSettingsSnapperEnabled]) {
+                    } else if ([masterKey isEqualToString:kSettingsSnapperEnabled]) {
                         ok = [d boolForKey:kSettingsSnapperEnabled] ? snapper_apply_in_session() : snapper_stop_in_session();
                         settings_mark_tweak_applied(kSettingsSnapperEnabled, ok && [d boolForKey:kSettingsSnapperEnabled]);
-                    } else if ([key isEqualToString:kSettingsPullOverEnabled]) {
+                    } else if ([masterKey isEqualToString:kSettingsPullOverEnabled]) {
                         ok = [d boolForKey:kSettingsPullOverEnabled] ? pullover_apply_in_session() : pullover_stop_in_session();
                         settings_mark_tweak_applied(kSettingsPullOverEnabled, ok && [d boolForKey:kSettingsPullOverEnabled]);
-                    } else if ([key isEqualToString:kSettingsAlkalineEnabled]) {
+                    } else if ([masterKey isEqualToString:kSettingsAlkalineEnabled]) {
                         ok = [d boolForKey:kSettingsAlkalineEnabled] ? alkaline_apply_in_session() : alkaline_stop_in_session();
                         settings_mark_tweak_applied(kSettingsAlkalineEnabled, ok && [d boolForKey:kSettingsAlkalineEnabled]);
                     }
-                    printf("[SETTINGS] live split tweak %s result=%d\n", key.UTF8String, ok);
+                    printf("[SETTINGS] live split tweak %s owner=%s result=%d\n", key.UTF8String, masterKey.UTF8String, ok);
                 }
                 settings_notify_package_queue_changed_async();
             });
         } else {
-            settings_mark_tweak_applied(key, NO);
+            settings_mark_tweak_applied(masterKey ?: key, NO);
             settings_notify_package_queue_changed_async();
         }
         return;
@@ -7905,6 +7980,27 @@ void settings_register_defaults(void)
         kSettingsCCStatusEnabled: @NO,
         kSettingsHapticCCEnabled: @NO,
         kSettingsSecureCCEnabled: @NO,
+        kSettingsCleanCCMaterialAlphaPct: @78,
+        kSettingsCleanCCGlassTintPct: @10,
+        kSettingsFUGapYOffset: @-24,
+        kSettingsModuleSpacingCornerRadius: @8,
+        kSettingsSugarCaneShowBrightness: @YES,
+        kSettingsSugarCaneShowVolume: @YES,
+        kSettingsSugarCaneFontSize: @13,
+        kSettingsBetterCCXIZLift: @4,
+        kSettingsBetterCCXIDepthLimit: @12,
+        kSettingsMagmaRed: @255,
+        kSettingsMagmaGreen: @71,
+        kSettingsMagmaBlue: @20,
+        kSettingsMagmaAlphaPct: @100,
+        kSettingsBetterCCIconsCornerRadius: @22,
+        kSettingsCCNoPlatterDimVisibleAlphaPct: @96,
+        kSettingsCCStatusShowWifi: @YES,
+        kSettingsCCStatusShowIP: @YES,
+        kSettingsCCStatusYOffset: @70,
+        kSettingsHapticCCFeedbackStyle: @1,
+        kSettingsSecureCCShowIndicator: @YES,
+        kSettingsSecureCCDelayMs: @750,
         kSettingsHideLabelsEnabled: @NO,
         kSettingsFakeClockUpEnabled: @NO,
         kSettingsFakeClockUpSpeed: @2.0,
@@ -8662,6 +8758,8 @@ static void settings_run_actions_internal(BOOL pendingOnly)
                         log_user("%s RealCC %s.\n", ok ? "[OK]" : "[WARN]", ok ? "active" : "did not start cleanly");
                         cyanide_upload_log_milestone(ok ? @"realcc-applied" : @"realcc-failed");
                     }
+
+                    settings_configure_control_center_tweaks(d);
 
                     if (runCleanCC) {
                         settings_progress(&step, total, "Applying CleanCC");
@@ -10116,57 +10214,100 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
 
 - (NSArray<NSDictionary *> *)cleanccRows
 {
-    return @[ @{ @"kind": @"toggle", @"key": kSettingsCleanCCEnabled, @"title": @"Enable CleanCC" } ];
+    return @[
+        @{ @"kind": @"toggle", @"key": kSettingsCleanCCEnabled, @"title": @"Enable CleanCC" },
+        @{ @"kind": @"slider", @"key": kSettingsCleanCCMaterialAlphaPct, @"title": @"Material alpha", @"min": @5, @"max": @100, @"step": @1, @"default": @78, @"unit": @"%" },
+        @{ @"kind": @"slider", @"key": kSettingsCleanCCGlassTintPct, @"title": @"Glass tint", @"min": @0, @"max": @80, @"step": @1, @"default": @10, @"unit": @"%" },
+    ];
 }
 
 - (NSArray<NSDictionary *> *)fugapRows
 {
-    return @[ @{ @"kind": @"toggle", @"key": kSettingsFUGapEnabled, @"title": @"Enable FUGap" } ];
+    return @[
+        @{ @"kind": @"toggle", @"key": kSettingsFUGapEnabled, @"title": @"Enable FUGap" },
+        @{ @"kind": @"slider", @"key": kSettingsFUGapYOffset, @"title": @"Y offset", @"min": @-80, @"max": @40, @"step": @2, @"default": @-24, @"unit": @"pt" },
+    ];
 }
 
 - (NSArray<NSDictionary *> *)modulespacingRows
 {
-    return @[ @{ @"kind": @"toggle", @"key": kSettingsModuleSpacingEnabled, @"title": @"Enable ModuleSpacing" } ];
+    return @[
+        @{ @"kind": @"toggle", @"key": kSettingsModuleSpacingEnabled, @"title": @"Enable ModuleSpacing" },
+        @{ @"kind": @"slider", @"key": kSettingsModuleSpacingCornerRadius, @"title": @"Module radius", @"min": @0, @"max": @40, @"step": @1, @"default": @8, @"unit": @"pt" },
+    ];
 }
 
 - (NSArray<NSDictionary *> *)sugarcaneRows
 {
-    return @[ @{ @"kind": @"toggle", @"key": kSettingsSugarCaneEnabled, @"title": @"Enable SugarCane" } ];
+    return @[
+        @{ @"kind": @"toggle", @"key": kSettingsSugarCaneEnabled, @"title": @"Enable SugarCane" },
+        @{ @"kind": @"toggle", @"key": kSettingsSugarCaneShowBrightness, @"title": @"Show brightness percent" },
+        @{ @"kind": @"toggle", @"key": kSettingsSugarCaneShowVolume, @"title": @"Show volume percent" },
+        @{ @"kind": @"slider", @"key": kSettingsSugarCaneFontSize, @"title": @"Overlay font", @"min": @10, @"max": @24, @"step": @1, @"default": @13, @"unit": @"pt" },
+    ];
 }
 
 - (NSArray<NSDictionary *> *)betterccxiRows
 {
-    return @[ @{ @"kind": @"toggle", @"key": kSettingsBetterCCXIEnabled, @"title": @"Enable BetterCCXI" } ];
+    return @[
+        @{ @"kind": @"toggle", @"key": kSettingsBetterCCXIEnabled, @"title": @"Enable BetterCCXI" },
+        @{ @"kind": @"slider", @"key": kSettingsBetterCCXIZLift, @"title": @"Module lift", @"min": @0, @"max": @20, @"step": @1, @"default": @4, @"unit": @"z" },
+        @{ @"kind": @"slider", @"key": kSettingsBetterCCXIDepthLimit, @"title": @"Scan depth", @"min": @4, @"max": @16, @"step": @1, @"default": @12 },
+    ];
 }
 
 - (NSArray<NSDictionary *> *)magmaRows
 {
-    return @[ @{ @"kind": @"toggle", @"key": kSettingsMagmaEnabled, @"title": @"Enable Magma" } ];
+    return @[
+        @{ @"kind": @"toggle", @"key": kSettingsMagmaEnabled, @"title": @"Enable Magma" },
+        @{ @"kind": @"slider", @"key": kSettingsMagmaRed, @"title": @"Red", @"min": @0, @"max": @255, @"step": @1, @"default": @255 },
+        @{ @"kind": @"slider", @"key": kSettingsMagmaGreen, @"title": @"Green", @"min": @0, @"max": @255, @"step": @1, @"default": @71 },
+        @{ @"kind": @"slider", @"key": kSettingsMagmaBlue, @"title": @"Blue", @"min": @0, @"max": @255, @"step": @1, @"default": @20 },
+        @{ @"kind": @"slider", @"key": kSettingsMagmaAlphaPct, @"title": @"Tint alpha", @"min": @5, @"max": @100, @"step": @1, @"default": @100, @"unit": @"%" },
+    ];
 }
 
 - (NSArray<NSDictionary *> *)bettercciconsRows
 {
-    return @[ @{ @"kind": @"toggle", @"key": kSettingsBetterCCIconsEnabled, @"title": @"Enable BetterCCIcons" } ];
+    return @[
+        @{ @"kind": @"toggle", @"key": kSettingsBetterCCIconsEnabled, @"title": @"Enable BetterCCIcons" },
+        @{ @"kind": @"slider", @"key": kSettingsBetterCCIconsCornerRadius, @"title": @"Icon corner radius", @"min": @0, @"max": @44, @"step": @1, @"default": @22, @"unit": @"pt" },
+    ];
 }
 
 - (NSArray<NSDictionary *> *)ccnoplatterdimRows
 {
-    return @[ @{ @"kind": @"toggle", @"key": kSettingsCCNoPlatterDimEnabled, @"title": @"Enable CCNoPlatterDim" } ];
+    return @[
+        @{ @"kind": @"toggle", @"key": kSettingsCCNoPlatterDimEnabled, @"title": @"Enable CCNoPlatterDim" },
+        @{ @"kind": @"slider", @"key": kSettingsCCNoPlatterDimVisibleAlphaPct, @"title": @"Expanded brightness", @"min": @40, @"max": @100, @"step": @1, @"default": @96, @"unit": @"%" },
+    ];
 }
 
 - (NSArray<NSDictionary *> *)ccstatusRows
 {
-    return @[ @{ @"kind": @"toggle", @"key": kSettingsCCStatusEnabled, @"title": @"Enable CCStatus" } ];
+    return @[
+        @{ @"kind": @"toggle", @"key": kSettingsCCStatusEnabled, @"title": @"Enable CCStatus" },
+        @{ @"kind": @"toggle", @"key": kSettingsCCStatusShowWifi, @"title": @"Show Wi-Fi line" },
+        @{ @"kind": @"toggle", @"key": kSettingsCCStatusShowIP, @"title": @"Show local IP line" },
+        @{ @"kind": @"slider", @"key": kSettingsCCStatusYOffset, @"title": @"Header Y position", @"min": @20, @"max": @180, @"step": @2, @"default": @70, @"unit": @"pt" },
+    ];
 }
 
 - (NSArray<NSDictionary *> *)hapticccRows
 {
-    return @[ @{ @"kind": @"toggle", @"key": kSettingsHapticCCEnabled, @"title": @"Enable HapticCC" } ];
+    return @[
+        @{ @"kind": @"toggle", @"key": kSettingsHapticCCEnabled, @"title": @"Enable HapticCC" },
+        @{ @"kind": @"slider", @"key": kSettingsHapticCCFeedbackStyle, @"title": @"Feedback style", @"min": @0, @"max": @4, @"step": @1, @"default": @1 },
+    ];
 }
 
 - (NSArray<NSDictionary *> *)secureccRows
 {
-    return @[ @{ @"kind": @"toggle", @"key": kSettingsSecureCCEnabled, @"title": @"Enable SecureCC" } ];
+    return @[
+        @{ @"kind": @"toggle", @"key": kSettingsSecureCCEnabled, @"title": @"Enable SecureCC" },
+        @{ @"kind": @"toggle", @"key": kSettingsSecureCCShowIndicator, @"title": @"Show armed indicator" },
+        @{ @"kind": @"slider", @"key": kSettingsSecureCCDelayMs, @"title": @"Confirmation delay", @"min": @0, @"max": @3000, @"step": @50, @"default": @750, @"unit": @"ms" },
+    ];
 }
 
 - (NSArray<NSDictionary *> *)hidellabelsRows
@@ -10654,26 +10795,42 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
                          @"value": applied ? @"Active" : (intent ? @"Queued" : @"Off")}];
     } else if (section == SectionCleanCC) {
         addSimpleSummary(@"CleanCC", kSettingsCleanCCEnabled);
+        [out addObject:@{@"title": @"Alpha", @"value": [NSString stringWithFormat:@"%ld%%", (long)[d integerForKey:kSettingsCleanCCMaterialAlphaPct]]}];
+        [out addObject:@{@"title": @"Glass tint", @"value": [NSString stringWithFormat:@"%ld%%", (long)[d integerForKey:kSettingsCleanCCGlassTintPct]]}];
     } else if (section == SectionFUGap) {
         addSimpleSummary(@"FUGap", kSettingsFUGapEnabled);
+        [out addObject:@{@"title": @"Y offset", @"value": [NSString stringWithFormat:@"%ldpt", (long)[d integerForKey:kSettingsFUGapYOffset]]}];
     } else if (section == SectionModuleSpacing) {
         addSimpleSummary(@"ModuleSpacing", kSettingsModuleSpacingEnabled);
+        [out addObject:@{@"title": @"Radius", @"value": [NSString stringWithFormat:@"%ldpt", (long)[d integerForKey:kSettingsModuleSpacingCornerRadius]]}];
     } else if (section == SectionSugarCane) {
         addSimpleSummary(@"SugarCane", kSettingsSugarCaneEnabled);
+        [out addObject:@{@"title": @"Brightness", @"value": [d boolForKey:kSettingsSugarCaneShowBrightness] ? @"On" : @"Off"}];
+        [out addObject:@{@"title": @"Volume", @"value": [d boolForKey:kSettingsSugarCaneShowVolume] ? @"On" : @"Off"}];
     } else if (section == SectionBetterCCXI) {
         addSimpleSummary(@"BetterCCXI", kSettingsBetterCCXIEnabled);
+        [out addObject:@{@"title": @"Lift", @"value": [@([d integerForKey:kSettingsBetterCCXIZLift]) stringValue]}];
     } else if (section == SectionMagma) {
         addSimpleSummary(@"Magma", kSettingsMagmaEnabled);
+        [out addObject:@{@"title": @"RGB", @"value": [NSString stringWithFormat:@"%ld/%ld/%ld",
+                                                       (long)[d integerForKey:kSettingsMagmaRed],
+                                                       (long)[d integerForKey:kSettingsMagmaGreen],
+                                                       (long)[d integerForKey:kSettingsMagmaBlue]]}];
     } else if (section == SectionBetterCCIcons) {
         addSimpleSummary(@"BetterCCIcons", kSettingsBetterCCIconsEnabled);
+        [out addObject:@{@"title": @"Radius", @"value": [NSString stringWithFormat:@"%ldpt", (long)[d integerForKey:kSettingsBetterCCIconsCornerRadius]]}];
     } else if (section == SectionCCNoPlatterDim) {
         addSimpleSummary(@"CCNoPlatterDim", kSettingsCCNoPlatterDimEnabled);
+        [out addObject:@{@"title": @"Brightness", @"value": [NSString stringWithFormat:@"%ld%%", (long)[d integerForKey:kSettingsCCNoPlatterDimVisibleAlphaPct]]}];
     } else if (section == SectionCCStatus) {
         addSimpleSummary(@"CCStatus", kSettingsCCStatusEnabled);
+        [out addObject:@{@"title": @"Header Y", @"value": [NSString stringWithFormat:@"%ldpt", (long)[d integerForKey:kSettingsCCStatusYOffset]]}];
     } else if (section == SectionHapticCC) {
         addSimpleSummary(@"HapticCC", kSettingsHapticCCEnabled);
+        [out addObject:@{@"title": @"Style", @"value": [@([d integerForKey:kSettingsHapticCCFeedbackStyle]) stringValue]}];
     } else if (section == SectionSecureCC) {
         addSimpleSummary(@"SecureCC", kSettingsSecureCCEnabled);
+        [out addObject:@{@"title": @"Delay", @"value": [NSString stringWithFormat:@"%ldms", (long)[d integerForKey:kSettingsSecureCCDelayMs]]}];
     } else if (section == SectionHideLabels) {
         BOOL intent = [d boolForKey:kSettingsHideLabelsEnabled];
         BOOL applied = settings_tweak_is_applied(kSettingsHideLabelsEnabled);

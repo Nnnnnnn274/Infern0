@@ -5,6 +5,7 @@
 
 bool sugarcane_apply_in_session(void);
 bool sugarcane_stop_in_session(void);
+void sugarcane_configure(bool showBrightness, bool showVolume, int fontSize);
 void sugarcane_forget_remote_state(void);
 
 #endif

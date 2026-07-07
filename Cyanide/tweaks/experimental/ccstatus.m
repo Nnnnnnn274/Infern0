@@ -7,6 +7,9 @@
 typedef struct { double x; double y; double width; double height; } CCStatusRect;
 
 static uint64_t gCCStatusLabel = 0;
+static bool gCCStatusShowWifi = true;
+static bool gCCStatusShowIP = true;
+static int gCCStatusYOffset = 70;
 
 static uint64_t ccstatus_key_window(void)
 {
@@ -19,15 +22,22 @@ static uint64_t ccstatus_key_window(void)
 bool ccstatus_apply_in_session(void)
 {
     printf("[CCSTATUS] apply\n");
-    if (r_is_objc_ptr(gCCStatusLabel)) return true;
+    if (r_is_objc_ptr(gCCStatusLabel)) {
+        r_msg2_main(gCCStatusLabel, "removeFromSuperview", 0, 0, 0, 0);
+        gCCStatusLabel = 0;
+    }
     uint64_t win = ccstatus_key_window();
     uint64_t UILabel = r_class("UILabel");
     if (!r_is_objc_ptr(win) || !r_is_objc_ptr(UILabel)) return false;
     uint64_t label = r_msg2_main(UILabel, "alloc", 0, 0, 0, 0);
-    CCStatusRect frame = { 24, 70, 260, 24 };
+    CCStatusRect frame = { 24, (double)gCCStatusYOffset, 300, 24 };
     label = r_msg2_main_raw(label, "initWithFrame:", &frame, sizeof(frame), NULL, 0, NULL, 0, NULL, 0);
     if (!r_is_objc_ptr(label)) return false;
-    uint64_t str = r_nsstr_retained("CCStatus  Wi-Fi: Active  Local IP: --");
+    const char *text = "CCStatus";
+    if (gCCStatusShowWifi && gCCStatusShowIP) text = "CCStatus  Wi-Fi: Active  Local IP: --";
+    else if (gCCStatusShowWifi) text = "CCStatus  Wi-Fi: Active";
+    else if (gCCStatusShowIP) text = "CCStatus  Local IP: --";
+    uint64_t str = r_nsstr_retained(text);
     if (r_is_objc_ptr(str)) {
         r_msg2_main(label, "setText:", str, 0, 0, 0);
         r_msg2_main(str, "release", 0, 0, 0, 0);
@@ -43,6 +53,15 @@ bool ccstatus_stop_in_session(void)
     if (r_is_objc_ptr(gCCStatusLabel)) r_msg2_main(gCCStatusLabel, "removeFromSuperview", 0, 0, 0, 0);
     gCCStatusLabel = 0;
     return true;
+}
+
+void ccstatus_configure(bool showWifi, bool showIP, int yOffset)
+{
+    if (yOffset < 20) yOffset = 20;
+    if (yOffset > 180) yOffset = 180;
+    gCCStatusShowWifi = showWifi;
+    gCCStatusShowIP = showIP;
+    gCCStatusYOffset = yOffset;
 }
 
 void ccstatus_forget_remote_state(void) { gCCStatusLabel = 0; }

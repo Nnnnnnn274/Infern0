@@ -6,6 +6,7 @@
 #import <string.h>
 
 static bool gBetterCCIconsApplied = false;
+static int gBetterCCIconsCornerRadius = 22;
 
 static uint64_t betterccicons_key_window(void)
 {
@@ -37,7 +38,7 @@ bool betterccicons_apply_in_session(void)
     uint64_t win = betterccicons_key_window();
     if (!r_is_objc_ptr(win)) return false;
     int hits = 0;
-    betterccicons_scan(win, 22.0, 0, &hits);
+    betterccicons_scan(win, (double)gBetterCCIconsCornerRadius, 0, &hits);
     gBetterCCIconsApplied = hits > 0;
     return gBetterCCIconsApplied;
 }
@@ -50,6 +51,13 @@ bool betterccicons_stop_in_session(void)
     if (r_is_objc_ptr(win)) betterccicons_scan(win, 12.0, 0, &hits);
     gBetterCCIconsApplied = false;
     return true;
+}
+
+void betterccicons_configure(int cornerRadius)
+{
+    if (cornerRadius < 0) cornerRadius = 0;
+    if (cornerRadius > 44) cornerRadius = 44;
+    gBetterCCIconsCornerRadius = cornerRadius;
 }
 
 void betterccicons_forget_remote_state(void) { gBetterCCIconsApplied = false; }

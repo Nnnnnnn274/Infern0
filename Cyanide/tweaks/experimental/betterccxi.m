@@ -6,6 +6,8 @@
 #import <string.h>
 
 static bool gBetterCCXIApplied = false;
+static int gBetterCCXIZLift = 4;
+static int gBetterCCXIDepthLimit = 12;
 
 static uint64_t betterccxi_key_window(void)
 {
@@ -17,10 +19,10 @@ static uint64_t betterccxi_key_window(void)
 
 static void betterccxi_scan(uint64_t parent, double scale, int depth, int *hits)
 {
-    if (!r_is_objc_ptr(parent) || depth > 12) return;
+    if (!r_is_objc_ptr(parent) || depth > gBetterCCXIDepthLimit) return;
     uint64_t layer = r_msg2_main(parent, "layer", 0, 0, 0, 0);
     if (r_is_objc_ptr(layer)) {
-        double z = scale > 1.0 ? 4.0 : 0.0;
+        double z = (double)gBetterCCXIZLift;
         r_msg2_main_raw(layer, "setZPosition:", &z, sizeof(z), NULL, 0, NULL, 0, NULL, 0);
     }
     uint64_t subviews = r_msg2_main(parent, "subviews", 0, 0, 0, 0);
@@ -49,6 +51,16 @@ bool betterccxi_stop_in_session(void)
     printf("[BETTERCCXI] stop\n");
     gBetterCCXIApplied = false;
     return true;
+}
+
+void betterccxi_configure(int zLift, int depthLimit)
+{
+    if (zLift < 0) zLift = 0;
+    if (zLift > 20) zLift = 20;
+    if (depthLimit < 4) depthLimit = 4;
+    if (depthLimit > 16) depthLimit = 16;
+    gBetterCCXIZLift = zLift;
+    gBetterCCXIDepthLimit = depthLimit;
 }
 
 void betterccxi_forget_remote_state(void) { gBetterCCXIApplied = false; }

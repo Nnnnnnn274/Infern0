@@ -6,6 +6,10 @@
 #import <string.h>
 
 static uint64_t gMagmaTint = 0;
+static int gMagmaRed = 255;
+static int gMagmaGreen = 71;
+static int gMagmaBlue = 20;
+static int gMagmaAlpha = 100;
 
 static uint64_t magma_color(double red, double green, double blue, double alpha)
 {
@@ -44,7 +48,10 @@ bool magma_apply_in_session(void)
     printf("[MAGMA] apply\n");
     uint64_t win = magma_key_window();
     if (!r_is_objc_ptr(win)) return false;
-    gMagmaTint = magma_color(1.0, 0.28, 0.08, 1.0);
+    gMagmaTint = magma_color((double)gMagmaRed / 255.0,
+                             (double)gMagmaGreen / 255.0,
+                             (double)gMagmaBlue / 255.0,
+                             (double)gMagmaAlpha / 100.0);
     int hits = 0;
     magma_scan(win, gMagmaTint, 0, &hits);
     return hits > 0;
@@ -59,6 +66,18 @@ bool magma_stop_in_session(void)
     if (r_is_objc_ptr(win)) magma_scan(win, white, 0, &hits);
     gMagmaTint = 0;
     return true;
+}
+
+void magma_configure(int red, int green, int blue, int alpha)
+{
+    if (red < 0) red = 0; if (red > 255) red = 255;
+    if (green < 0) green = 0; if (green > 255) green = 255;
+    if (blue < 0) blue = 0; if (blue > 255) blue = 255;
+    if (alpha < 5) alpha = 5; if (alpha > 100) alpha = 100;
+    gMagmaRed = red;
+    gMagmaGreen = green;
+    gMagmaBlue = blue;
+    gMagmaAlpha = alpha;
 }
 
 void magma_forget_remote_state(void) { gMagmaTint = 0; }
