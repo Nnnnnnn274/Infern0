@@ -12,6 +12,10 @@ typedef struct {
 } BarmojiRect;
 
 static uint64_t gBarmojiView = 0;
+static int gBarmojiYOffset = 92;
+static int gBarmojiWidthPercent = 92;
+static int gBarmojiFontSize = 21;
+static int gBarmojiBackgroundAlphaPercent = 86;
 
 static uint64_t barmoji_color(double red, double green, double blue, double alpha)
 {
@@ -100,20 +104,23 @@ static uint64_t barmoji_alloc_label(const char *text, double x, double y, double
 bool barmoji_apply_in_session(void)
 {
     printf("[BARMOJI] apply\n");
-    if (r_is_objc_ptr(gBarmojiView)) return true;
+    if (r_is_objc_ptr(gBarmojiView)) {
+        r_msg2_main(gBarmojiView, "removeFromSuperview", 0, 0, 0, 0);
+        gBarmojiView = 0;
+    }
 
     uint64_t win = barmoji_key_window();
     if (!r_is_objc_ptr(win)) return false;
     BarmojiRect bounds = barmoji_bounds_for_view(win);
-    double barWidth = bounds.width - 36.0;
+    double barWidth = bounds.width * ((double)gBarmojiWidthPercent / 100.0);
     if (barWidth > 390.0) barWidth = 390.0;
     if (barWidth < 260.0) barWidth = 260.0;
     double barX = (bounds.width - barWidth) / 2.0;
-    double barY = bounds.height - 92.0;
+    double barY = bounds.height - (double)gBarmojiYOffset;
     uint64_t bar = barmoji_alloc_view(barX, barY, barWidth, 44);
     if (!r_is_objc_ptr(bar)) return false;
 
-    uint64_t bg = barmoji_color(0.10, 0.10, 0.12, 0.86);
+    uint64_t bg = barmoji_color(0.10, 0.10, 0.12, (double)gBarmojiBackgroundAlphaPercent / 100.0);
     if (r_is_objc_ptr(bg)) r_msg2_main(bar, "setBackgroundColor:", bg, 0, 0, 0);
     uint64_t layer = r_msg2_main(bar, "layer", 0, 0, 0, 0);
     if (r_is_objc_ptr(layer)) {
@@ -131,7 +138,7 @@ bool barmoji_apply_in_session(void)
         "\xF0\x9F\x94\xA5  "
         "\xF0\x9F\x98\xAD  "
         "\xE2\x9C\xA8";
-    uint64_t label = barmoji_alloc_label(emojiStrip, 8, 4, barWidth - 16.0, 36, 21.0);
+    uint64_t label = barmoji_alloc_label(emojiStrip, 8, 4, barWidth - 16.0, 36, (double)gBarmojiFontSize);
     if (r_is_objc_ptr(label)) {
         uint64_t white = barmoji_color(1, 1, 1, 1);
         if (r_is_objc_ptr(white)) r_msg2_main(label, "setTextColor:", white, 0, 0, 0);
@@ -149,6 +156,22 @@ bool barmoji_stop_in_session(void)
     if (r_is_objc_ptr(gBarmojiView)) r_msg2_main(gBarmojiView, "removeFromSuperview", 0, 0, 0, 0);
     gBarmojiView = 0;
     return true;
+}
+
+void barmoji_configure(int yOffset, int widthPercent, int fontSize, int backgroundAlphaPercent)
+{
+    if (yOffset < 48) yOffset = 48;
+    if (yOffset > 180) yOffset = 180;
+    if (widthPercent < 65) widthPercent = 65;
+    if (widthPercent > 100) widthPercent = 100;
+    if (fontSize < 14) fontSize = 14;
+    if (fontSize > 28) fontSize = 28;
+    if (backgroundAlphaPercent < 20) backgroundAlphaPercent = 20;
+    if (backgroundAlphaPercent > 100) backgroundAlphaPercent = 100;
+    gBarmojiYOffset = yOffset;
+    gBarmojiWidthPercent = widthPercent;
+    gBarmojiFontSize = fontSize;
+    gBarmojiBackgroundAlphaPercent = backgroundAlphaPercent;
 }
 
 void barmoji_forget_remote_state(void) { gBarmojiView = 0; }

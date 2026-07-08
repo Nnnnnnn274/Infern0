@@ -12,6 +12,11 @@ typedef struct {
 } PullOverRect;
 
 static uint64_t gPullOverView = 0;
+static int gPullOverWidth = 76;
+static int gPullOverYOffset = 130;
+static int gPullOverMaxHeight = 420;
+static int gPullOverCornerRadius = 20;
+static int gPullOverBackgroundAlphaPercent = 88;
 
 static uint64_t pullover_color(double red, double green, double blue, double alpha)
 {
@@ -78,20 +83,26 @@ static uint64_t pullover_alloc_label(void)
 bool pullover_apply_in_session(void)
 {
     printf("[PULLOVER] apply\n");
-    if (r_is_objc_ptr(gPullOverView)) return true;
+    if (r_is_objc_ptr(gPullOverView)) {
+        r_msg2_main(gPullOverView, "removeFromSuperview", 0, 0, 0, 0);
+        gPullOverView = 0;
+    }
     uint64_t win = pullover_key_window();
     if (!r_is_objc_ptr(win)) return false;
     PullOverRect bounds = pullover_bounds_for_view(win);
     double trayHeight = bounds.height - 260.0;
     if (trayHeight < 260.0) trayHeight = 260.0;
-    if (trayHeight > 420.0) trayHeight = 420.0;
-    uint64_t tray = pullover_alloc_view(bounds.width - 84.0, 130, 76, trayHeight);
+    if (trayHeight > (double)gPullOverMaxHeight) trayHeight = (double)gPullOverMaxHeight;
+    uint64_t tray = pullover_alloc_view(bounds.width - (double)gPullOverWidth - 8.0,
+                                        (double)gPullOverYOffset,
+                                        (double)gPullOverWidth,
+                                        trayHeight);
     if (!r_is_objc_ptr(tray)) return false;
-    uint64_t bg = pullover_color(0.08, 0.09, 0.11, 0.88);
+    uint64_t bg = pullover_color(0.08, 0.09, 0.11, (double)gPullOverBackgroundAlphaPercent / 100.0);
     if (r_is_objc_ptr(bg)) r_msg2_main(tray, "setBackgroundColor:", bg, 0, 0, 0);
     uint64_t layer = r_msg2_main(tray, "layer", 0, 0, 0, 0);
     if (r_is_objc_ptr(layer)) {
-        double radius = 20.0;
+        double radius = (double)gPullOverCornerRadius;
         r_msg2_main_raw(layer, "setCornerRadius:", &radius, sizeof(radius), NULL, 0, NULL, 0, NULL, 0);
         r_msg2_main(layer, "setMasksToBounds:", 1, 0, 0, 0);
     }
@@ -108,6 +119,20 @@ bool pullover_stop_in_session(void)
     if (r_is_objc_ptr(gPullOverView)) r_msg2_main(gPullOverView, "removeFromSuperview", 0, 0, 0, 0);
     gPullOverView = 0;
     return true;
+}
+
+void pullover_configure(int width, int yOffset, int maxHeight, int cornerRadius, int backgroundAlphaPercent)
+{
+    if (width < 52) width = 52; if (width > 140) width = 140;
+    if (yOffset < 40) yOffset = 40; if (yOffset > 300) yOffset = 300;
+    if (maxHeight < 220) maxHeight = 220; if (maxHeight > 720) maxHeight = 720;
+    if (cornerRadius < 0) cornerRadius = 0; if (cornerRadius > 40) cornerRadius = 40;
+    if (backgroundAlphaPercent < 20) backgroundAlphaPercent = 20; if (backgroundAlphaPercent > 100) backgroundAlphaPercent = 100;
+    gPullOverWidth = width;
+    gPullOverYOffset = yOffset;
+    gPullOverMaxHeight = maxHeight;
+    gPullOverCornerRadius = cornerRadius;
+    gPullOverBackgroundAlphaPercent = backgroundAlphaPercent;
 }
 
 void pullover_forget_remote_state(void) { gPullOverView = 0; }

@@ -9,6 +9,9 @@
 
 static bool gCyApplied = false;
 static uint64_t gCyLastIconListView = 0;
+static int gCyDepth = -10;
+static int gCyPerspectiveDistance = 650;
+static int gCyMaxIcons = 128;
 
 typedef struct {
     double m11, m12, m13, m14;
@@ -32,7 +35,9 @@ static void cy_apply_perspective_to_layer(uint64_t layer, bool enabled)
 {
     if (!r_is_objc_ptr(layer)) return;
     CYRemoteCATransform3D t = cy_identity_transform();
-    if (enabled) t.m34 = -1.0 / 650.0;
+    int distance = gCyPerspectiveDistance;
+    if (distance < 250) distance = 250;
+    if (enabled) t.m34 = -1.0 / (double)distance;
     r_msg2_main_raw(layer, "setSublayerTransform:",
                     &t, sizeof(t), NULL, 0, NULL, 0, NULL, 0);
 }
@@ -100,7 +105,7 @@ bool cylinderlite_apply_in_session(void)
     uint64_t subviews = r_msg2_main(iconListView, "subviews", 0, 0, 0, 0);
     if (!r_is_objc_ptr(subviews)) return false;
     uint64_t iconCount = r_msg2_main(subviews, "count", 0, 0, 0, 0);
-    if (iconCount > 128) iconCount = 128;
+    if (iconCount > (uint64_t)gCyMaxIcons) iconCount = (uint64_t)gCyMaxIcons;
 
     for (uint64_t i = 0; i < iconCount; i++) {
         uint64_t sv = r_msg2_main(subviews, "objectAtIndex:", i, 0, 0, 0);
@@ -122,7 +127,7 @@ bool cylinderlite_apply_in_session(void)
         if (strstr(cls, "SBIconView") || strstr(cls, "SBIcon")) {
             uint64_t layer = r_msg2_main(sv, "layer", 0, 0, 0, 0);
             if (r_is_objc_ptr(layer)) {
-                double z = -10.0;
+                double z = (double)gCyDepth;
                 r_msg2_main_raw(layer, "setZPosition:", &z, sizeof(z), NULL, 0, NULL, 0, NULL, 0);
                 printf("[CYLINDER] set depth on icon 0x%llx\n", sv);
             }
@@ -150,6 +155,19 @@ bool cylinderlite_stop_in_session(void)
     }
     gCyApplied = false;
     return true;
+}
+
+void cylinderlite_configure(int depth, int perspectiveDistance, int maxIcons)
+{
+    if (depth > 0) depth = 0;
+    if (depth < -80) depth = -80;
+    if (perspectiveDistance < 250) perspectiveDistance = 250;
+    if (perspectiveDistance > 1600) perspectiveDistance = 1600;
+    if (maxIcons < 8) maxIcons = 8;
+    if (maxIcons > 256) maxIcons = 256;
+    gCyDepth = depth;
+    gCyPerspectiveDistance = perspectiveDistance;
+    gCyMaxIcons = maxIcons;
 }
 
 void cylinderlite_forget_remote_state(void)

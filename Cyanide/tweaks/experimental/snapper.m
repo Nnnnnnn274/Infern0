@@ -12,6 +12,12 @@ typedef struct {
 } SnapperRect;
 
 static uint64_t gSnapperView = 0;
+static int gSnapperX = 44;
+static int gSnapperY = 160;
+static int gSnapperWidth = 300;
+static int gSnapperHeight = 220;
+static int gSnapperBorderWidth = 2;
+static int gSnapperCornerRadius = 12;
 
 static uint64_t snapper_color(double red, double green, double blue, double alpha)
 {
@@ -64,17 +70,23 @@ static uint64_t snapper_alloc_label(const char *text)
 bool snapper_apply_in_session(void)
 {
     printf("[SNAPPER] apply\n");
-    if (r_is_objc_ptr(gSnapperView)) return true;
+    if (r_is_objc_ptr(gSnapperView)) {
+        r_msg2_main(gSnapperView, "removeFromSuperview", 0, 0, 0, 0);
+        gSnapperView = 0;
+    }
     uint64_t win = snapper_key_window();
     if (!r_is_objc_ptr(win)) return false;
-    uint64_t frame = snapper_alloc_view(44, 160, 300, 220);
+    uint64_t frame = snapper_alloc_view((double)gSnapperX,
+                                        (double)gSnapperY,
+                                        (double)gSnapperWidth,
+                                        (double)gSnapperHeight);
     if (!r_is_objc_ptr(frame)) return false;
     uint64_t clear = snapper_color(0.05, 0.18, 0.32, 0.16);
     if (r_is_objc_ptr(clear)) r_msg2_main(frame, "setBackgroundColor:", clear, 0, 0, 0);
     uint64_t layer = r_msg2_main(frame, "layer", 0, 0, 0, 0);
     if (r_is_objc_ptr(layer)) {
-        double borderWidth = 2.0;
-        double radius = 12.0;
+        double borderWidth = (double)gSnapperBorderWidth;
+        double radius = (double)gSnapperCornerRadius;
         uint64_t border = snapper_color(0.15, 0.66, 1.0, 0.95);
         uint64_t cg = r_is_objc_ptr(border) ? r_msg2_main(border, "CGColor", 0, 0, 0, 0) : 0;
         if (cg) r_msg2_main(layer, "setBorderColor:", cg, 0, 0, 0);
@@ -94,6 +106,22 @@ bool snapper_stop_in_session(void)
     if (r_is_objc_ptr(gSnapperView)) r_msg2_main(gSnapperView, "removeFromSuperview", 0, 0, 0, 0);
     gSnapperView = 0;
     return true;
+}
+
+void snapper_configure(int x, int y, int width, int height, int borderWidth, int cornerRadius)
+{
+    if (x < 0) x = 0; if (x > 220) x = 220;
+    if (y < 40) y = 40; if (y > 520) y = 520;
+    if (width < 80) width = 80; if (width > 390) width = 390;
+    if (height < 80) height = 80; if (height > 640) height = 640;
+    if (borderWidth < 1) borderWidth = 1; if (borderWidth > 8) borderWidth = 8;
+    if (cornerRadius < 0) cornerRadius = 0; if (cornerRadius > 40) cornerRadius = 40;
+    gSnapperX = x;
+    gSnapperY = y;
+    gSnapperWidth = width;
+    gSnapperHeight = height;
+    gSnapperBorderWidth = borderWidth;
+    gSnapperCornerRadius = cornerRadius;
 }
 
 void snapper_forget_remote_state(void) { gSnapperView = 0; }

@@ -6,6 +6,10 @@
 #import <string.h>
 
 static uint64_t gBlurryBadgesTint = 0;
+static int gBlurryBadgesRed = 59;
+static int gBlurryBadgesGreen = 140;
+static int gBlurryBadgesBlue = 255;
+static int gBlurryBadgesAlphaPercent = 92;
 
 static uint64_t blurrybadges_color(double red, double green, double blue, double alpha)
 {
@@ -83,7 +87,10 @@ bool blurrybadges_apply_in_session(void)
     printf("[BLURRYBADGES] apply\n");
     uint64_t win = blurrybadges_key_window();
     if (!r_is_objc_ptr(win)) return false;
-    gBlurryBadgesTint = blurrybadges_color(0.23, 0.55, 1.0, 0.92);
+    gBlurryBadgesTint = blurrybadges_color((double)gBlurryBadgesRed / 255.0,
+                                           (double)gBlurryBadgesGreen / 255.0,
+                                           (double)gBlurryBadgesBlue / 255.0,
+                                           (double)gBlurryBadgesAlphaPercent / 100.0);
     int hits = 0;
     blurrybadges_scan_and_tint(win, gBlurryBadgesTint, 0, &hits);
     printf("[BLURRYBADGES] tinted %d badge-ish views\n", hits);
@@ -99,6 +106,18 @@ bool blurrybadges_stop_in_session(void)
     if (r_is_objc_ptr(win)) blurrybadges_scan_and_tint(win, red, 0, &hits);
     gBlurryBadgesTint = 0;
     return true;
+}
+
+void blurrybadges_configure(int red, int green, int blue, int alphaPercent)
+{
+    if (red < 0) red = 0; if (red > 255) red = 255;
+    if (green < 0) green = 0; if (green > 255) green = 255;
+    if (blue < 0) blue = 0; if (blue > 255) blue = 255;
+    if (alphaPercent < 10) alphaPercent = 10; if (alphaPercent > 100) alphaPercent = 100;
+    gBlurryBadgesRed = red;
+    gBlurryBadgesGreen = green;
+    gBlurryBadgesBlue = blue;
+    gBlurryBadgesAlphaPercent = alphaPercent;
 }
 
 void blurrybadges_forget_remote_state(void) { gBlurryBadgesTint = 0; }

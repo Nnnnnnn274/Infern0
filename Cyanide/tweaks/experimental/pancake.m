@@ -9,6 +9,9 @@
 static bool gPcApplied = false;
 static uint64_t gPcGesture = 0;
 static uint64_t gPcWindow = 0;
+static int gPcMinimumTouches = 1;
+static int gPcMaximumTouches = 1;
+static bool gPcCancelsTouches = false;
 
 static uint64_t pc_navigation_target_for_controller(uint64_t controller, int depth)
 {
@@ -45,6 +48,12 @@ static uint64_t pc_navigation_target_for_controller(uint64_t controller, int dep
 bool pancake_apply_in_session(void)
 {
     printf("[PANCAKE] apply\n");
+    if (r_is_objc_ptr(gPcWindow) && r_is_objc_ptr(gPcGesture)) {
+        r_msg2_main(gPcWindow, "removeGestureRecognizer:", gPcGesture, 0, 0, 0);
+        gPcGesture = 0;
+        gPcWindow = 0;
+        gPcApplied = false;
+    }
 
     uint64_t UIApplication = r_class("UIApplication");
     if (!r_is_objc_ptr(UIApplication)) return false;
@@ -85,6 +94,9 @@ bool pancake_apply_in_session(void)
     if (!r_is_objc_ptr(panGesture)) return false;
     panGesture = r_msg2_main(panGesture, "init", 0, 0, 0, 0);
     if (!r_is_objc_ptr(panGesture)) return false;
+    r_msg2_main(panGesture, "setMinimumNumberOfTouches:", (uint64_t)gPcMinimumTouches, 0, 0, 0);
+    r_msg2_main(panGesture, "setMaximumNumberOfTouches:", (uint64_t)gPcMaximumTouches, 0, 0, 0);
+    r_msg2_main(panGesture, "setCancelsTouchesInView:", gPcCancelsTouches ? 1 : 0, 0, 0, 0);
 
     uint64_t backSel = r_sel("popViewControllerAnimated:");
     if (!backSel) return false;
@@ -110,6 +122,17 @@ bool pancake_stop_in_session(void)
     gPcWindow = 0;
     gPcApplied = false;
     return true;
+}
+
+void pancake_configure(int minimumTouches, int maximumTouches, bool cancelsTouches)
+{
+    if (minimumTouches < 1) minimumTouches = 1;
+    if (minimumTouches > 2) minimumTouches = 2;
+    if (maximumTouches < minimumTouches) maximumTouches = minimumTouches;
+    if (maximumTouches > 3) maximumTouches = 3;
+    gPcMinimumTouches = minimumTouches;
+    gPcMaximumTouches = maximumTouches;
+    gPcCancelsTouches = cancelsTouches;
 }
 
 void pancake_forget_remote_state(void)

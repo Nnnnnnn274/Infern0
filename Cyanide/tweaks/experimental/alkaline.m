@@ -6,6 +6,10 @@
 #import <string.h>
 
 static uint64_t gAlkalineTint = 0;
+static int gAlkalineRed = 43;
+static int gAlkalineGreen = 219;
+static int gAlkalineBlue = 115;
+static int gAlkalineAlphaPercent = 100;
 
 static uint64_t alkaline_color(double red, double green, double blue, double alpha)
 {
@@ -71,7 +75,10 @@ bool alkaline_apply_in_session(void)
     printf("[ALKALINE] apply\n");
     uint64_t win = alkaline_key_window();
     if (!r_is_objc_ptr(win)) return false;
-    gAlkalineTint = alkaline_color(0.17, 0.86, 0.45, 1.0);
+    gAlkalineTint = alkaline_color((double)gAlkalineRed / 255.0,
+                                   (double)gAlkalineGreen / 255.0,
+                                   (double)gAlkalineBlue / 255.0,
+                                   (double)gAlkalineAlphaPercent / 100.0);
     int hits = 0;
     alkaline_scan_and_tint(win, gAlkalineTint, 0, &hits);
     printf("[ALKALINE] tinted %d battery-ish views\n", hits);
@@ -87,6 +94,18 @@ bool alkaline_stop_in_session(void)
     if (r_is_objc_ptr(win)) alkaline_scan_and_tint(win, white, 0, &hits);
     gAlkalineTint = 0;
     return true;
+}
+
+void alkaline_configure(int red, int green, int blue, int alphaPercent)
+{
+    if (red < 0) red = 0; if (red > 255) red = 255;
+    if (green < 0) green = 0; if (green > 255) green = 255;
+    if (blue < 0) blue = 0; if (blue > 255) blue = 255;
+    if (alphaPercent < 10) alphaPercent = 10; if (alphaPercent > 100) alphaPercent = 100;
+    gAlkalineRed = red;
+    gAlkalineGreen = green;
+    gAlkalineBlue = blue;
+    gAlkalineAlphaPercent = alphaPercent;
 }
 
 void alkaline_forget_remote_state(void) { gAlkalineTint = 0; }

@@ -1035,12 +1035,41 @@ NSString * const kSettingsHideLabelsEnabled = @"HideLabelsEnabled";
 NSString * const kSettingsFakeClockUpEnabled = @"FakeClockUpEnabled";
 NSString * const kSettingsFakeClockUpSpeed = @"FakeClockUpSpeed";
 NSString * const kSettingsPancakeEnabled = @"PancakeEnabled";
+static NSString * const kSettingsPancakeMinTouches = @"PancakeMinTouches";
+static NSString * const kSettingsPancakeMaxTouches = @"PancakeMaxTouches";
+static NSString * const kSettingsPancakeCancelsTouches = @"PancakeCancelsTouches";
 NSString * const kSettingsCylinderLiteEnabled = @"CylinderLiteEnabled";
+static NSString * const kSettingsCylinderLiteDepth = @"CylinderLiteDepth";
+static NSString * const kSettingsCylinderLitePerspective = @"CylinderLitePerspective";
+static NSString * const kSettingsCylinderLiteMaxIcons = @"CylinderLiteMaxIcons";
 NSString * const kSettingsBarmojiEnabled = @"BarmojiEnabled";
+static NSString * const kSettingsBarmojiYOffset = @"BarmojiYOffset";
+static NSString * const kSettingsBarmojiWidthPct = @"BarmojiWidthPct";
+static NSString * const kSettingsBarmojiFontSize = @"BarmojiFontSize";
+static NSString * const kSettingsBarmojiBackgroundAlphaPct = @"BarmojiBackgroundAlphaPct";
 NSString * const kSettingsBlurryBadgesEnabled = @"BlurryBadgesEnabled";
+static NSString * const kSettingsBlurryBadgesRed = @"BlurryBadgesRed";
+static NSString * const kSettingsBlurryBadgesGreen = @"BlurryBadgesGreen";
+static NSString * const kSettingsBlurryBadgesBlue = @"BlurryBadgesBlue";
+static NSString * const kSettingsBlurryBadgesAlphaPct = @"BlurryBadgesAlphaPct";
 NSString * const kSettingsSnapperEnabled = @"SnapperEnabled";
+static NSString * const kSettingsSnapperX = @"SnapperX";
+static NSString * const kSettingsSnapperY = @"SnapperY";
+static NSString * const kSettingsSnapperWidth = @"SnapperWidth";
+static NSString * const kSettingsSnapperHeight = @"SnapperHeight";
+static NSString * const kSettingsSnapperBorderWidth = @"SnapperBorderWidth";
+static NSString * const kSettingsSnapperCornerRadius = @"SnapperCornerRadius";
 NSString * const kSettingsPullOverEnabled = @"PullOverEnabled";
+static NSString * const kSettingsPullOverWidth = @"PullOverWidth";
+static NSString * const kSettingsPullOverYOffset = @"PullOverYOffset";
+static NSString * const kSettingsPullOverMaxHeight = @"PullOverMaxHeight";
+static NSString * const kSettingsPullOverCornerRadius = @"PullOverCornerRadius";
+static NSString * const kSettingsPullOverBackgroundAlphaPct = @"PullOverBackgroundAlphaPct";
 NSString * const kSettingsAlkalineEnabled = @"AlkalineEnabled";
+static NSString * const kSettingsAlkalineRed = @"AlkalineRed";
+static NSString * const kSettingsAlkalineGreen = @"AlkalineGreen";
+static NSString * const kSettingsAlkalineBlue = @"AlkalineBlue";
+static NSString * const kSettingsAlkalineAlphaPct = @"AlkalineAlphaPct";
 NSString * const kSettingsTweakLoaderEnabled = @"TweakLoaderEnabled";
 
 static NSString * const kSettingsFastLockXLiteRetryInterval = @"FastLockXLiteRetryInterval";
@@ -6258,12 +6287,32 @@ static BOOL settings_key_is_fakeclockup(NSString *key)
 
 static BOOL settings_key_is_pancake(NSString *key)
 {
-    return [key isEqualToString:kSettingsPancakeEnabled];
+    return [key isEqualToString:kSettingsPancakeEnabled] ||
+           [key isEqualToString:kSettingsPancakeMinTouches] ||
+           [key isEqualToString:kSettingsPancakeMaxTouches] ||
+           [key isEqualToString:kSettingsPancakeCancelsTouches];
 }
 
 static BOOL settings_key_is_cylinderlite(NSString *key)
 {
-    return [key isEqualToString:kSettingsCylinderLiteEnabled];
+    return [key isEqualToString:kSettingsCylinderLiteEnabled] ||
+           [key isEqualToString:kSettingsCylinderLiteDepth] ||
+           [key isEqualToString:kSettingsCylinderLitePerspective] ||
+           [key isEqualToString:kSettingsCylinderLiteMaxIcons];
+}
+
+static void settings_configure_pancake(NSUserDefaults *d)
+{
+    pancake_configure((int)[d integerForKey:kSettingsPancakeMinTouches],
+                      (int)[d integerForKey:kSettingsPancakeMaxTouches],
+                      [d boolForKey:kSettingsPancakeCancelsTouches]);
+}
+
+static void settings_configure_cylinderlite(NSUserDefaults *d)
+{
+    cylinderlite_configure((int)[d integerForKey:kSettingsCylinderLiteDepth],
+                           (int)[d integerForKey:kSettingsCylinderLitePerspective],
+                           (int)[d integerForKey:kSettingsCylinderLiteMaxIcons]);
 }
 
 static void settings_configure_control_center_tweaks(NSUserDefaults *d)
@@ -6289,6 +6338,29 @@ static void settings_configure_control_center_tweaks(NSUserDefaults *d)
     hapticcc_configure((int)[d integerForKey:kSettingsHapticCCFeedbackStyle]);
     securecc_configure([d boolForKey:kSettingsSecureCCShowIndicator],
                        (int)[d integerForKey:kSettingsSecureCCDelayMs]);
+    barmoji_configure((int)[d integerForKey:kSettingsBarmojiYOffset],
+                      (int)[d integerForKey:kSettingsBarmojiWidthPct],
+                      (int)[d integerForKey:kSettingsBarmojiFontSize],
+                      (int)[d integerForKey:kSettingsBarmojiBackgroundAlphaPct]);
+    blurrybadges_configure((int)[d integerForKey:kSettingsBlurryBadgesRed],
+                           (int)[d integerForKey:kSettingsBlurryBadgesGreen],
+                           (int)[d integerForKey:kSettingsBlurryBadgesBlue],
+                           (int)[d integerForKey:kSettingsBlurryBadgesAlphaPct]);
+    snapper_configure((int)[d integerForKey:kSettingsSnapperX],
+                      (int)[d integerForKey:kSettingsSnapperY],
+                      (int)[d integerForKey:kSettingsSnapperWidth],
+                      (int)[d integerForKey:kSettingsSnapperHeight],
+                      (int)[d integerForKey:kSettingsSnapperBorderWidth],
+                      (int)[d integerForKey:kSettingsSnapperCornerRadius]);
+    pullover_configure((int)[d integerForKey:kSettingsPullOverWidth],
+                       (int)[d integerForKey:kSettingsPullOverYOffset],
+                       (int)[d integerForKey:kSettingsPullOverMaxHeight],
+                       (int)[d integerForKey:kSettingsPullOverCornerRadius],
+                       (int)[d integerForKey:kSettingsPullOverBackgroundAlphaPct]);
+    alkaline_configure((int)[d integerForKey:kSettingsAlkalineRed],
+                       (int)[d integerForKey:kSettingsAlkalineGreen],
+                       (int)[d integerForKey:kSettingsAlkalineBlue],
+                       (int)[d integerForKey:kSettingsAlkalineAlphaPct]);
 }
 
 static NSString *settings_split_tweak_master_key_for_key(NSString *key)
@@ -6325,11 +6397,34 @@ static NSString *settings_split_tweak_master_key_for_key(NSString *key)
     if ([key isEqualToString:kSettingsSecureCCEnabled] ||
         [key isEqualToString:kSettingsSecureCCShowIndicator] ||
         [key isEqualToString:kSettingsSecureCCDelayMs]) return kSettingsSecureCCEnabled;
-    if ([key isEqualToString:kSettingsBarmojiEnabled]) return kSettingsBarmojiEnabled;
-    if ([key isEqualToString:kSettingsBlurryBadgesEnabled]) return kSettingsBlurryBadgesEnabled;
-    if ([key isEqualToString:kSettingsSnapperEnabled]) return kSettingsSnapperEnabled;
-    if ([key isEqualToString:kSettingsPullOverEnabled]) return kSettingsPullOverEnabled;
-    if ([key isEqualToString:kSettingsAlkalineEnabled]) return kSettingsAlkalineEnabled;
+    if ([key isEqualToString:kSettingsBarmojiEnabled] ||
+        [key isEqualToString:kSettingsBarmojiYOffset] ||
+        [key isEqualToString:kSettingsBarmojiWidthPct] ||
+        [key isEqualToString:kSettingsBarmojiFontSize] ||
+        [key isEqualToString:kSettingsBarmojiBackgroundAlphaPct]) return kSettingsBarmojiEnabled;
+    if ([key isEqualToString:kSettingsBlurryBadgesEnabled] ||
+        [key isEqualToString:kSettingsBlurryBadgesRed] ||
+        [key isEqualToString:kSettingsBlurryBadgesGreen] ||
+        [key isEqualToString:kSettingsBlurryBadgesBlue] ||
+        [key isEqualToString:kSettingsBlurryBadgesAlphaPct]) return kSettingsBlurryBadgesEnabled;
+    if ([key isEqualToString:kSettingsSnapperEnabled] ||
+        [key isEqualToString:kSettingsSnapperX] ||
+        [key isEqualToString:kSettingsSnapperY] ||
+        [key isEqualToString:kSettingsSnapperWidth] ||
+        [key isEqualToString:kSettingsSnapperHeight] ||
+        [key isEqualToString:kSettingsSnapperBorderWidth] ||
+        [key isEqualToString:kSettingsSnapperCornerRadius]) return kSettingsSnapperEnabled;
+    if ([key isEqualToString:kSettingsPullOverEnabled] ||
+        [key isEqualToString:kSettingsPullOverWidth] ||
+        [key isEqualToString:kSettingsPullOverYOffset] ||
+        [key isEqualToString:kSettingsPullOverMaxHeight] ||
+        [key isEqualToString:kSettingsPullOverCornerRadius] ||
+        [key isEqualToString:kSettingsPullOverBackgroundAlphaPct]) return kSettingsPullOverEnabled;
+    if ([key isEqualToString:kSettingsAlkalineEnabled] ||
+        [key isEqualToString:kSettingsAlkalineRed] ||
+        [key isEqualToString:kSettingsAlkalineGreen] ||
+        [key isEqualToString:kSettingsAlkalineBlue] ||
+        [key isEqualToString:kSettingsAlkalineAlphaPct]) return kSettingsAlkalineEnabled;
     return nil;
 }
 
@@ -7302,6 +7397,7 @@ static void settings_schedule_live_apply_for_key(NSString *key)
             dispatch_async(dispatch_get_global_queue(0, 0), ^{
                 @synchronized (settings_rc_lock()) {
                     if (settings_cleanup_in_progress() || ![d boolForKey:kSettingsPancakeEnabled] || !g_springboard_rc_ready) return;
+                    settings_configure_pancake(d);
                     bool ok = pancake_apply_in_session();
                     settings_mark_tweak_applied(kSettingsPancakeEnabled, ok && [d boolForKey:kSettingsPancakeEnabled]);
                     printf("[SETTINGS] live Pancake apply result=%d\n", ok);
@@ -7336,6 +7432,7 @@ static void settings_schedule_live_apply_for_key(NSString *key)
                 dispatch_async(dispatch_get_global_queue(0, 0), ^{
                     @synchronized (settings_rc_lock()) {
                         if (settings_cleanup_in_progress() || ![d boolForKey:kSettingsCylinderLiteEnabled] || !g_springboard_rc_ready) return;
+                        settings_configure_cylinderlite(d);
                         bool ok = cylinderlite_apply_in_session();
                         settings_mark_tweak_applied(kSettingsCylinderLiteEnabled, ok && [d boolForKey:kSettingsCylinderLiteEnabled]);
                         printf("[SETTINGS] live Cylinder Lite apply result=%d\n", ok);
@@ -8005,12 +8102,41 @@ void settings_register_defaults(void)
         kSettingsFakeClockUpEnabled: @NO,
         kSettingsFakeClockUpSpeed: @2.0,
         kSettingsPancakeEnabled: @NO,
+        kSettingsPancakeMinTouches: @1,
+        kSettingsPancakeMaxTouches: @1,
+        kSettingsPancakeCancelsTouches: @NO,
         kSettingsCylinderLiteEnabled: @NO,
+        kSettingsCylinderLiteDepth: @-10,
+        kSettingsCylinderLitePerspective: @650,
+        kSettingsCylinderLiteMaxIcons: @128,
         kSettingsBarmojiEnabled: @NO,
+        kSettingsBarmojiYOffset: @92,
+        kSettingsBarmojiWidthPct: @92,
+        kSettingsBarmojiFontSize: @21,
+        kSettingsBarmojiBackgroundAlphaPct: @86,
         kSettingsBlurryBadgesEnabled: @NO,
+        kSettingsBlurryBadgesRed: @59,
+        kSettingsBlurryBadgesGreen: @140,
+        kSettingsBlurryBadgesBlue: @255,
+        kSettingsBlurryBadgesAlphaPct: @92,
         kSettingsSnapperEnabled: @NO,
+        kSettingsSnapperX: @44,
+        kSettingsSnapperY: @160,
+        kSettingsSnapperWidth: @300,
+        kSettingsSnapperHeight: @220,
+        kSettingsSnapperBorderWidth: @2,
+        kSettingsSnapperCornerRadius: @12,
         kSettingsPullOverEnabled: @NO,
+        kSettingsPullOverWidth: @76,
+        kSettingsPullOverYOffset: @130,
+        kSettingsPullOverMaxHeight: @420,
+        kSettingsPullOverCornerRadius: @20,
+        kSettingsPullOverBackgroundAlphaPct: @88,
         kSettingsAlkalineEnabled: @NO,
+        kSettingsAlkalineRed: @43,
+        kSettingsAlkalineGreen: @219,
+        kSettingsAlkalineBlue: @115,
+        kSettingsAlkalineAlphaPct: @100,
         kSettingsTweakLoaderEnabled: @NO,
 
         kSettingsGravityLiteEnabled: @NO,
@@ -8880,6 +9006,7 @@ static void settings_run_actions_internal(BOOL pendingOnly)
 
                     if (runPancake) {
                         settings_progress(&step, total, "Applying Pancake");
+                        settings_configure_pancake(d);
                         bool ok = pancake_apply_in_session();
                         settings_mark_tweak_applied(kSettingsPancakeEnabled, ok && [d boolForKey:kSettingsPancakeEnabled]);
                         printf("[SETTINGS] Pancake result=%d\n", ok);
@@ -8889,6 +9016,7 @@ static void settings_run_actions_internal(BOOL pendingOnly)
 
                     if (runCylinderLite) {
                         settings_progress(&step, total, "Applying Cylinder Lite");
+                        settings_configure_cylinderlite(d);
                         bool ok = cylinderlite_apply_in_session();
                         settings_mark_tweak_applied(kSettingsCylinderLiteEnabled, ok && [d boolForKey:kSettingsCylinderLiteEnabled]);
                         printf("[SETTINGS] Cylinder Lite result=%d\n", ok);
@@ -10329,6 +10457,9 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
 {
     return @[
         @{ @"kind": @"toggle", @"key": kSettingsPancakeEnabled, @"title": @"Enable Pancake" },
+        @{ @"kind": @"slider", @"key": kSettingsPancakeMinTouches, @"title": @"Minimum touches", @"min": @1, @"max": @2, @"step": @1, @"default": @1 },
+        @{ @"kind": @"slider", @"key": kSettingsPancakeMaxTouches, @"title": @"Maximum touches", @"min": @1, @"max": @3, @"step": @1, @"default": @1 },
+        @{ @"kind": @"toggle", @"key": kSettingsPancakeCancelsTouches, @"title": @"Cancel touches in view" },
     ];
 }
 
@@ -10336,6 +10467,9 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
 {
     return @[
         @{ @"kind": @"toggle", @"key": kSettingsCylinderLiteEnabled, @"title": @"Enable Cylinder Lite" },
+        @{ @"kind": @"slider", @"key": kSettingsCylinderLiteDepth, @"title": @"Icon depth", @"min": @-80, @"max": @0, @"step": @1, @"default": @-10, @"unit": @"z" },
+        @{ @"kind": @"slider", @"key": kSettingsCylinderLitePerspective, @"title": @"Perspective distance", @"min": @250, @"max": @1600, @"step": @25, @"default": @650 },
+        @{ @"kind": @"slider", @"key": kSettingsCylinderLiteMaxIcons, @"title": @"Max icons", @"min": @8, @"max": @256, @"step": @8, @"default": @128 },
     ];
 }
 
@@ -10343,6 +10477,10 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
 {
     return @[
         @{ @"kind": @"toggle", @"key": kSettingsBarmojiEnabled, @"title": @"Enable Barmoji" },
+        @{ @"kind": @"slider", @"key": kSettingsBarmojiYOffset, @"title": @"Bottom offset", @"min": @48, @"max": @180, @"step": @2, @"default": @92, @"unit": @"pt" },
+        @{ @"kind": @"slider", @"key": kSettingsBarmojiWidthPct, @"title": @"Bar width", @"min": @65, @"max": @100, @"step": @1, @"default": @92, @"unit": @"%" },
+        @{ @"kind": @"slider", @"key": kSettingsBarmojiFontSize, @"title": @"Emoji size", @"min": @14, @"max": @28, @"step": @1, @"default": @21, @"unit": @"pt" },
+        @{ @"kind": @"slider", @"key": kSettingsBarmojiBackgroundAlphaPct, @"title": @"Background alpha", @"min": @20, @"max": @100, @"step": @1, @"default": @86, @"unit": @"%" },
     ];
 }
 
@@ -10350,6 +10488,10 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
 {
     return @[
         @{ @"kind": @"toggle", @"key": kSettingsBlurryBadgesEnabled, @"title": @"Enable BlurryBadges" },
+        @{ @"kind": @"slider", @"key": kSettingsBlurryBadgesRed, @"title": @"Red", @"min": @0, @"max": @255, @"step": @1, @"default": @59 },
+        @{ @"kind": @"slider", @"key": kSettingsBlurryBadgesGreen, @"title": @"Green", @"min": @0, @"max": @255, @"step": @1, @"default": @140 },
+        @{ @"kind": @"slider", @"key": kSettingsBlurryBadgesBlue, @"title": @"Blue", @"min": @0, @"max": @255, @"step": @1, @"default": @255 },
+        @{ @"kind": @"slider", @"key": kSettingsBlurryBadgesAlphaPct, @"title": @"Tint alpha", @"min": @10, @"max": @100, @"step": @1, @"default": @92, @"unit": @"%" },
     ];
 }
 
@@ -10357,6 +10499,12 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
 {
     return @[
         @{ @"kind": @"toggle", @"key": kSettingsSnapperEnabled, @"title": @"Enable Snapper" },
+        @{ @"kind": @"slider", @"key": kSettingsSnapperX, @"title": @"Frame X", @"min": @0, @"max": @220, @"step": @2, @"default": @44, @"unit": @"pt" },
+        @{ @"kind": @"slider", @"key": kSettingsSnapperY, @"title": @"Frame Y", @"min": @40, @"max": @520, @"step": @4, @"default": @160, @"unit": @"pt" },
+        @{ @"kind": @"slider", @"key": kSettingsSnapperWidth, @"title": @"Frame width", @"min": @80, @"max": @390, @"step": @5, @"default": @300, @"unit": @"pt" },
+        @{ @"kind": @"slider", @"key": kSettingsSnapperHeight, @"title": @"Frame height", @"min": @80, @"max": @640, @"step": @5, @"default": @220, @"unit": @"pt" },
+        @{ @"kind": @"slider", @"key": kSettingsSnapperBorderWidth, @"title": @"Border width", @"min": @1, @"max": @8, @"step": @1, @"default": @2, @"unit": @"pt" },
+        @{ @"kind": @"slider", @"key": kSettingsSnapperCornerRadius, @"title": @"Corner radius", @"min": @0, @"max": @40, @"step": @1, @"default": @12, @"unit": @"pt" },
     ];
 }
 
@@ -10364,6 +10512,11 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
 {
     return @[
         @{ @"kind": @"toggle", @"key": kSettingsPullOverEnabled, @"title": @"Enable PullOver" },
+        @{ @"kind": @"slider", @"key": kSettingsPullOverWidth, @"title": @"Tray width", @"min": @52, @"max": @140, @"step": @2, @"default": @76, @"unit": @"pt" },
+        @{ @"kind": @"slider", @"key": kSettingsPullOverYOffset, @"title": @"Tray Y position", @"min": @40, @"max": @300, @"step": @5, @"default": @130, @"unit": @"pt" },
+        @{ @"kind": @"slider", @"key": kSettingsPullOverMaxHeight, @"title": @"Max height", @"min": @220, @"max": @720, @"step": @10, @"default": @420, @"unit": @"pt" },
+        @{ @"kind": @"slider", @"key": kSettingsPullOverCornerRadius, @"title": @"Corner radius", @"min": @0, @"max": @40, @"step": @1, @"default": @20, @"unit": @"pt" },
+        @{ @"kind": @"slider", @"key": kSettingsPullOverBackgroundAlphaPct, @"title": @"Background alpha", @"min": @20, @"max": @100, @"step": @1, @"default": @88, @"unit": @"%" },
     ];
 }
 
@@ -10371,6 +10524,10 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
 {
     return @[
         @{ @"kind": @"toggle", @"key": kSettingsAlkalineEnabled, @"title": @"Enable Alkaline" },
+        @{ @"kind": @"slider", @"key": kSettingsAlkalineRed, @"title": @"Red", @"min": @0, @"max": @255, @"step": @1, @"default": @43 },
+        @{ @"kind": @"slider", @"key": kSettingsAlkalineGreen, @"title": @"Green", @"min": @0, @"max": @255, @"step": @1, @"default": @219 },
+        @{ @"kind": @"slider", @"key": kSettingsAlkalineBlue, @"title": @"Blue", @"min": @0, @"max": @255, @"step": @1, @"default": @115 },
+        @{ @"kind": @"slider", @"key": kSettingsAlkalineAlphaPct, @"title": @"Tint alpha", @"min": @10, @"max": @100, @"step": @1, @"default": @100, @"unit": @"%" },
     ];
 }
 
@@ -10846,36 +11003,63 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
         BOOL applied = settings_tweak_is_applied(kSettingsPancakeEnabled);
         [out addObject:@{@"title": @"Pancake",
                          @"value": applied ? @"Active" : (intent ? @"Queued" : @"Off")}];
+        [out addObject:@{@"title": @"Touches",
+                         @"value": [NSString stringWithFormat:@"%ld-%ld",
+                                    (long)[d integerForKey:kSettingsPancakeMinTouches],
+                                    (long)[d integerForKey:kSettingsPancakeMaxTouches]]}];
     } else if (section == SectionCylinderLite) {
         BOOL intent = [d boolForKey:kSettingsCylinderLiteEnabled];
         BOOL applied = settings_tweak_is_applied(kSettingsCylinderLiteEnabled);
         [out addObject:@{@"title": @"Cylinder Lite",
                          @"value": applied ? @"Active" : (intent ? @"Queued" : @"Off")}];
+        [out addObject:@{@"title": @"Depth",
+                         @"value": [NSString stringWithFormat:@"%ld / %ld",
+                                    (long)[d integerForKey:kSettingsCylinderLiteDepth],
+                                    (long)[d integerForKey:kSettingsCylinderLitePerspective]]}];
     } else if (section == SectionBarmoji) {
         BOOL intent = [d boolForKey:kSettingsBarmojiEnabled];
         BOOL applied = settings_tweak_is_applied(kSettingsBarmojiEnabled);
         [out addObject:@{@"title": @"Barmoji",
                          @"value": applied ? @"Active" : (intent ? @"Queued" : @"Off")}];
+        [out addObject:@{@"title": @"Size", @"value": [NSString stringWithFormat:@"%ld%% / %ldpt",
+                                                        (long)[d integerForKey:kSettingsBarmojiWidthPct],
+                                                        (long)[d integerForKey:kSettingsBarmojiFontSize]]}];
     } else if (section == SectionBlurryBadges) {
         BOOL intent = [d boolForKey:kSettingsBlurryBadgesEnabled];
         BOOL applied = settings_tweak_is_applied(kSettingsBlurryBadgesEnabled);
         [out addObject:@{@"title": @"BlurryBadges",
                          @"value": applied ? @"Active" : (intent ? @"Queued" : @"Off")}];
+        [out addObject:@{@"title": @"RGB", @"value": [NSString stringWithFormat:@"%ld/%ld/%ld",
+                                                       (long)[d integerForKey:kSettingsBlurryBadgesRed],
+                                                       (long)[d integerForKey:kSettingsBlurryBadgesGreen],
+                                                       (long)[d integerForKey:kSettingsBlurryBadgesBlue]]}];
     } else if (section == SectionSnapper) {
         BOOL intent = [d boolForKey:kSettingsSnapperEnabled];
         BOOL applied = settings_tweak_is_applied(kSettingsSnapperEnabled);
         [out addObject:@{@"title": @"Snapper",
                          @"value": applied ? @"Active" : (intent ? @"Queued" : @"Off")}];
+        [out addObject:@{@"title": @"Frame", @"value": [NSString stringWithFormat:@"%ld,%ld %ldx%ld",
+                                                        (long)[d integerForKey:kSettingsSnapperX],
+                                                        (long)[d integerForKey:kSettingsSnapperY],
+                                                        (long)[d integerForKey:kSettingsSnapperWidth],
+                                                        (long)[d integerForKey:kSettingsSnapperHeight]]}];
     } else if (section == SectionPullOver) {
         BOOL intent = [d boolForKey:kSettingsPullOverEnabled];
         BOOL applied = settings_tweak_is_applied(kSettingsPullOverEnabled);
         [out addObject:@{@"title": @"PullOver",
                          @"value": applied ? @"Active" : (intent ? @"Queued" : @"Off")}];
+        [out addObject:@{@"title": @"Tray", @"value": [NSString stringWithFormat:@"%ldpt wide / %ldpt max",
+                                                       (long)[d integerForKey:kSettingsPullOverWidth],
+                                                       (long)[d integerForKey:kSettingsPullOverMaxHeight]]}];
     } else if (section == SectionAlkaline) {
         BOOL intent = [d boolForKey:kSettingsAlkalineEnabled];
         BOOL applied = settings_tweak_is_applied(kSettingsAlkalineEnabled);
         [out addObject:@{@"title": @"Alkaline",
                          @"value": applied ? @"Active" : (intent ? @"Queued" : @"Off")}];
+        [out addObject:@{@"title": @"RGB", @"value": [NSString stringWithFormat:@"%ld/%ld/%ld",
+                                                       (long)[d integerForKey:kSettingsAlkalineRed],
+                                                       (long)[d integerForKey:kSettingsAlkalineGreen],
+                                                       (long)[d integerForKey:kSettingsAlkalineBlue]]}];
     } else if (section == SectionTweakLoader) {
         BOOL intent = [d boolForKey:kSettingsTweakLoaderEnabled];
         BOOL applied = settings_tweak_is_applied(kSettingsTweakLoaderEnabled);
