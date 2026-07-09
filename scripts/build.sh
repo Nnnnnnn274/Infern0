@@ -37,11 +37,11 @@ SDK="${SDK:-iphoneos}"
 PROJECT="Cyanide.xcodeproj"
 DERIVED="$PWD/build/DerivedData"
 PRODUCT_DIR="$DERIVED/Build/Products/${CONFIG}-${SDK}"
-APP_NAME="Cyanide.app"
+APP_NAME="infern0.app"
 if [ "$SCHEME" = "CyanideVPhone" ]; then
     IPA_PREFIX="CyanideVPhone"
 else
-    IPA_PREFIX="Cyanide"
+    IPA_PREFIX="infern0"
 fi
 IPA_LATEST="$PWD/build/${IPA_PREFIX}.ipa"
 XCODEBUILD_EXTRA=()
@@ -155,18 +155,18 @@ echo "==> wrote $IPA_OUT ($SIZE)"
 echo "==> symlink $IPA_LATEST -> $IPA_BASENAME"
 
 if [ "$SCHEME" = "CyanideVPhone" ]; then
-    ARM64_IPA_OUT="$PWD/build/CyanideVPhone-vphone-arm64.ipa"
+    ARM64_IPA_OUT="$PWD/build/infern0VPhone-vphone-arm64.ipa"
     ARM64_STAGE="$(mktemp -d -t cyanide-vphone-arm64)"
     trap 'rm -rf "$STAGE" "${ARM64_STAGE:-}"' EXIT
     mkdir -p "$ARM64_STAGE/Payload"
-    ditto "$APP_PATH" "$ARM64_STAGE/Payload/Cyanide.app"
-    lipo "$ARM64_STAGE/Payload/Cyanide.app/Cyanide" -thin arm64 \
-        -output "$ARM64_STAGE/Payload/Cyanide.app/Cyanide.arm64"
-    mv "$ARM64_STAGE/Payload/Cyanide.app/Cyanide.arm64" \
-        "$ARM64_STAGE/Payload/Cyanide.app/Cyanide"
-    chmod +x "$ARM64_STAGE/Payload/Cyanide.app/Cyanide"
+    ditto "$APP_PATH" "$ARM64_STAGE/Payload/infern0.app"
+    lipo "$ARM64_STAGE/Payload/infern0.app/infern0" -thin arm64 \
+        -output "$ARM64_STAGE/Payload/infern0.app/infern0.arm64"
+    mv "$ARM64_STAGE/Payload/infern0.app/infern0.arm64" \
+        "$ARM64_STAGE/Payload/infern0.app/infern0"
+    chmod +x "$ARM64_STAGE/Payload/infern0.app/infern0"
     ldid -S"$PWD/scripts/vphone_app.entitlements" \
-        "$ARM64_STAGE/Payload/Cyanide.app/Cyanide"
+        "$ARM64_STAGE/Payload/infern0.app/infern0"
     rm -f "$ARM64_IPA_OUT"
     ( cd "$ARM64_STAGE" && zip -qry "$ARM64_IPA_OUT" Payload )
     ARM64_SIZE=$(du -h "$ARM64_IPA_OUT" | cut -f1)

@@ -480,7 +480,7 @@ CHANGELOG_PENDING_SKIP_LOG="$CHANGELOG_SKIP_LOG" \
 # Read bundle versions from the just-built app. CFBundleShortVersionString
 # drives the IPA filename and tag; CFBundleVersion must advance too so iOS/Xcode
 # never keeps a stale installed bundle around under the same internal build.
-APP_PATH="$PWD/build/DerivedData/Build/Products/Debug-iphoneos/Cyanide.app"
+APP_PATH="$PWD/build/DerivedData/Build/Products/Debug-iphoneos/infern0.app"
 VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$APP_PATH/Info.plist" 2>/dev/null || true)
 if [ -z "$VERSION" ]; then
     echo "error: could not read CFBundleShortVersionString from $APP_PATH/Info.plist" >&2
