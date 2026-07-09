@@ -127,7 +127,7 @@
 			exceptions = (
 				AAA2978E2F72D43A000B5902 /* Exceptions for "Cyanide" folder in "Cyanide" target */,
 			);
-			path = Cyanide;
+			path = Infern0;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -597,7 +597,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "if [ \"$PLATFORM_NAME\" = \"iphonesimulator\" ]; then\n    make -C \"$SRCROOT/Cyanide/XPF\" output/iphonesimulator/libxpf.dylib\nelse\n    make -C \"$SRCROOT/Cyanide/XPF\" output/ios/libxpf.dylib\nfi\n";
+			shellScript = "if [ \"$PLATFORM_NAME\" = \"iphonesimulator\" ]; then\n    make -C \"$SRCROOT/Infern0/XPF\" output/iphonesimulator/libxpf.dylib\nelse\n    make -C \"$SRCROOT/Infern0/XPF\" output/ios/libxpf.dylib\nfi\n";
 		};
 		FBC0A0012FD6000000C0A001 /* Embed XPF dylib */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -616,7 +616,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "if [ \"$PLATFORM_NAME\" = \"iphonesimulator\" ]; then\n    src=\"$SRCROOT/Cyanide/XPF/output/iphonesimulator/libxpf.dylib\"\nelse\n    src=\"$SRCROOT/Cyanide/XPF/output/ios/libxpf.dylib\"\nfi\ndst=\"$TARGET_BUILD_DIR/$WRAPPER_NAME/libxpf.dylib\"\nif [ -f \"$src\" ]; then\n    cp \"$src\" \"$dst\"\nfi\n";
+			shellScript = "if [ \"$PLATFORM_NAME\" = \"iphonesimulator\" ]; then\n    src=\"$SRCROOT/Infern0/XPF/output/iphonesimulator/libxpf.dylib\"\nelse\n    src=\"$SRCROOT/Infern0/XPF/output/ios/libxpf.dylib\"\nfi\ndst=\"$TARGET_BUILD_DIR/$WRAPPER_NAME/libxpf.dylib\"\nif [ -f \"$src\" ]; then\n    cp \"$src\" \"$dst\"\nfi\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -645,10 +645,10 @@
 				"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = x86_64;
 				GENERATE_INFOPLIST_FILE = YES;
 				HEADER_SEARCH_PATHS = (
-					"$(SRCROOT)/Cyanide/XPF/src",
-					"$(SRCROOT)/Cyanide/XPF/external/ChOma/include",
+					"$(SRCROOT)/Infern0/XPF/src",
+					"$(SRCROOT)/Infern0/XPF/external/ChOma/include",
 				);
-				INFOPLIST_FILE = Cyanide/Info.plist;
+				INFOPLIST_FILE = Infern0/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = infern0;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
@@ -662,24 +662,24 @@
 				);
 				LIBRARY_SEARCH_PATHS = (
 					"$(inherited)",
-					"$(PROJECT_DIR)/Cyanide/XPF/external/ChOma/external/ios",
-					"$(PROJECT_DIR)/Cyanide/XPF/output/ios",
-					"$(PROJECT_DIR)/Cyanide/XPF/output/iphonesimulator",
-					"$(PROJECT_DIR)/Cyanide/XPF/output/macos",
+					"$(PROJECT_DIR)/Infern0/XPF/external/ChOma/external/ios",
+					"$(PROJECT_DIR)/Infern0/XPF/output/ios",
+					"$(PROJECT_DIR)/Infern0/XPF/output/iphonesimulator",
+					"$(PROJECT_DIR)/Infern0/XPF/output/macos",
 				);
 				"LIBRARY_SEARCH_PATHS[sdk=iphoneos*]" = (
 					"$(inherited)",
-					"$(PROJECT_DIR)/Cyanide/XPF/output/ios",
-					"$(PROJECT_DIR)/Cyanide/XPF/output/macos",
-					"$(PROJECT_DIR)/Cyanide/XPF/external/ChOma/external/ios",
-					"$(PROJECT_DIR)/Cyanide/resident/output",
+					"$(PROJECT_DIR)/Infern0/XPF/output/ios",
+					"$(PROJECT_DIR)/Infern0/XPF/output/macos",
+					"$(PROJECT_DIR)/Infern0/XPF/external/ChOma/external/ios",
+					"$(PROJECT_DIR)/Infern0/resident/output",
 				);
 				"LIBRARY_SEARCH_PATHS[sdk=iphonesimulator*]" = (
 					"$(inherited)",
-					"$(PROJECT_DIR)/Cyanide/XPF/output/iphonesimulator",
-					"$(PROJECT_DIR)/Cyanide/XPF/output/macos",
-					"$(PROJECT_DIR)/Cyanide/XPF/external/ChOma/external/ios",
-					"$(PROJECT_DIR)/Cyanide/resident/output",
+					"$(PROJECT_DIR)/Infern0/XPF/output/iphonesimulator",
+					"$(PROJECT_DIR)/Infern0/XPF/output/macos",
+					"$(PROJECT_DIR)/Infern0/XPF/external/ChOma/external/ios",
+					"$(PROJECT_DIR)/Infern0/resident/output",
 				);
 				MARKETING_VERSION = 2.0.0;
 				OTHER_CFLAGS = "";
@@ -688,11 +688,11 @@
 					"$(inherited)",
 					"-framework",
 					IOKit,
-					"$(PROJECT_DIR)/Cyanide/XPF/output/ios/libxpf.dylib",
+					"$(PROJECT_DIR)/Infern0/XPF/output/ios/libxpf.dylib",
 				);
 				"OTHER_LDFLAGS[sdk=iphonesimulator*]" = (
 					"$(inherited)",
-					"$(PROJECT_DIR)/Cyanide/XPF/output/iphonesimulator/libxpf.dylib",
+					"$(PROJECT_DIR)/Infern0/XPF/output/iphonesimulator/libxpf.dylib",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = "com.nnnnnnn274.infern0";
 				PRODUCT_NAME = infern0;
@@ -722,10 +722,10 @@
 				"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = x86_64;
 				GENERATE_INFOPLIST_FILE = YES;
 				HEADER_SEARCH_PATHS = (
-					"$(SRCROOT)/Cyanide/XPF/src",
-					"$(SRCROOT)/Cyanide/XPF/external/ChOma/include",
+					"$(SRCROOT)/Infern0/XPF/src",
+					"$(SRCROOT)/Infern0/XPF/external/ChOma/include",
 				);
-				INFOPLIST_FILE = Cyanide/Info.plist;
+				INFOPLIST_FILE = Infern0/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = infern0;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
@@ -739,24 +739,24 @@
 				);
 				LIBRARY_SEARCH_PATHS = (
 					"$(inherited)",
-					"$(PROJECT_DIR)/Cyanide/XPF/external/ChOma/external/ios",
-					"$(PROJECT_DIR)/Cyanide/XPF/output/ios",
-					"$(PROJECT_DIR)/Cyanide/XPF/output/iphonesimulator",
-					"$(PROJECT_DIR)/Cyanide/XPF/output/macos",
+					"$(PROJECT_DIR)/Infern0/XPF/external/ChOma/external/ios",
+					"$(PROJECT_DIR)/Infern0/XPF/output/ios",
+					"$(PROJECT_DIR)/Infern0/XPF/output/iphonesimulator",
+					"$(PROJECT_DIR)/Infern0/XPF/output/macos",
 				);
 				"LIBRARY_SEARCH_PATHS[sdk=iphoneos*]" = (
 					"$(inherited)",
-					"$(PROJECT_DIR)/Cyanide/XPF/output/ios",
-					"$(PROJECT_DIR)/Cyanide/XPF/output/macos",
-					"$(PROJECT_DIR)/Cyanide/XPF/external/ChOma/external/ios",
-					"$(PROJECT_DIR)/Cyanide/resident/output",
+					"$(PROJECT_DIR)/Infern0/XPF/output/ios",
+					"$(PROJECT_DIR)/Infern0/XPF/output/macos",
+					"$(PROJECT_DIR)/Infern0/XPF/external/ChOma/external/ios",
+					"$(PROJECT_DIR)/Infern0/resident/output",
 				);
 				"LIBRARY_SEARCH_PATHS[sdk=iphonesimulator*]" = (
 					"$(inherited)",
-					"$(PROJECT_DIR)/Cyanide/XPF/output/iphonesimulator",
-					"$(PROJECT_DIR)/Cyanide/XPF/output/macos",
-					"$(PROJECT_DIR)/Cyanide/XPF/external/ChOma/external/ios",
-					"$(PROJECT_DIR)/Cyanide/resident/output",
+					"$(PROJECT_DIR)/Infern0/XPF/output/iphonesimulator",
+					"$(PROJECT_DIR)/Infern0/XPF/output/macos",
+					"$(PROJECT_DIR)/Infern0/XPF/external/ChOma/external/ios",
+					"$(PROJECT_DIR)/Infern0/resident/output",
 				);
 				MARKETING_VERSION = 2.0.0;
 				OTHER_CFLAGS = "";
@@ -765,11 +765,11 @@
 					"$(inherited)",
 					"-framework",
 					IOKit,
-					"$(PROJECT_DIR)/Cyanide/XPF/output/ios/libxpf.dylib",
+					"$(PROJECT_DIR)/Infern0/XPF/output/ios/libxpf.dylib",
 				);
 				"OTHER_LDFLAGS[sdk=iphonesimulator*]" = (
 					"$(inherited)",
-					"$(PROJECT_DIR)/Cyanide/XPF/output/iphonesimulator/libxpf.dylib",
+					"$(PROJECT_DIR)/Infern0/XPF/output/iphonesimulator/libxpf.dylib",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = "com.nnnnnnn274.infern0";
 				PRODUCT_NAME = infern0;
@@ -933,10 +933,10 @@
 				);
 				GENERATE_INFOPLIST_FILE = YES;
 				HEADER_SEARCH_PATHS = (
-					"$(SRCROOT)/Cyanide/XPF/src",
-					"$(SRCROOT)/Cyanide/XPF/external/ChOma/include",
+					"$(SRCROOT)/Infern0/XPF/src",
+					"$(SRCROOT)/Infern0/XPF/external/ChOma/include",
 				);
-				INFOPLIST_FILE = Cyanide/Info.plist;
+				INFOPLIST_FILE = Infern0/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "infern0 VPhone";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
@@ -950,24 +950,24 @@
 				);
 				LIBRARY_SEARCH_PATHS = (
 					"$(inherited)",
-					"$(PROJECT_DIR)/Cyanide/XPF/external/ChOma/external/ios",
-					"$(PROJECT_DIR)/Cyanide/XPF/output/ios",
-					"$(PROJECT_DIR)/Cyanide/XPF/output/iphonesimulator",
-					"$(PROJECT_DIR)/Cyanide/XPF/output/macos",
+					"$(PROJECT_DIR)/Infern0/XPF/external/ChOma/external/ios",
+					"$(PROJECT_DIR)/Infern0/XPF/output/ios",
+					"$(PROJECT_DIR)/Infern0/XPF/output/iphonesimulator",
+					"$(PROJECT_DIR)/Infern0/XPF/output/macos",
 				);
 				"LIBRARY_SEARCH_PATHS[sdk=iphoneos*]" = (
 					"$(inherited)",
-					"$(PROJECT_DIR)/Cyanide/XPF/output/ios",
-					"$(PROJECT_DIR)/Cyanide/XPF/output/macos",
-					"$(PROJECT_DIR)/Cyanide/XPF/external/ChOma/external/ios",
-					"$(PROJECT_DIR)/Cyanide/resident/output",
+					"$(PROJECT_DIR)/Infern0/XPF/output/ios",
+					"$(PROJECT_DIR)/Infern0/XPF/output/macos",
+					"$(PROJECT_DIR)/Infern0/XPF/external/ChOma/external/ios",
+					"$(PROJECT_DIR)/Infern0/resident/output",
 				);
 				"LIBRARY_SEARCH_PATHS[sdk=iphonesimulator*]" = (
 					"$(inherited)",
-					"$(PROJECT_DIR)/Cyanide/XPF/output/iphonesimulator",
-					"$(PROJECT_DIR)/Cyanide/XPF/output/macos",
-					"$(PROJECT_DIR)/Cyanide/XPF/external/ChOma/external/ios",
-					"$(PROJECT_DIR)/Cyanide/resident/output",
+					"$(PROJECT_DIR)/Infern0/XPF/output/iphonesimulator",
+					"$(PROJECT_DIR)/Infern0/XPF/output/macos",
+					"$(PROJECT_DIR)/Infern0/XPF/external/ChOma/external/ios",
+					"$(PROJECT_DIR)/Infern0/resident/output",
 				);
 				MARKETING_VERSION = 2.0.0;
 				OTHER_CFLAGS = "";
@@ -976,11 +976,11 @@
 					"$(inherited)",
 					"-framework",
 					IOKit,
-					"$(PROJECT_DIR)/Cyanide/XPF/output/ios/libxpf.dylib",
+					"$(PROJECT_DIR)/Infern0/XPF/output/ios/libxpf.dylib",
 				);
 				"OTHER_LDFLAGS[sdk=iphonesimulator*]" = (
 					"$(inherited)",
-					"$(PROJECT_DIR)/Cyanide/XPF/output/iphonesimulator/libxpf.dylib",
+					"$(PROJECT_DIR)/Infern0/XPF/output/iphonesimulator/libxpf.dylib",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = "com.nnnnnnn274.infern0";
 				PRODUCT_NAME = infern0;

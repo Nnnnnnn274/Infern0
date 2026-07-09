@@ -45,7 +45,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-OUT="Cyanide/Changelog.plist"
+OUT="Infern0/Changelog.plist"
 COUNT="${CHANGELOG_COUNT:-5}"
 PENDING_VERSION="${CHANGELOG_PENDING_VERSION:-}"
 PENDING_BASE="${CHANGELOG_PENDING_BASE:-}"

@@ -102,7 +102,7 @@ fi
 MSG="${1:-}"
 NOTES_ARG="${2:-}"
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
-PBXPROJ="Cyanide.xcodeproj/project.pbxproj"
+PBXPROJ="Infern0.xcodeproj/project.pbxproj"
 RELEASE_NOTES_FILE="RELEASE_NOTES.md"
 
 # --- versioning -------------------------------------------------------------
@@ -367,7 +367,7 @@ fi
 #     GitHub Release notes default. Override with RELEASE_NO_AUTO_BULLETS=1.
 #
 #     Rules:
-#       - Untracked Cyanide/tweaks/<name>.m       → "Add <Pretty Name> tweak"
+#       - Untracked Infern0/tweaks/<name>.m       → "Add <Pretty Name> tweak"
 #       - Added `name:@"X"` line in PackageCatalog → "Add X package"
 #     Bullets whose key already appears in MSG (case-insensitive substring)
 #     are dropped so we don't repeat the human's wording.
@@ -409,26 +409,26 @@ compute_extra_bullets() {
         esac
         add_bullet "Add ${pretty} tweak" "$pretty"
     done < <(git ls-files --others --exclude-standard 2>/dev/null \
-             | grep -E '^Cyanide/tweaks/.*\.m$' || true)
+             | grep -E '^Infern0/tweaks/.*\.m$' || true)
 
     while IFS= read -r name; do
         [ -z "$name" ] && continue
         add_bullet "Add ${name} package" "$name"
-    done < <(git diff --no-color -- Cyanide/installer/PackageCatalog.m 2>/dev/null \
+    done < <(git diff --no-color -- Infern0/installer/PackageCatalog.m 2>/dev/null \
              | grep -E '^\+[[:space:]]+name:@"' \
              | sed -E 's/^\+[[:space:]]+name:@"([^"]+)".*/\1/' \
              | head -10)
 
-    if printf '%s\n' "$changed_files" | grep -Eq '^Cyanide/installer/'; then
+    if printf '%s\n' "$changed_files" | grep -Eq '^Infern0/installer/'; then
         add_bullet "Polish package installer queue, badges, and activity status UI" "installer"
     fi
-    if printf '%s\n' "$changed_files" | grep -Fxq 'Cyanide/SettingsViewController.m'; then
+    if printf '%s\n' "$changed_files" | grep -Fxq 'Infern0/SettingsViewController.m'; then
         add_bullet "Track DarkSword toggle apply results independently in Settings" "settings"
     fi
-    if printf '%s\n' "$changed_files" | grep -Fxq 'Cyanide/LogTextView.m'; then
+    if printf '%s\n' "$changed_files" | grep -Fxq 'Infern0/LogTextView.m'; then
         add_bullet "Tighten Log tab typography for dense verbose traces" "log view"
     fi
-    if printf '%s\n' "$changed_files" | grep -Fxq 'Cyanide/tweaks/darksword_tweaks.m'; then
+    if printf '%s\n' "$changed_files" | grep -Fxq 'Infern0/tweaks/darksword_tweaks.m'; then
         add_bullet "Improve Disable App Library handling with an iOS 17 fallback path" "darksword"
     fi
     if printf '%s\n' "$changed_files" | grep -Fxq 'scripts/release.sh'; then
@@ -451,7 +451,7 @@ if [ -n "$EXTRA_BULLETS" ]; then
     printf '%s' "$EXTRA_BULLETS" | sed 's/^/      - /'
 fi
 
-# 1b. Regenerate Cyanide/Changelog.plist with the new version as the top entry,
+# 1b. Regenerate Infern0/Changelog.plist with the new version as the top entry,
 #     so the IPA we're about to build carries its own "What's New" content.
 #     Commits between the last release tag and HEAD become the changes list,
 #     plus the auto-derived EXTRA_BULLETS. If no richer bullets are available,
@@ -472,8 +472,8 @@ CHANGELOG_PENDING_SKIP_LOG="$CHANGELOG_SKIP_LOG" \
     || echo "==> changelog generation failed (continuing without it)"
 
 # 1b. Build the IPA against the newly resolved MARKETING_VERSION and
-#     CURRENT_PROJECT_VERSION. build.sh writes build/Cyanide-${VERSION}.ipa and
-#     refreshes a build/Cyanide.ipa symlink. We build *before* committing so the
+#     CURRENT_PROJECT_VERSION. build.sh writes build/Infern0-${VERSION}.ipa and
+#     refreshes a build/Infern0.ipa symlink. We build *before* committing so the
 #     actual IPA size can be baked into source.json in the same commit.
 ./scripts/build.sh
 
@@ -502,7 +502,7 @@ if [ "$BUILD_VERSION" != "$NEW_BUILD_VERSION" ]; then
 fi
 echo "==> built bundle version: marketing=$VERSION build=$BUILD_VERSION bundle=$BUNDLE_IDENTIFIER"
 
-IPA="$PWD/build/Cyanide-${VERSION}.ipa"
+IPA="$PWD/build/Infern0-${VERSION}.ipa"
 if [ ! -f "$IPA" ]; then
     echo "error: $IPA not found after build" >&2
     exit 1
@@ -520,7 +520,7 @@ if [ -f "$SOURCE_JSON" ]; then
     REPO_SLUG_FOR_JSON=$(echo "$ORIGIN_URL_FOR_JSON" \
         | sed -E 's#^(https?://[^/]+/|git@[^:]+:)##' \
         | sed -E 's#\.git$##')
-    DOWNLOAD_URL="https://github.com/${REPO_SLUG_FOR_JSON}/releases/download/${EFFECTIVE_TAG}/Cyanide-${VERSION}.ipa"
+    DOWNLOAD_URL="https://github.com/${REPO_SLUG_FOR_JSON}/releases/download/${EFFECTIVE_TAG}/Infern0-${VERSION}.ipa"
     echo "==> refreshing $SOURCE_JSON: version=$VERSION size=$IPA_BYTES"
     python3 - <<PY
 import json
@@ -608,7 +608,7 @@ ORIGIN_URL=$(git remote get-url origin)
 REPO_SLUG=$(echo "$ORIGIN_URL" \
     | sed -E 's#^(https?://[^/]+/|git@[^:]+:)##' \
     | sed -E 's#\.git$##')
-RELEASE_TITLE="Cyanide ${TAG}"
+RELEASE_TITLE="Infern0 ${TAG}"
 
 LOCAL_TAG_SHA=""
 if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then

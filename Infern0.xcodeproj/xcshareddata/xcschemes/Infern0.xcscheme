@@ -18,7 +18,7 @@
                      BlueprintIdentifier = "AAA297762F72D439000B5902"
                      BuildableName = "infern0.app"
                      BlueprintName = "infern0"
-                     ReferencedContainer = "container:Cyanide.xcodeproj">
+                     ReferencedContainer = "container:Infern0.xcodeproj">
                   </BuildableReference>
                </EnvironmentBuildable>
             </ActionContent>
@@ -36,7 +36,7 @@
                BlueprintIdentifier = "AAA297762F72D439000B5902"
                BuildableName = "infern0.app"
                BlueprintName = "infern0"
-               ReferencedContainer = "container:Cyanide.xcodeproj">
+               ReferencedContainer = "container:Infern0.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -65,7 +65,7 @@
             BlueprintIdentifier = "AAA297762F72D439000B5902"
             BuildableName = "infern0.app"
             BlueprintName = "infern0"
-            ReferencedContainer = "container:Cyanide.xcodeproj">
+            ReferencedContainer = "container:Infern0.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>
@@ -82,7 +82,7 @@
             BlueprintIdentifier = "AAA297762F72D439000B5902"
             BuildableName = "infern0.app"
             BlueprintName = "infern0"
-            ReferencedContainer = "container:Cyanide.xcodeproj">
+            ReferencedContainer = "container:Infern0.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>

@@ -15,7 +15,7 @@ jobs:
 
       - name: Download Public Submodules
         run: |
-          git config submodule.Cyanide/tweaks/private.update none
+          git config submodule.Infern0/tweaks/private.update none
           git submodule update --init --recursive
 
       - name: Set up Xcode
@@ -52,7 +52,7 @@ jobs:
         shell: bash
         run: |
           v=$(sed -nE 's/.*MARKETING_VERSION = ([0-9.]+);.*/\1/p' \
-            Cyanide.xcodeproj/project.pbxproj | head -1)
+            Infern0.xcodeproj/project.pbxproj | head -1)
           echo "value=$v" >> "$GITHUB_OUTPUT"
 
       - name: Generate changelog

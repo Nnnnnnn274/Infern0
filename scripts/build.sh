@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Build Cyanide for iphoneos and package the resulting .app into a versioned IPA
-# under build/, e.g. build/Cyanide-1.0.14.ipa, with a build/Cyanide.ipa
+# Build Infern0 for iphoneos and package the resulting .app into a versioned IPA
+# under build/, e.g. build/Infern0-1.0.14.ipa, with a build/Infern0.ipa
 # symlink pointing at the latest build. With SDK=iphonesimulator, build the
 # simulator .app and skip IPA packaging.
 #
@@ -19,29 +19,29 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-SCHEME="${SCHEME:-Cyanide}"
-if [ "$SCHEME" = "CyanideVPhone" ]; then
+SCHEME="${SCHEME:-Infern0}"
+if [ "$SCHEME" = "Infern0VPhone" ]; then
     CONFIG="${CONFIG:-VPhone Debug}"
     if [ "$CONFIG" != "VPhone Debug" ]; then
-        echo "error: CyanideVPhone must use CONFIG='VPhone Debug'" >&2
+        echo "error: Infern0VPhone must use CONFIG='VPhone Debug'" >&2
         exit 1
     fi
 else
     CONFIG="${CONFIG:-Debug}"
     if [ "$CONFIG" = "VPhone Debug" ]; then
-        echo "error: CONFIG='VPhone Debug' is only for SCHEME=CyanideVPhone" >&2
+        echo "error: CONFIG='VPhone Debug' is only for SCHEME=Infern0VPhone" >&2
         exit 1
     fi
 fi
 SDK="${SDK:-iphoneos}"
-PROJECT="Cyanide.xcodeproj"
+PROJECT="Infern0.xcodeproj"
 DERIVED="$PWD/build/DerivedData"
 PRODUCT_DIR="$DERIVED/Build/Products/${CONFIG}-${SDK}"
 APP_NAME="infern0.app"
-if [ "$SCHEME" = "CyanideVPhone" ]; then
-    IPA_PREFIX="CyanideVPhone"
+if [ "$SCHEME" = "Infern0VPhone" ]; then
+    IPA_PREFIX="Infern0VPhone"
 else
-    IPA_PREFIX="infern0"
+    IPA_PREFIX="Infern0"
 fi
 IPA_LATEST="$PWD/build/${IPA_PREFIX}.ipa"
 XCODEBUILD_EXTRA=()
@@ -84,7 +84,7 @@ if [ "$SDK" = "iphonesimulator" ]; then
     exit 0
 fi
 
-if [ "$SCHEME" = "CyanideVPhone" ]; then
+if [ "$SCHEME" = "Infern0VPhone" ]; then
     VPHONE_BRIDGE_SRC="$PWD/vphone-assets/vphone_springboard_bridge.dylib"
     VPHONE_BRIDGE_SOURCE="$PWD/vphone-assets/vphone_springboard_bridge.m"
     VPHONE_BRIDGE_DST="$APP_PATH/vphone_springboard_bridge.dylib"
@@ -154,7 +154,7 @@ SIZE=$(du -h "$IPA_OUT" | cut -f1)
 echo "==> wrote $IPA_OUT ($SIZE)"
 echo "==> symlink $IPA_LATEST -> $IPA_BASENAME"
 
-if [ "$SCHEME" = "CyanideVPhone" ]; then
+if [ "$SCHEME" = "Infern0VPhone" ]; then
     ARM64_IPA_OUT="$PWD/build/infern0VPhone-vphone-arm64.ipa"
     ARM64_STAGE="$(mktemp -d -t cyanide-vphone-arm64)"
     trap 'rm -rf "$STAGE" "${ARM64_STAGE:-}"' EXIT
