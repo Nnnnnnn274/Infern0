@@ -6,8 +6,7 @@
 
 ## Project status
 
-Cyanide is no longer maintained by `Nnnnnnn274`.  
-It is now **infern0** maintained by `Nnnnnnn274`.
+**infern0** is maintained by `Nnnnnnn274`.
 
 ## features
 AMFI bypass prob broken
