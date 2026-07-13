@@ -1,5 +1,6 @@
 #import "cleancc.h"
 #import "../remote_objc.h"
+#import "../sb_walk.h"
 #import "../../TaskRop/RemoteCall.h"
 
 #import <Foundation/Foundation.h>
@@ -67,7 +68,7 @@ static void cleancc_scan(uint64_t parent, uint64_t color, double alpha, int dept
 bool cleancc_apply_in_session(void)
 {
     printf("[CLEANCC] apply\n");
-    uint64_t win = cleancc_key_window();
+    uint64_t win = sb_frontmost_window();
     if (!r_is_objc_ptr(win)) return false;
     double tintAlpha = (double)gCleanCCGlassTintPercent / 100.0;
     double materialAlpha = (double)gCleanCCMaterialAlphaPercent / 100.0;
@@ -83,7 +84,7 @@ bool cleancc_apply_in_session(void)
 bool cleancc_stop_in_session(void)
 {
     printf("[CLEANCC] stop\n");
-    uint64_t win = cleancc_key_window();
+    uint64_t win = sb_frontmost_window();
     uint64_t clear = cleancc_color(0, 0, 0, 0);
     int hits = 0;
     if (r_is_objc_ptr(win)) cleancc_scan(win, clear, 1.0, 0, &hits);

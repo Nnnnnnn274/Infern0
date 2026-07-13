@@ -1,5 +1,6 @@
 #import "magma.h"
 #import "../remote_objc.h"
+#import "../sb_walk.h"
 #import "../../TaskRop/RemoteCall.h"
 
 #import <Foundation/Foundation.h>
@@ -65,7 +66,7 @@ static void magma_scan(uint64_t parent, uint64_t color, int depth, int *hits)
 bool magma_apply_in_session(void)
 {
     printf("[MAGMA] apply\n");
-    uint64_t win = magma_key_window();
+    uint64_t win = sb_frontmost_window();
     if (!r_is_objc_ptr(win)) return false;
     gMagmaTint = magma_color((double)gMagmaRed / 255.0,
                              (double)gMagmaGreen / 255.0,
@@ -79,7 +80,7 @@ bool magma_apply_in_session(void)
 bool magma_stop_in_session(void)
 {
     printf("[MAGMA] stop\n");
-    uint64_t win = magma_key_window();
+    uint64_t win = sb_frontmost_window();
     uint64_t white = magma_color(1, 1, 1, 1);
     int hits = 0;
     if (r_is_objc_ptr(win)) magma_scan(win, white, 0, &hits);

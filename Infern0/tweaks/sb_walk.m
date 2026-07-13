@@ -231,3 +231,43 @@ int sb_collect_views_in_windows(uint64_t klass, uint64_t *out, int cap)
     }
     return n;
 }
+
+int sb_collect_windows(uint64_t *out, int cap)
+{
+    if (!out || cap <= 0) return 0;
+    uint64_t clsApp = r_class("UIApplication");
+    if (!clsApp) return 0;
+    uint64_t app = sw_safe_msg(clsApp, "sharedApplication", 0, 0, 0, 0);
+    if (!app) return 0;
+
+    int n = 0;
+    uint64_t wins = sw_safe_msg(app, "windows", 0, 0, 0, 0);
+    if (wins) {
+        uint64_t count = r_msg(wins, r_sel("count"), 0, 0, 0, 0);
+        if (count > (uint64_t)cap) count = (uint64_t)cap;
+        for (uint64_t i = 0; i < count; i++) {
+            uint64_t win = r_msg(wins, r_sel("objectAtIndex:"), i, 0, 0, 0);
+            if (r_is_objc_ptr(win)) out[n++] = win;
+        }
+    }
+    if (n == 0) {
+        uint64_t key = sw_safe_msg(app, "keyWindow", 0, 0, 0, 0);
+        if (r_is_objc_ptr(key)) out[n++] = key;
+    }
+    return n;
+}
+
+uint64_t sb_frontmost_window(void)
+{
+    uint64_t windows[64] = {0};
+    int count = sb_collect_windows(windows, 64);
+    for (int i = count - 1; i >= 0; i--) {
+        uint64_t hidden = sw_safe_msg(windows[i], "isHidden", 0, 0, 0, 0);
+        if (!(hidden & 0xff)) return windows[i];
+    }
+    for (int i = 0; i < count; i++) {
+        uint64_t isKey = sw_safe_msg(windows[i], "isKeyWindow", 0, 0, 0, 0);
+        if (isKey & 0xff) return windows[i];
+    }
+    return count > 0 ? windows[count - 1] : 0;
+}

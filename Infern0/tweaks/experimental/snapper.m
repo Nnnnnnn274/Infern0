@@ -1,5 +1,6 @@
 #import "snapper.h"
 #import "../remote_objc.h"
+#import "../sb_walk.h"
 #import "../../TaskRop/RemoteCall.h"
 
 #import <Foundation/Foundation.h>
@@ -97,7 +98,7 @@ bool snapper_apply_in_session(void)
         r_msg2_main(gSnapperView, "removeFromSuperview", 0, 0, 0, 0);
         gSnapperView = 0;
     }
-    uint64_t win = snapper_key_window();
+    uint64_t win = sb_frontmost_window();
     if (!r_is_objc_ptr(win)) return false;
     uint64_t frame = snapper_alloc_view((double)gSnapperX,
                                         (double)gSnapperY,

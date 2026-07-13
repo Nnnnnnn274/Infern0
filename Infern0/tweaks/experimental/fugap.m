@@ -1,5 +1,6 @@
 #import "fugap.h"
 #import "../remote_objc.h"
+#import "../sb_walk.h"
 #import "../../TaskRop/RemoteCall.h"
 
 #import <Foundation/Foundation.h>
@@ -56,7 +57,7 @@ static void fugap_scan(uint64_t parent, double offset, int depth, int *hits)
 bool fugap_apply_in_session(void)
 {
     printf("[FUGAP] apply\n");
-    uint64_t win = fugap_key_window();
+    uint64_t win = sb_frontmost_window();
     if (!r_is_objc_ptr(win)) return false;
     int hits = 0;
     fugap_scan(win, (double)gFUGapYOffset, 0, &hits);
@@ -67,7 +68,7 @@ bool fugap_apply_in_session(void)
 bool fugap_stop_in_session(void)
 {
     printf("[FUGAP] stop\n");
-    uint64_t win = fugap_key_window();
+    uint64_t win = sb_frontmost_window();
     int hits = 0;
     if (r_is_objc_ptr(win)) fugap_scan(win, 0.0, 0, &hits);
     gFUGapApplied = false;

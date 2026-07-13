@@ -1,5 +1,6 @@
 #import "betterccxi.h"
 #import "../remote_objc.h"
+#import "../sb_walk.h"
 #import "../../TaskRop/RemoteCall.h"
 
 #import <Foundation/Foundation.h>
@@ -57,7 +58,7 @@ static void betterccxi_scan(uint64_t parent, double scale, int depth, int *hits)
 bool betterccxi_apply_in_session(void)
 {
     printf("[BETTERCCXI] apply\n");
-    uint64_t win = betterccxi_key_window();
+    uint64_t win = sb_frontmost_window();
     if (!r_is_objc_ptr(win)) return false;
     int hits = 0;
     betterccxi_scan(win, 1.0, 0, &hits);
@@ -68,7 +69,7 @@ bool betterccxi_apply_in_session(void)
 bool betterccxi_stop_in_session(void)
 {
     printf("[BETTERCCXI] stop\n");
-    uint64_t win = betterccxi_key_window();
+    uint64_t win = sb_frontmost_window();
     int hits = 0;
     int old = gBetterCCXIZLift;
     gBetterCCXIZLift = 0;

@@ -1047,6 +1047,11 @@ static NSString * const kSettingsBarmojiYOffset = @"BarmojiYOffset";
 static NSString * const kSettingsBarmojiWidthPct = @"BarmojiWidthPct";
 static NSString * const kSettingsBarmojiFontSize = @"BarmojiFontSize";
 static NSString * const kSettingsBarmojiBackgroundAlphaPct = @"BarmojiBackgroundAlphaPct";
+NSString * const kSettingsRoundedIconsEnabled = @"RoundedIconsEnabled";
+static NSString * const kSettingsRoundedIconsRadius = @"RoundedIconsRadius";
+NSString * const kSettingsWatchLayoutEnabled = @"WatchLayoutEnabled";
+static NSString * const kSettingsWatchLayoutCompactPct = @"WatchLayoutCompactPct";
+static NSString * const kSettingsWatchLayoutScalePct = @"WatchLayoutScalePct";
 NSString * const kSettingsBlurryBadgesEnabled = @"BlurryBadgesEnabled";
 static NSString * const kSettingsBlurryBadgesRed = @"BlurryBadgesRed";
 static NSString * const kSettingsBlurryBadgesGreen = @"BlurryBadgesGreen";
@@ -1172,6 +1177,8 @@ static volatile int g_notificationisland_live_running = 0;
 static volatile int g_notificationisland_live_stop_requested = 0;
 static volatile int g_velvet_live_running = 0;
 static volatile int g_velvet_live_stop_requested = 0;
+static volatile int g_visual_refresh_live_running = 0;
+static volatile int g_visual_refresh_live_stop_requested = 0;
 static volatile int g_gravitylite_background_armed = 0;
 static volatile int g_gravitylite_start_worker_running = 0;
 static volatile int g_gravity_motion_stop_requested = 1;
@@ -1288,6 +1295,7 @@ static void settings_request_typebanner_stop(void) { g_typebanner_live_stop_requ
 static void settings_request_notificationisland_stop(void) { g_notificationisland_live_stop_requested = 1; }
 static void settings_request_themer_stop(void) { g_themer_live_stop_requested = 1; }
 static void settings_request_velvet_stop(void) { g_velvet_live_stop_requested = 1; }
+static void settings_request_visual_refresh_stop(void) { g_visual_refresh_live_stop_requested = 1; }
 static void settings_request_gravitylite_stop(void)
 {
     __sync_lock_test_and_set(&g_gravitylite_background_armed, 0);
@@ -1559,6 +1567,18 @@ static bool settings_stop_barmoji_registered(BOOL springboardWillDie)
     return barmoji_stop_in_session();
 }
 
+static bool settings_stop_roundedicons_registered(BOOL springboardWillDie)
+{
+    (void)springboardWillDie;
+    return roundedicons_stop_in_session();
+}
+
+static bool settings_stop_watchlayout_registered(BOOL springboardWillDie)
+{
+    (void)springboardWillDie;
+    return watchlayout_stop_in_session();
+}
+
 static bool settings_stop_blurrybadges_registered(BOOL springboardWillDie)
 {
     (void)springboardWillDie;
@@ -1649,6 +1669,8 @@ static void settings_each_springboard_cleanup_entry(void (^block)(const Settings
         { kSettingsPancakeEnabled, "Pancake", NULL, settings_stop_pancake_registered, pancake_forget_remote_state, NULL, YES, YES },
         { kSettingsCylinderLiteEnabled, "Cylinder Lite", NULL, settings_stop_cylinderlite_registered, cylinderlite_forget_remote_state, NULL, YES, YES },
         { kSettingsBarmojiEnabled, "Barmoji", NULL, settings_stop_barmoji_registered, barmoji_forget_remote_state, NULL, YES, YES },
+        { kSettingsRoundedIconsEnabled, "Rounded Icons", NULL, settings_stop_roundedicons_registered, roundedicons_forget_remote_state, NULL, YES, YES },
+        { kSettingsWatchLayoutEnabled, "Watch Layout", NULL, settings_stop_watchlayout_registered, watchlayout_forget_remote_state, NULL, YES, YES },
         { kSettingsBlurryBadgesEnabled, "BlurryBadges", NULL, settings_stop_blurrybadges_registered, blurrybadges_forget_remote_state, NULL, YES, YES },
         { kSettingsSnapperEnabled, "Snapper", NULL, settings_stop_snapper_registered, snapper_forget_remote_state, NULL, YES, YES },
         { kSettingsPullOverEnabled, "PullOver", NULL, settings_stop_pullover_registered, pullover_forget_remote_state, NULL, YES, YES },
@@ -1666,6 +1688,7 @@ static void settings_each_springboard_cleanup_entry(void (^block)(const Settings
 
 static BOOL settings_any_registered_live_loop_running(void)
 {
+    if (g_visual_refresh_live_running) return YES;
     __block BOOL running = NO;
     settings_each_springboard_cleanup_entry(^(const SettingsSpringBoardTweakCleanupEntry *entry) {
         if (!running && entry->isRunning && entry->isRunning()) running = YES;
@@ -1676,6 +1699,7 @@ static BOOL settings_any_registered_live_loop_running(void)
 static NSString *settings_registered_live_loop_status_string(void)
 {
     NSMutableArray<NSString *> *parts = [NSMutableArray array];
+    [parts addObject:[NSString stringWithFormat:@"visual-refresh=%d", g_visual_refresh_live_running ? 1 : 0]];
     settings_each_springboard_cleanup_entry(^(const SettingsSpringBoardTweakCleanupEntry *entry) {
         if (!entry->isRunning) return;
         [parts addObject:[NSString stringWithFormat:@"%s=%d",
@@ -1790,6 +1814,8 @@ static const NSUInteger kNotificationIslandLiveMaxTicks = 43200;
 static const useconds_t kVelvetLiveIntervalUS = 1000000;
 static const useconds_t kVelvetLiveBackgroundIntervalUS = 2000000;
 static const NSUInteger kVelvetLiveMaxTicks = 7200;
+static const useconds_t kVisualRefreshIntervalUS = 750000;
+static const useconds_t kVisualRefreshBackgroundIntervalUS = 2000000;
 // Only Clock/Calendar need periodic repair; normal icons persist through the
 // model graft and should not be repainted during SpringBoard animations.
 static const useconds_t kThemerLiveIntervalUS = 2000000;
@@ -2758,6 +2784,7 @@ static BOOL settings_cleanup_in_progress(void)
 
 static void settings_request_all_live_loops_stop(const char *reason)
 {
+    settings_request_visual_refresh_stop();
     settings_each_springboard_cleanup_entry(^(const SettingsSpringBoardTweakCleanupEntry *entry) {
         if (entry->requestStop) entry->requestStop();
     });
@@ -5777,6 +5804,99 @@ static void settings_start_velvet_live_loop(void)
     });
 }
 
+static BOOL settings_visual_refresh_enabled(NSUserDefaults *d)
+{
+    return [d boolForKey:kSettingsCleanCCEnabled] ||
+           [d boolForKey:kSettingsFUGapEnabled] ||
+           [d boolForKey:kSettingsModuleSpacingEnabled] ||
+           [d boolForKey:kSettingsSugarCaneEnabled] ||
+           [d boolForKey:kSettingsBetterCCXIEnabled] ||
+           [d boolForKey:kSettingsMagmaEnabled] ||
+           [d boolForKey:kSettingsBetterCCIconsEnabled] ||
+           [d boolForKey:kSettingsCCNoPlatterDimEnabled] ||
+           [d boolForKey:kSettingsHapticCCEnabled] ||
+           [d boolForKey:kSettingsSecureCCEnabled] ||
+           [d boolForKey:kSettingsCylinderLiteEnabled] ||
+           [d boolForKey:kSettingsBlurryBadgesEnabled] ||
+           [d boolForKey:kSettingsAlkalineEnabled] ||
+           [d boolForKey:kSettingsRoundedIconsEnabled] ||
+           [d boolForKey:kSettingsWatchLayoutEnabled];
+}
+
+static void settings_visual_refresh_mark_if_ready(NSString *key, bool ready)
+{
+    if (ready && !settings_tweak_is_applied(key)) settings_mark_tweak_applied(key, YES);
+}
+
+static void settings_visual_refresh_tick(NSUserDefaults *d, BOOL fullScan)
+{
+    if (fullScan && [d boolForKey:kSettingsCleanCCEnabled])
+        settings_visual_refresh_mark_if_ready(kSettingsCleanCCEnabled, cleancc_apply_in_session());
+    if (fullScan && [d boolForKey:kSettingsFUGapEnabled])
+        settings_visual_refresh_mark_if_ready(kSettingsFUGapEnabled, fugap_apply_in_session());
+    if (fullScan && [d boolForKey:kSettingsModuleSpacingEnabled])
+        settings_visual_refresh_mark_if_ready(kSettingsModuleSpacingEnabled, modulespacing_apply_in_session());
+    if ([d boolForKey:kSettingsSugarCaneEnabled])
+        settings_visual_refresh_mark_if_ready(kSettingsSugarCaneEnabled, sugarcane_apply_in_session());
+    if (fullScan && [d boolForKey:kSettingsBetterCCXIEnabled])
+        settings_visual_refresh_mark_if_ready(kSettingsBetterCCXIEnabled, betterccxi_apply_in_session());
+    if (fullScan && [d boolForKey:kSettingsMagmaEnabled])
+        settings_visual_refresh_mark_if_ready(kSettingsMagmaEnabled, magma_apply_in_session());
+    if (fullScan && [d boolForKey:kSettingsBetterCCIconsEnabled])
+        settings_visual_refresh_mark_if_ready(kSettingsBetterCCIconsEnabled, betterccicons_apply_in_session());
+    if (fullScan && [d boolForKey:kSettingsCCNoPlatterDimEnabled])
+        settings_visual_refresh_mark_if_ready(kSettingsCCNoPlatterDimEnabled, ccnoplatterdim_apply_in_session());
+    if ([d boolForKey:kSettingsHapticCCEnabled])
+        settings_visual_refresh_mark_if_ready(kSettingsHapticCCEnabled, hapticcc_apply_in_session());
+    if ([d boolForKey:kSettingsSecureCCEnabled])
+        settings_visual_refresh_mark_if_ready(kSettingsSecureCCEnabled, securecc_apply_in_session());
+    if (fullScan && [d boolForKey:kSettingsCylinderLiteEnabled])
+        settings_visual_refresh_mark_if_ready(kSettingsCylinderLiteEnabled, cylinderlite_apply_in_session());
+    if (fullScan && [d boolForKey:kSettingsBlurryBadgesEnabled])
+        settings_visual_refresh_mark_if_ready(kSettingsBlurryBadgesEnabled, blurrybadges_apply_in_session());
+    if (fullScan && [d boolForKey:kSettingsAlkalineEnabled])
+        settings_visual_refresh_mark_if_ready(kSettingsAlkalineEnabled, alkaline_apply_in_session());
+    if (fullScan && [d boolForKey:kSettingsRoundedIconsEnabled])
+        settings_visual_refresh_mark_if_ready(kSettingsRoundedIconsEnabled, roundedicons_apply_in_session());
+    if (fullScan && [d boolForKey:kSettingsWatchLayoutEnabled])
+        settings_visual_refresh_mark_if_ready(kSettingsWatchLayoutEnabled, watchlayout_apply_in_session());
+}
+
+static void settings_start_visual_refresh_live_loop(void)
+{
+    NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
+    if (!settings_visual_refresh_enabled(d) || !g_springboard_rc_ready ||
+        settings_cleanup_in_progress()) return;
+    if (__sync_lock_test_and_set(&g_visual_refresh_live_running, 1)) return;
+    g_visual_refresh_live_stop_requested = 0;
+
+    dispatch_async(dispatch_get_global_queue(0, 0), ^{
+        NSUInteger tick = 0;
+        printf("[SETTINGS] visual refresh loop started\n");
+        @try {
+            while (settings_visual_refresh_enabled(d) &&
+                   !settings_cleanup_in_progress() &&
+                   !g_visual_refresh_live_stop_requested) {
+                if (!g_settings_actions_running) {
+                    @synchronized (settings_rc_lock()) {
+                        if (!g_visual_refresh_live_stop_requested && g_springboard_rc_ready)
+                            settings_visual_refresh_tick(d, (tick % 4) == 0);
+                    }
+                }
+                tick++;
+                useconds_t interval = settings_live_interval(kVisualRefreshIntervalUS,
+                                                              kVisualRefreshBackgroundIntervalUS);
+                settings_live_loop_sleep_interruptible(0, interval,
+                                                       &g_visual_refresh_live_stop_requested);
+            }
+        } @finally {
+            printf("[SETTINGS] visual refresh loop exited enabled=%d stop=%d\n",
+                   settings_visual_refresh_enabled(d), g_visual_refresh_live_stop_requested);
+            __sync_lock_release(&g_visual_refresh_live_running);
+        }
+    });
+}
+
 static void settings_start_themer_live_loop(void)
 {
     if (!settings_device_supported()) return;
@@ -6326,7 +6446,7 @@ static void settings_log_pancake_config(NSUserDefaults *d, const char *prefix)
 
 static void settings_log_cylinderlite_config(NSUserDefaults *d, const char *prefix)
 {
-    log_user("[%s] Cylinder Lite config: depth=%ld perspective=%ld maxIcons=%ld.\n",
+    log_user("[%s] Cylinder Lite config: depth=%ld perspective=%ld scanLimit=512 requestedLimit=%ld pages=all taps=preserved.\n",
              prefix ?: "CFG",
              (long)[d integerForKey:kSettingsCylinderLiteDepth],
              (long)[d integerForKey:kSettingsCylinderLitePerspective],
@@ -6379,6 +6499,9 @@ static void settings_configure_control_center_tweaks(NSUserDefaults *d)
                        (int)[d integerForKey:kSettingsAlkalineGreen],
                        (int)[d integerForKey:kSettingsAlkalineBlue],
                        (int)[d integerForKey:kSettingsAlkalineAlphaPct]);
+    roundedicons_configure((int)[d integerForKey:kSettingsRoundedIconsRadius]);
+    watchlayout_configure((int)[d integerForKey:kSettingsWatchLayoutCompactPct],
+                          (int)[d integerForKey:kSettingsWatchLayoutScalePct]);
 }
 
 static void settings_log_split_tweak_config(NSString *masterKey, NSUserDefaults *d, const char *prefix)
@@ -6460,6 +6583,13 @@ static void settings_log_split_tweak_config(NSString *masterKey, NSUserDefaults 
                  (long)[d integerForKey:kSettingsAlkalineGreen],
                  (long)[d integerForKey:kSettingsAlkalineBlue],
                  (long)[d integerForKey:kSettingsAlkalineAlphaPct]);
+    } else if ([masterKey isEqualToString:kSettingsRoundedIconsEnabled]) {
+        log_user("[%s] Rounded Icons config: continuousRadius=%ldpt pages=all discovered.\n", tag,
+                 (long)[d integerForKey:kSettingsRoundedIconsRadius]);
+    } else if ([masterKey isEqualToString:kSettingsWatchLayoutEnabled]) {
+        log_user("[%s] Watch Layout config: compact=%ld%% scale=%ld%% circular=1 pages=all discovered.\n", tag,
+                 (long)[d integerForKey:kSettingsWatchLayoutCompactPct],
+                 (long)[d integerForKey:kSettingsWatchLayoutScalePct]);
     }
 }
 
@@ -6525,6 +6655,11 @@ static NSString *settings_split_tweak_master_key_for_key(NSString *key)
         [key isEqualToString:kSettingsAlkalineGreen] ||
         [key isEqualToString:kSettingsAlkalineBlue] ||
         [key isEqualToString:kSettingsAlkalineAlphaPct]) return kSettingsAlkalineEnabled;
+    if ([key isEqualToString:kSettingsRoundedIconsEnabled] ||
+        [key isEqualToString:kSettingsRoundedIconsRadius]) return kSettingsRoundedIconsEnabled;
+    if ([key isEqualToString:kSettingsWatchLayoutEnabled] ||
+        [key isEqualToString:kSettingsWatchLayoutCompactPct] ||
+        [key isEqualToString:kSettingsWatchLayoutScalePct]) return kSettingsWatchLayoutEnabled;
     return nil;
 }
 
@@ -7612,6 +7747,12 @@ static void settings_schedule_live_apply_for_key(NSString *key)
                     } else if ([masterKey isEqualToString:kSettingsAlkalineEnabled]) {
                         ok = [d boolForKey:kSettingsAlkalineEnabled] ? alkaline_apply_in_session() : alkaline_stop_in_session();
                         settings_mark_tweak_applied(kSettingsAlkalineEnabled, ok && [d boolForKey:kSettingsAlkalineEnabled]);
+                    } else if ([masterKey isEqualToString:kSettingsRoundedIconsEnabled]) {
+                        ok = [d boolForKey:kSettingsRoundedIconsEnabled] ? roundedicons_apply_in_session() : roundedicons_stop_in_session();
+                        settings_mark_tweak_applied(kSettingsRoundedIconsEnabled, ok && [d boolForKey:kSettingsRoundedIconsEnabled]);
+                    } else if ([masterKey isEqualToString:kSettingsWatchLayoutEnabled]) {
+                        ok = [d boolForKey:kSettingsWatchLayoutEnabled] ? watchlayout_apply_in_session() : watchlayout_stop_in_session();
+                        settings_mark_tweak_applied(kSettingsWatchLayoutEnabled, ok && [d boolForKey:kSettingsWatchLayoutEnabled]);
                     }
                     printf("[SETTINGS] live split tweak %s owner=%s result=%d\n", key.UTF8String, masterKey.UTF8String, ok);
                 }
@@ -8211,12 +8352,17 @@ void settings_register_defaults(void)
         kSettingsCylinderLiteEnabled: @NO,
         kSettingsCylinderLiteDepth: @-10,
         kSettingsCylinderLitePerspective: @650,
-        kSettingsCylinderLiteMaxIcons: @128,
+        kSettingsCylinderLiteMaxIcons: @512,
         kSettingsBarmojiEnabled: @NO,
         kSettingsBarmojiYOffset: @92,
         kSettingsBarmojiWidthPct: @92,
         kSettingsBarmojiFontSize: @21,
         kSettingsBarmojiBackgroundAlphaPct: @86,
+        kSettingsRoundedIconsEnabled: @NO,
+        kSettingsRoundedIconsRadius: @18,
+        kSettingsWatchLayoutEnabled: @NO,
+        kSettingsWatchLayoutCompactPct: @82,
+        kSettingsWatchLayoutScalePct: @88,
         kSettingsBlurryBadgesEnabled: @NO,
         kSettingsBlurryBadgesRed: @59,
         kSettingsBlurryBadgesGreen: @140,
@@ -8323,6 +8469,8 @@ void settings_register_defaults(void)
             kSettingsPancakeEnabled,
             kSettingsCylinderLiteEnabled,
             kSettingsBarmojiEnabled,
+            kSettingsRoundedIconsEnabled,
+            kSettingsWatchLayoutEnabled,
             kSettingsBlurryBadgesEnabled,
             kSettingsSnapperEnabled,
             kSettingsPullOverEnabled,
@@ -8351,6 +8499,72 @@ void settings_register_defaults(void)
         [defaults synchronize];
     }
     settings_install_screen_awake_observers();
+}
+
+typedef struct {
+    __unsafe_unretained NSString *key;
+    const char *name;
+    const char *effect;
+} SettingsTweakLogDescriptor;
+
+static void settings_log_tweak_plan_details(NSUserDefaults *d, BOOL pendingOnly)
+{
+    const SettingsTweakLogDescriptor entries[] = {
+        { kSettingsSBCEnabled, "SBCustomizer", "rewrites the live dock and home-screen icon grid" },
+        { kSettingsPowercuffEnabled, "Powercuff", "sends the selected thermal-pressure level to thermalmonitord" },
+        { kSettingsStatBarEnabled, "StatBar", "creates and refreshes the battery, memory, CPU, and network status overlay" },
+        { kSettingsNSBarEnabled, "NSBar", "creates a live network-speed status-bar overlay" },
+        { kSettingsNiceBarLiteEnabled, "NiceBar Lite", "renders the configured status-bar text slots and live values" },
+        { kSettingsRSSIDisplayEnabled, "Signal Readouts", "replaces signal glyphs with live cellular/Wi-Fi readouts" },
+        { kSettingsAxonLiteEnabled, "Axon Lite", "groups visible Notification Center requests by application" },
+        { kSettingsTypeBannerEnabled, "TypeBanner", "polls imagent and presents typing indicators below the Dynamic Island" },
+        { kSettingsNotificationIslandEnabled, "Notification Island", "mirrors SpringBoard notification banners through ActivityKit" },
+        { kSettingsVelvetEnabled, "Velvet", "restyles visible notification backgrounds, borders, corners, and text" },
+        { kSettingsCleanNCEnabled, "CleanNC", "removes supported Notification Center visual clutter" },
+        { kSettingsUnderTimeEnabled, "UnderTime", "adds a secondary live time label under the status-bar clock" },
+        { kSettingsZeppelinLiteEnabled, "Zeppelin Lite", "replaces supported carrier labels with the configured text" },
+        { kSettingsCleanHomeScreenEnabled, "CleanHomeScreen", "hides the selected badges, page dots, and icon labels" },
+        { kSettingsRealCCEnabled, "RealCC", "changes the selected Control Center connectivity toggles" },
+        { kSettingsCleanCCEnabled, "CleanCC", "adjusts Control Center material alpha and glass tint" },
+        { kSettingsFUGapEnabled, "FUGap", "moves visible Control Center containers by the configured offset" },
+        { kSettingsModuleSpacingEnabled, "ModuleSpacing", "applies the configured Control Center module radius" },
+        { kSettingsSugarCaneEnabled, "SugarCane", "adds live percentage labels to brightness and volume controls" },
+        { kSettingsBetterCCXIEnabled, "BetterCCXI", "applies the configured Control Center depth and lift pass" },
+        { kSettingsMagmaEnabled, "Magma", "tints visible Control Center glyphs with the configured color" },
+        { kSettingsBetterCCIconsEnabled, "BetterCCIcons", "rounds visible Control Center icon and module layers" },
+        { kSettingsCCNoPlatterDimEnabled, "CCNoPlatterDim", "reduces dimming on expanded Control Center platters" },
+        { kSettingsCCStatusEnabled, "CCStatus", "adds the configured network status header to Control Center" },
+        { kSettingsHapticCCEnabled, "HapticCC", "watches Control Center state changes and emits the selected haptic" },
+        { kSettingsSecureCCEnabled, "SecureCC", "blocks supported Control Center interaction while the UI is locked" },
+        { kSettingsHideLabelsEnabled, "HideLabels", "hides visible home-screen icon labels" },
+        { kSettingsFakeClockUpEnabled, "FakeClockUp", "changes the Clock icon animation speed" },
+        { kSettingsPancakeEnabled, "Pancake", "installs the configured left-edge home-screen gesture hint" },
+        { kSettingsCylinderLiteEnabled, "Cylinder Lite", "applies perspective depth to visible home-screen icons" },
+        { kSettingsBarmojiEnabled, "Barmoji", "adds the configured emoji strip overlay to SpringBoard" },
+        { kSettingsRoundedIconsEnabled, "Rounded Icons", "applies a continuous corner mask to every discovered Home Screen icon" },
+        { kSettingsWatchLayoutEnabled, "Watch Layout", "compacts every discovered icon page into a circular Apple Watch-style grid" },
+        { kSettingsBlurryBadgesEnabled, "BlurryBadges", "tints visible notification badges with the configured color" },
+        { kSettingsSnapperEnabled, "Snapper", "shows the configured crop-frame overlay" },
+        { kSettingsPullOverEnabled, "PullOver", "shows the configured slide-over tray shell" },
+        { kSettingsAlkalineEnabled, "Alkaline", "tints visible battery views with the configured color" },
+        { kSettingsAppSwitcherGridEnabled, "App Switcher Grid", "patches SpringBoard's app-switcher layout in memory" },
+        { kSettingsGravityLiteEnabled, "Gravity Lite", "adds gravity, collision, bounce, and motion steering to icon snapshots" },
+        { kSettingsLayoutExtrasEnabled, "Home Layout Extras", "adds the configured padding and scaling to home and dock icons" },
+        { kSettingsThemerEnabled, "Themer", "replaces app icon imagery using the selected local theme" },
+        { kSettingsSnowBoardLiteEnabled, "SnowBoard Lite", "applies the selected SnowBoard/IconBundles theme" },
+        { kSettingsLiveWPEnabled, "LiveWP", "plays the selected video behind SpringBoard" },
+        { kSettingsStageStripEnabled, "Dynamic Stage Lite", "installs the picker and two floating application scene hosts" },
+        { kSettingsFastLockXLiteEnabled, "FastLockX Lite", "arms the configured lock-screen authentication and unlock behavior" },
+        { kSettingsTweakLoaderEnabled, "TweakLoader", "runs all registered precompiled RemoteCall tweaks" },
+        { kSettingsQuickLoaderEnabled, "QuickLoader", "executes the selected local JavaScript tweak" },
+        { kSettingsRepoTweaksEnabled, "RepoTweaks", "executes enabled repository JavaScript tweaks" },
+    };
+    for (NSUInteger i = 0; i < sizeof(entries) / sizeof(entries[0]); i++) {
+        const SettingsTweakLogDescriptor *entry = &entries[i];
+        if (!settings_enabled_tweak_should_run(d, entry->key, pendingOnly)) continue;
+        log_user("[TWEAK] %s: %s; enabled=1 previouslyApplied=%d.\n",
+                 entry->name, entry->effect, settings_tweak_is_applied(entry->key));
+    }
 }
 
 static void settings_run_actions_internal(BOOL pendingOnly)
@@ -8446,6 +8660,8 @@ static void settings_run_actions_internal(BOOL pendingOnly)
             BOOL runPancake = settings_pancake_install_allowed() && settings_enabled_tweak_should_run(d, kSettingsPancakeEnabled, springBoardPendingOnly);
             BOOL runCylinderLite = settings_cylinderlite_install_allowed() && settings_enabled_tweak_should_run(d, kSettingsCylinderLiteEnabled, springBoardPendingOnly);
             BOOL runBarmoji = settings_barmoji_install_allowed() && settings_enabled_tweak_should_run(d, kSettingsBarmojiEnabled, springBoardPendingOnly);
+            BOOL runRoundedIcons = settings_enabled_tweak_should_run(d, kSettingsRoundedIconsEnabled, springBoardPendingOnly);
+            BOOL runWatchLayout = settings_enabled_tweak_should_run(d, kSettingsWatchLayoutEnabled, springBoardPendingOnly);
             BOOL runBlurryBadges = settings_blurrybadges_install_allowed() && settings_enabled_tweak_should_run(d, kSettingsBlurryBadgesEnabled, springBoardPendingOnly);
             BOOL runSnapper = settings_snapper_install_allowed() && settings_enabled_tweak_should_run(d, kSettingsSnapperEnabled, springBoardPendingOnly);
             BOOL runPullOver = settings_pullover_install_allowed() && settings_enabled_tweak_should_run(d, kSettingsPullOverEnabled, springBoardPendingOnly);
@@ -8466,7 +8682,7 @@ static void settings_run_actions_internal(BOOL pendingOnly)
                 settings_note_themer_stage_conflict(YES);
             }
             BOOL cleanupDisabledSpringBoardTweaks = settings_disabled_applied_springboard_cleanup_needed(d);
-            BOOL needsSpringBoardWork = runSBC || runDarkTweaks || runStatBar || runNSBar || runNiceBarLite || runRSSI || runAxonLite || runGravityLite || runLayoutExtras || runTypeBanner || runNotificationIsland || runVelvet || runCleanNC || runUnderTime || runZeppelinLite || runCleanHomeScreen || runRealCC || runCleanCC || runFUGap || runModuleSpacing || runSugarCane || runBetterCCXI || runMagma || runBetterCCIcons || runCCNoPlatterDim || runCCStatus || runHapticCC || runSecureCC || runHideLabels || runFakeClockUp || runPancake || runCylinderLite || runBarmoji || runBlurryBadges || runSnapper || runPullOver || runAlkaline || runTweakLoader || runAppSwitcherGrid || runThemer || runSnowBoardLite || runLiveWP || runStageStrip || runFastLockXLite || runQuickLoader || runRepoTweaks || cleanupDisabledSpringBoardTweaks;
+            BOOL needsSpringBoardWork = runSBC || runDarkTweaks || runStatBar || runNSBar || runNiceBarLite || runRSSI || runAxonLite || runGravityLite || runLayoutExtras || runTypeBanner || runNotificationIsland || runVelvet || runCleanNC || runUnderTime || runZeppelinLite || runCleanHomeScreen || runRealCC || runCleanCC || runFUGap || runModuleSpacing || runSugarCane || runBetterCCXI || runMagma || runBetterCCIcons || runCCNoPlatterDim || runCCStatus || runHapticCC || runSecureCC || runHideLabels || runFakeClockUp || runPancake || runCylinderLite || runBarmoji || runRoundedIcons || runWatchLayout || runBlurryBadges || runSnapper || runPullOver || runAlkaline || runTweakLoader || runAppSwitcherGrid || runThemer || runSnowBoardLite || runLiveWP || runStageStrip || runFastLockXLite || runQuickLoader || runRepoTweaks || cleanupDisabledSpringBoardTweaks;
             BOOL runSandboxEscape = [d boolForKey:kSettingsRunSandboxEscape] && (!pendingOnly || needsSpringBoardWork);
             // TypeBanner prewarms its hidden SpringBoard window during Apply
             // and reuses the open SpringBoard session for text-only updates.
@@ -8520,6 +8736,8 @@ static void settings_run_actions_internal(BOOL pendingOnly)
             if (runPancake) total++;
             if (runCylinderLite) total++;
             if (runBarmoji) total++;
+            if (runRoundedIcons) total++;
+            if (runWatchLayout) total++;
             if (runBlurryBadges) total++;
             if (runSnapper) total++;
             if (runPullOver) total++;
@@ -8566,6 +8784,8 @@ static void settings_run_actions_internal(BOOL pendingOnly)
             if (runPancake) [enabledTweaks addObject:@"pancake"];
             if (runCylinderLite) [enabledTweaks addObject:@"cylinderlite"];
             if (runBarmoji) [enabledTweaks addObject:@"barmoji"];
+            if (runRoundedIcons) [enabledTweaks addObject:@"rounded-icons"];
+            if (runWatchLayout) [enabledTweaks addObject:@"watch-layout"];
             if (runBlurryBadges) [enabledTweaks addObject:@"blurrybadges"];
             if (runSnapper) [enabledTweaks addObject:@"snapper"];
             if (runPullOver) [enabledTweaks addObject:@"pullover"];
@@ -8588,6 +8808,7 @@ static void settings_run_actions_internal(BOOL pendingOnly)
             log_user("[PLAN] %lu stages: %s\n",
                      (unsigned long)total,
                      enabledTweaks.count ? [[enabledTweaks componentsJoinedByString:@", "] UTF8String] : "none");
+            settings_log_tweak_plan_details(d, pendingOnly);
             if (runFastLockXLite && runStageStrip) {
                 log_user("[COMPAT] FastLockX Lite will arm before Dynamic Stage Lite starts its control loop.\n");
             }
@@ -9150,6 +9371,22 @@ static void settings_run_actions_internal(BOOL pendingOnly)
                         cyanide_upload_log_milestone(ok ? @"barmoji-applied" : @"barmoji-failed");
                     }
 
+                    if (runRoundedIcons) {
+                        settings_progress(&step, total, "Applying Rounded Icons to all pages");
+                        settings_log_split_tweak_config(kSettingsRoundedIconsEnabled, d, "RUN");
+                        bool ok = roundedicons_apply_in_session();
+                        settings_mark_tweak_applied(kSettingsRoundedIconsEnabled, ok && [d boolForKey:kSettingsRoundedIconsEnabled]);
+                        log_user("%s Rounded Icons %s.\n", ok ? "[OK]" : "[WARN]", ok ? "active on discovered icons" : "found no icon views");
+                    }
+
+                    if (runWatchLayout) {
+                        settings_progress(&step, total, "Applying Watch Layout to all pages");
+                        settings_log_split_tweak_config(kSettingsWatchLayoutEnabled, d, "RUN");
+                        bool ok = watchlayout_apply_in_session();
+                        settings_mark_tweak_applied(kSettingsWatchLayoutEnabled, ok && [d boolForKey:kSettingsWatchLayoutEnabled]);
+                        log_user("%s Watch Layout %s.\n", ok ? "[OK]" : "[WARN]", ok ? "active with tappable circular icons" : "found no icon views");
+                    }
+
                     if (runBlurryBadges) {
                         settings_progress(&step, total, "Applying BlurryBadges");
                         settings_log_split_tweak_config(kSettingsBlurryBadgesEnabled, d, "RUN");
@@ -9307,6 +9544,11 @@ static void settings_run_actions_internal(BOOL pendingOnly)
                 } else if (!velvetEnabled) {
                     g_velvet_live_stop_requested = 1;
                 }
+                if (settings_visual_refresh_enabled(d)) {
+                    settings_start_visual_refresh_live_loop();
+                } else {
+                    g_visual_refresh_live_stop_requested = 1;
+                }
             }
 
             if (runTypeBanner) {
@@ -9456,6 +9698,11 @@ typedef NS_ENUM(NSInteger, SettingsSection) {
     SectionTweakLoader,
     SectionQuickLoader,
     SectionRepoTweaks,
+    SectionStageStrip,
+    SectionCallRecordingSound,
+    SectionHideHomeBar,
+    SectionRoundedIcons,
+    SectionWatchLayout,
     SectionCount,
 };
 
@@ -9980,6 +10227,13 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
                                                                          action:@selector(navRespringTapped)];
         respringItem.accessibilityLabel = @"Respring";
         self.navigationItem.rightBarButtonItem = respringItem;
+    } else {
+        UIBarButtonItem *logsItem = [[UIBarButtonItem alloc] initWithTitle:@"Logs"
+                                                                    style:UIBarButtonItemStylePlain
+                                                                   target:self
+                                                                   action:@selector(openViewLog)];
+        logsItem.accessibilityLabel = @"View detailed tweak activity log";
+        self.navigationItem.rightBarButtonItem = logsItem;
     }
 }
 
@@ -10296,7 +10550,11 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
 
 - (NSArray<NSDictionary *> *)darkSwordTweakRows
 {
-    return @[];
+    return @[
+        @{ @"kind": @"info", @"title": @"Runtime behavior",
+           @"subtitle": @"The installed DarkSword patch changes SpringBoard in memory. A respring restores stock behavior." },
+        @{ @"kind": @"button", @"title": @"View Detailed Activity Log", @"action": @"view-log" },
+    ];
 }
 
 - (NSArray<NSDictionary *> *)dragCoefficientRows
@@ -10393,7 +10651,40 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
 
 - (NSArray<NSDictionary *> *)axonLiteRows
 {
-    return @[];
+    return @[
+        @{ @"kind": @"info", @"title": @"Grouping mode",
+           @"subtitle": @"Groups visible Notification Center requests by application and filters duplicate request identifiers." },
+        @{ @"kind": @"info", @"title": @"Session lifetime",
+           @"subtitle": @"Runs through infern0's live SpringBoard session and stops during cleanup or when infern0 exits." },
+        @{ @"kind": @"button", @"title": @"View Detailed Activity Log", @"action": @"view-log" },
+    ];
+}
+
+- (NSArray<NSDictionary *> *)stageStripRows
+{
+    return @[
+        @{ @"kind": @"info", @"title": @"Floating windows", @"subtitle": @"Hosts up to two movable, resizable application scenes from the bottom-right picker." },
+        @{ @"kind": @"info", @"title": @"First-run scan", @"subtitle": @"The initial run builds the installed-app picker cache; later runs reuse it." },
+        @{ @"kind": @"button", @"title": @"View Detailed Activity Log", @"action": @"view-log" },
+    ];
+}
+
+- (NSArray<NSDictionary *> *)callRecordingSoundRows
+{
+    return @[
+        @{ @"kind": @"info", @"title": @"Files changed", @"subtitle": @"Replaces CallServices disclosure audio with silent assets after saving first-original backups." },
+        @{ @"kind": @"info", @"title": @"Persistence", @"subtitle": @"This persists until the Installer restores the backed-up originals." },
+        @{ @"kind": @"button", @"title": @"View Detailed Activity Log", @"action": @"view-log" },
+    ];
+}
+
+- (NSArray<NSDictionary *> *)hideHomeBarRows
+{
+    return @[
+        @{ @"kind": @"info", @"title": @"Asset change", @"subtitle": @"Zeros the first page of MaterialKit Assets.car; SpringBoard reloads the result after a respring." },
+        @{ @"kind": @"info", @"title": @"Restore", @"subtitle": @"Use Restore Home Bar in the Installer, then respring again." },
+        @{ @"kind": @"button", @"title": @"View Detailed Activity Log", @"action": @"view-log" },
+    ];
 }
 
 - (NSArray<NSDictionary *> *)typebannerRows
@@ -10590,7 +10881,8 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
         @{ @"kind": @"toggle", @"key": kSettingsCylinderLiteEnabled, @"title": @"Enable Cylinder Lite" },
         @{ @"kind": @"slider", @"key": kSettingsCylinderLiteDepth, @"title": @"Icon depth", @"min": @-80, @"max": @0, @"step": @1, @"default": @-10, @"unit": @"z" },
         @{ @"kind": @"slider", @"key": kSettingsCylinderLitePerspective, @"title": @"Perspective distance", @"min": @250, @"max": @1600, @"step": @25, @"default": @650 },
-        @{ @"kind": @"slider", @"key": kSettingsCylinderLiteMaxIcons, @"title": @"Max icons", @"min": @8, @"max": @256, @"step": @8, @"default": @128 },
+        @{ @"kind": @"info", @"title": @"Coverage", @"subtitle": @"Scans up to 512 live icons across every discovered Home Screen page and preserves icon interaction." },
+        @{ @"kind": @"button", @"title": @"View Detailed Activity Log", @"action": @"view-log" },
     ];
 }
 
@@ -10602,6 +10894,29 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
         @{ @"kind": @"slider", @"key": kSettingsBarmojiWidthPct, @"title": @"Bar width", @"min": @65, @"max": @100, @"step": @1, @"default": @92, @"unit": @"%" },
         @{ @"kind": @"slider", @"key": kSettingsBarmojiFontSize, @"title": @"Emoji size", @"min": @14, @"max": @28, @"step": @1, @"default": @21, @"unit": @"pt" },
         @{ @"kind": @"slider", @"key": kSettingsBarmojiBackgroundAlphaPct, @"title": @"Background alpha", @"min": @20, @"max": @100, @"step": @1, @"default": @86, @"unit": @"%" },
+        @{ @"kind": @"info", @"title": @"Press behavior", @"subtitle": @"Each emoji is a real button with highlight and selection feedback. The overlay does not inject text into another app's keyboard host." },
+        @{ @"kind": @"button", @"title": @"View Detailed Activity Log", @"action": @"view-log" },
+    ];
+}
+
+- (NSArray<NSDictionary *> *)roundedIconsRows
+{
+    return @[
+        @{ @"kind": @"toggle", @"key": kSettingsRoundedIconsEnabled, @"title": @"Enable Rounded Icons" },
+        @{ @"kind": @"slider", @"key": kSettingsRoundedIconsRadius, @"title": @"Corner radius", @"min": @4, @"max": @36, @"step": @1, @"default": @18, @"unit": @"pt" },
+        @{ @"kind": @"info", @"title": @"Coverage", @"subtitle": @"Applies a continuous mask to every discovered Home Screen page and keeps the original icons tappable." },
+        @{ @"kind": @"button", @"title": @"View Detailed Activity Log", @"action": @"view-log" },
+    ];
+}
+
+- (NSArray<NSDictionary *> *)watchLayoutRows
+{
+    return @[
+        @{ @"kind": @"toggle", @"key": kSettingsWatchLayoutEnabled, @"title": @"Enable Watch Layout" },
+        @{ @"kind": @"slider", @"key": kSettingsWatchLayoutCompactPct, @"title": @"Grid compactness", @"min": @60, @"max": @100, @"step": @1, @"default": @82, @"unit": @"%" },
+        @{ @"kind": @"slider", @"key": kSettingsWatchLayoutScalePct, @"title": @"Circular icon size", @"min": @60, @"max": @110, @"step": @1, @"default": @88, @"unit": @"%" },
+        @{ @"kind": @"info", @"title": @"Interaction", @"subtitle": @"Uses live SBIconViews instead of snapshots, so transformed icons still launch normally." },
+        @{ @"kind": @"button", @"title": @"View Detailed Activity Log", @"action": @"view-log" },
     ];
 }
 
@@ -11274,6 +11589,11 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
         case SectionLiveWP: return self.liveWPRows;
         case SectionQuickLoader: return self.quickLoaderRows;
         case SectionRepoTweaks: return self.repoTweaksRows;
+        case SectionStageStrip: return self.stageStripRows;
+        case SectionCallRecordingSound: return self.callRecordingSoundRows;
+        case SectionHideHomeBar: return self.hideHomeBarRows;
+        case SectionRoundedIcons: return self.roundedIconsRows;
+        case SectionWatchLayout: return self.watchLayoutRows;
         default: return @[];
     }
 }
@@ -11340,6 +11660,11 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
         @{ @"title": @"SpringBoard Tweaks", @"icon": @"apps.iphone",                         @"color": [UIColor systemIndigoColor], @"section": @(SectionDarkSwordTweaks) },
         @{ @"title": @"Drag Coefficient",   @"icon": @"dial.medium.fill",                    @"color": [UIColor systemIndigoColor], @"section": @(SectionDragCoefficient) },
         @{ @"title": @"Home Layout Extras", @"icon": @"square.dashed.inset.filled",          @"color": [UIColor systemPurpleColor], @"section": @(SectionLayoutExtras) },
+#if CYANIDE_EXPERIMENTAL_TWEAKS_AVAILABLE
+        @{ @"title": @"Dynamic Stage Lite", @"icon": @"sidebar.left", @"color": [UIColor systemBlueColor], @"section": @(SectionStageStrip), @"indev": @YES },
+#endif
+        @{ @"title": @"Rounded Icons", @"icon": @"app.fill", @"color": [UIColor systemBlueColor], @"section": @(SectionRoundedIcons) },
+        @{ @"title": @"Watch Layout", @"icon": @"circle.grid.3x3.fill", @"color": [UIColor systemGreenColor], @"section": @(SectionWatchLayout) },
     ];
 }
 
@@ -11349,6 +11674,8 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
         @{ @"title": @"OTA Updates",       @"icon": @"icloud.slash.fill",    @"color": [UIColor systemGrayColor],   @"section": @(SectionOTA) },
         @{ @"title": @"IPA Decryptor",     @"icon": @"lock.open.fill",       @"color": [UIColor systemGreenColor],  @"section": @(SectionIPADecryptor) },
         @{ @"title": @"Watch Pairing",     @"icon": @"applewatch.radiowaves.left.and.right", @"color": [UIColor systemPurpleColor], @"section": @(SectionNanoRegistry) },
+        @{ @"title": @"Call Recording Sound", @"icon": @"speaker.slash.fill", @"color": [UIColor systemOrangeColor], @"section": @(SectionCallRecordingSound) },
+        @{ @"title": @"Hide Home Bar", @"icon": @"line.3.horizontal", @"color": [UIColor systemGrayColor], @"section": @(SectionHideHomeBar) },
     ];
 }
 
@@ -11504,6 +11831,15 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
     if (s == SectionAxonLite) {
         return @"RemoteCall-only Axon port. It uses a live app-side loop rather than substrate hooks, so it lasts for the active infern0 SpringBoard session.";
     }
+    if (s == SectionStageStrip) {
+        return @"RemoteCall-only floating app windows. The first picker build can take one or two minutes; later runs reuse the cached app list. Touch routing inside hosted apps remains experimental.";
+    }
+    if (s == SectionCallRecordingSound) {
+        return @"Persistent CallServices file replacement. The log records every target, backup, write, verification, and restore result. Disclosure sounds may be legally required where you live.";
+    }
+    if (s == SectionHideHomeBar) {
+        return @"Persistent MaterialKit asset edit. Apply or restore it by itself, then respring. The log records the target path, write result, and pending-respring state.";
+    }
     if (s == SectionTypeBanner) {
         return @"Partial TypeMillennium port. Detection runs against imagent using original-thread RemoteCall probes, while SpringBoard renders a prewarmed banner window.";
     }
@@ -11571,10 +11907,16 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
         return @"Adds a left-hand gesture hint to the home screen for one-handed navigation.";
     }
     if (s == SectionCylinderLite) {
-        return @"Adds perspective-based icon animations to the home screen when tilting the device.";
+        return @"Applies perspective depth to every discovered Home Screen page. It keeps each live SBIconView interactive so icons continue to open normally.";
     }
     if (s == SectionBarmoji) {
-        return @"Adds a lightweight emoji strip overlay near the bottom of SpringBoard.";
+        return @"Adds eight real emoji buttons near the bottom of SpringBoard. Buttons highlight and produce selection feedback when pressed. The enabled setting survives reboot; the live overlay is recreated when infern0 starts its SpringBoard session.";
+    }
+    if (s == SectionRoundedIcons) {
+        return @"Applies smooth continuous corners to every discovered Home Screen icon without requiring a theme. Live icon views remain tappable.";
+    }
+    if (s == SectionWatchLayout) {
+        return @"Compacts every discovered Home Screen page into a circular Apple Watch-style layout. Refreshes use saved stock frames, so the layout does not keep shrinking and can be restored.";
     }
     if (s == SectionBlurryBadges) {
         return @"Tints visible notification badge views for a softer, colorized badge look.";
@@ -13916,7 +14258,12 @@ void cyanide_present_contact(UIViewController *host)
     }
     NSString *key = row[@"key"];
     [[NSUserDefaults standardUserDefaults] setBool:sender.isOn forKey:key];
-    printf("[SETTINGS] toggle %s=%d\n", key.UTF8String, sender.isOn);
+    log_user("[SETTINGS] %s (%s) set to %s%s%s.\n",
+             [row[@"title"] UTF8String] ?: "Toggle",
+             key.UTF8String ?: "unknown-key",
+             sender.isOn ? "ON" : "OFF",
+             [row[@"subtitle"] length] ? " - " : "",
+             [row[@"subtitle"] length] ? [row[@"subtitle"] UTF8String] : "");
     settings_note_package_configuration_changed(key);
     if ([key isEqualToString:kSettingsKeepAlive]) {
         ds_keepalive_apply_enabled(sender.isOn);
@@ -13956,7 +14303,13 @@ void cyanide_present_contact(UIViewController *host)
     NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
     BOOL showLocationLog = settings_key_is_location_sim(key) && settings_location_sim_is_active(d);
     [d setInteger:value forKey:key];
-    printf("[SETTINGS] slider %s=%ld\n", key.UTF8String, (long)value);
+    log_user("[SETTINGS] %s (%s) set to %ld%s%s%s.\n",
+             [row[@"title"] UTF8String] ?: "Slider",
+             key.UTF8String ?: "unknown-key",
+             (long)value,
+             [row[@"unit"] UTF8String] ?: "",
+             [row[@"subtitle"] length] ? " - " : "",
+             [row[@"subtitle"] length] ? [row[@"subtitle"] UTF8String] : "");
     settings_note_package_configuration_changed(key);
     if (showLocationLog) {
         [self presentActivityLogWithCompletion:^{
@@ -14040,7 +14393,12 @@ void cyanide_present_contact(UIViewController *host)
         [d synchronize];
 
         NSString *valueText = settings_number_row_value_string(row, value, YES);
-        printf("[SETTINGS] number %s=%s\n", key.UTF8String, valueText.UTF8String);
+        log_user("[SETTINGS] %s (%s) set to %s%s%s.\n",
+                 [row[@"title"] UTF8String] ?: "Number",
+                 key.UTF8String ?: "unknown-key",
+                 valueText.UTF8String ?: "",
+                 [row[@"subtitle"] length] ? " - " : "",
+                 [row[@"subtitle"] length] ? [row[@"subtitle"] UTF8String] : "");
         settings_note_package_configuration_changed(key);
         settings_schedule_live_apply_for_key(key);
         [strongSelf reloadSectionOrAll:section];
@@ -14962,6 +15320,13 @@ void cyanide_present_contact(UIViewController *host)
         }
     } else {
         indexPath = [NSIndexPath indexPathForRow:indexPath.row inSection:self.underlyingSection];
+    }
+
+    NSArray<NSDictionary *> *selectedRows = [self rowsForSection:indexPath.section];
+    if (indexPath.row < (NSInteger)selectedRows.count &&
+        [selectedRows[indexPath.row][@"action"] isEqualToString:@"view-log"]) {
+        [self openViewLog];
+        return;
     }
 
     if (!settings_device_supported() &&

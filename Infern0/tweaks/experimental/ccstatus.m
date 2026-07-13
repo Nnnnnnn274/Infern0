@@ -1,5 +1,6 @@
 #import "ccstatus.h"
 #import "../remote_objc.h"
+#import "../sb_walk.h"
 #import "../../TaskRop/RemoteCall.h"
 
 #import <Foundation/Foundation.h>
@@ -35,7 +36,7 @@ bool ccstatus_apply_in_session(void)
         r_msg2_main(gCCStatusLabel, "removeFromSuperview", 0, 0, 0, 0);
         gCCStatusLabel = 0;
     }
-    uint64_t win = ccstatus_key_window();
+    uint64_t win = sb_frontmost_window();
     uint64_t UILabel = r_class("UILabel");
     if (!r_is_objc_ptr(win) || !r_is_objc_ptr(UILabel)) return false;
     uint64_t label = r_msg2_main(UILabel, "alloc", 0, 0, 0, 0);

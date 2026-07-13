@@ -106,11 +106,13 @@ static BOOL catalog_repo_script_requires_native_bridge(NSString *rawScript)
 // Mirrors of the private SettingsSection enum values in SettingsViewController.m
 // (kept in sync — must match the underlying section indices used for the
 // detail-mode SettingsViewController push).
+static const NSInteger kSecOTA              = 3;
 static const NSInteger kSecSBC              = 4;
 static const NSInteger kSecStatBar          = 5;
 static const NSInteger kSecNSBar            = 6;
 static const NSInteger kSecNiceBarLite      = 7;
 static const NSInteger kSecRSSI             = 8;
+static const NSInteger kSecAxonLite         = 9;
 static const NSInteger kSecTypeBanner       = 10;
 static const NSInteger kSecNotificationIsland = 11;
 static const NSInteger kSecPowercuff        = 12;
@@ -153,6 +155,12 @@ static const NSInteger kSecAlkaline         = 50;
 static const NSInteger kSecTweakLoader      = 51;
 static const NSInteger kSecQuickLoader      = 52;
 static const NSInteger kSecRepoTweaks       = 53;
+static const NSInteger kSecStageStrip       = 54;
+static const NSInteger kSecCallRecordingSound = 55;
+static const NSInteger kSecHideHomeBar      = 56;
+static const NSInteger kSecRoundedIcons     = 57;
+static const NSInteger kSecWatchLayout      = 58;
+static const NSInteger kSecDarkSwordTweaks  = 13;
 
 + (NSArray<Package *> *)allPackages
 {
@@ -270,6 +278,7 @@ static const NSInteger kSecRepoTweaks       = 53;
                                            kind:PackageInstallKindToggle
                                      enabledKey:kSettingsAxonLiteEnabled
                                           isNew:NO];
+        axon.settingsSection = kSecAxonLite;
         axon.unstableWarning = @"⚠️ Experimental: work-in-progress. Expect SpringBoard crashes, dropped notifications, layout glitches, and breakage between infern0 builds. Don't rely on it for anything important.";
 
 #if CYANIDE_EXPERIMENTAL_TWEAKS_AVAILABLE
@@ -339,6 +348,7 @@ static const NSInteger kSecRepoTweaks       = 53;
                                            kind:PackageInstallKindToggle
                                      enabledKey:kSettingsStageStripEnabled
                                           isNew:NO];
+        stageStrip.settingsSection = kSecStageStrip;
         stageStrip.unstableWarning = @"Beta / unstable: First Run takes 1-2 minutes because the picker enumerates every installed app and builds a tile per app. Re-Runs are fast. Touch routing into hosted windows isn't wired yet, so scrolling/typing inside a floating window may not work.";
 #endif
 
@@ -742,8 +752,8 @@ static const NSInteger kSecRepoTweaks       = 53;
 
         Package *barmoji = [[Package alloc] initWithIdentifier:@"com.darksword.barmoji"
                                            name:@"Barmoji"
-                               shortDescription:@"Emoji strip overlay"
-                                longDescription:@"First-pass Barmoji port. Adds a lightweight most-used emoji strip overlay near the bottom of SpringBoard while infern0 is active.\n\nThis version is a SpringBoard overlay shell; deeper keyboard-host integration will come later."
+                               shortDescription:@"Pressable emoji button strip"
+                                longDescription:@"Adds eight real emoji buttons near the bottom of SpringBoard. Each button highlights and produces selection feedback when pressed. The enabled preference survives reboot, and infern0 recreates the live overlay when its SpringBoard session starts.\n\nCross-process insertion into arbitrary app text fields is not part of this SpringBoard overlay build."
                                         version:version
                                          author:@"Nnnnnnn274"
                                        category:@"SpringBoard"
@@ -752,7 +762,33 @@ static const NSInteger kSecRepoTweaks       = 53;
                                      enabledKey:kSettingsBarmojiEnabled
                                           isNew:YES];
         barmoji.settingsSection = kSecBarmoji;
-        barmoji.unstableWarning = @"Beta: overlay-only first pass. It does not yet inject into every app keyboard host.";
+        barmoji.unstableWarning = @"Beta: press feedback works in the SpringBoard overlay, but this build does not inject text into arbitrary app keyboard hosts.";
+
+        Package *roundedIcons = [[Package alloc] initWithIdentifier:@"com.darksword.roundedicons"
+                                           name:@"Rounded Icons"
+                               shortDescription:@"Smooth corners for every Home Screen icon"
+                                longDescription:@"Applies a configurable continuous corner radius directly to every discovered live Home Screen icon. No icon theme is required, all pages are scanned, and the original icon views remain tappable."
+                                        version:version
+                                         author:@"zeroxjf"
+                                       category:@"Home Screen"
+                                     symbolName:@"app.fill"
+                                           kind:PackageInstallKindToggle
+                                     enabledKey:kSettingsRoundedIconsEnabled
+                                          isNew:YES];
+        roundedIcons.settingsSection = kSecRoundedIcons;
+
+        Package *watchLayout = [[Package alloc] initWithIdentifier:@"com.darksword.watchlayout"
+                                           name:@"Watch Layout"
+                               shortDescription:@"Circular Apple Watch-style icon grid"
+                                longDescription:@"Compacts every discovered Home Screen page into a circular Apple Watch-style grid with circular icons and configurable spacing and scale. It transforms live icon views, so icons remain pressable, and saves stock frames for clean restoration."
+                                        version:version
+                                         author:@"zeroxjf"
+                                       category:@"Home Screen"
+                                     symbolName:@"circle.grid.3x3.fill"
+                                           kind:PackageInstallKindToggle
+                                     enabledKey:kSettingsWatchLayoutEnabled
+                                          isNew:YES];
+        watchLayout.settingsSection = kSecWatchLayout;
 
         Package *blurryBadges = [[Package alloc] initWithIdentifier:@"com.darksword.blurrybadges"
                                            name:@"BlurryBadges"
@@ -847,6 +883,7 @@ static const NSInteger kSecRepoTweaks       = 53;
                                            kind:PackageInstallKindCallRecordingSound
                                      enabledKey:nil
                                           isNew:NO];
+        callRecordingSound.settingsSection = kSecCallRecordingSound;
         callRecordingSound.experimental = NO;
         callRecordingSound.unstableWarning = @"Beta: persistent CallServices system-file replacement. Disclosure sounds may be legally required where you live; you are responsible for your use and apply this at your own risk. Use Restore Original Sounds before removing infern0 if you want infern0's backups written back.";
 
@@ -861,6 +898,7 @@ static const NSInteger kSecRepoTweaks       = 53;
                                            kind:PackageInstallKindHideHomeBar
                                      enabledKey:nil
                                           isNew:NO];
+        hideHomeBar.settingsSection = kSecHideHomeBar;
         hideHomeBar.unstableWarning = @"Beta: system asset page zeroing. Run by itself, then respring after hiding. To restore the home indicator, choose Restore Home Bar and respring.";
 
         Package *otaBlock = [[Package alloc] initWithIdentifier:@"com.darksword.ota-block"
@@ -874,6 +912,7 @@ static const NSInteger kSecRepoTweaks       = 53;
                                           kind:PackageInstallKindOTA
                                     enabledKey:nil
                                          isNew:NO];
+        otaBlock.settingsSection = kSecOTA;
         otaBlock.unstableWarning = @"Warning: persistent system-file edit. This package modifies launchd disabled.plist to change OTA job state across reboot. Disable or re-enable OTA updates at your own risk.";
 
         Package *disableAppLibrary = [[Package alloc] initWithIdentifier:@"com.darksword.disable-app-library"
@@ -1001,6 +1040,8 @@ static const NSInteger kSecRepoTweaks       = 53;
             pancake,
             cylinderLite,
             barmoji,
+            roundedIcons,
+            watchLayout,
             blurryBadges,
             snapper,
             pullOver,
@@ -1013,6 +1054,18 @@ static const NSInteger kSecRepoTweaks       = 53;
             appSwitcherGrid,
             quickLoader,
         ];
+        NSSet<NSString *> *darkSwordIDs = [NSSet setWithArray:@[
+            @"com.darksword.disable-app-library",
+            @"com.darksword.disable-icon-flyin",
+            @"com.darksword.zero-wake-animation",
+            @"com.darksword.zero-backlight-fade",
+            @"com.darksword.double-tap-to-lock",
+        ]];
+        for (Package *package in list) {
+            if ([darkSwordIDs containsObject:package.identifier]) {
+                package.settingsSection = kSecDarkSwordTweaks;
+            }
+        }
     });
     NSArray<Package *> *repoPackages = [self repoPackages];
     if (repoPackages.count == 0) return list;

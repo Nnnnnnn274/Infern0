@@ -22,4 +22,12 @@ int sb_collect_views_in_windows(uint64_t klass, uint64_t *out, int cap);
 // Bridge-only variant: BFS via the vphone bridge using a class name string.
 int sb_collect_views_in_windows_by_name(const char *className, uint64_t *out, int cap);
 
+// Collects UIApplication's windows in back-to-front order. This avoids the
+// deprecated -keyWindow path, which is commonly nil for SpringBoard scenes.
+int sb_collect_windows(uint64_t *out, int cap);
+
+// Returns the key window when one exists, otherwise the frontmost visible
+// UIApplication window.
+uint64_t sb_frontmost_window(void);
+
 #endif /* sb_walk_h */

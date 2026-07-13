@@ -1,5 +1,6 @@
 #import "blurrybadges.h"
 #import "../remote_objc.h"
+#import "../sb_walk.h"
 #import "../../TaskRop/RemoteCall.h"
 
 #import <Foundation/Foundation.h>
@@ -85,7 +86,7 @@ static void blurrybadges_scan_and_tint(uint64_t parent, uint64_t color, int dept
 bool blurrybadges_apply_in_session(void)
 {
     printf("[BLURRYBADGES] apply\n");
-    uint64_t win = blurrybadges_key_window();
+    uint64_t win = sb_frontmost_window();
     if (!r_is_objc_ptr(win)) return false;
     gBlurryBadgesTint = blurrybadges_color((double)gBlurryBadgesRed / 255.0,
                                            (double)gBlurryBadgesGreen / 255.0,
@@ -100,7 +101,7 @@ bool blurrybadges_apply_in_session(void)
 bool blurrybadges_stop_in_session(void)
 {
     printf("[BLURRYBADGES] stop\n");
-    uint64_t win = blurrybadges_key_window();
+    uint64_t win = sb_frontmost_window();
     uint64_t red = blurrybadges_color(1.0, 0.23, 0.19, 1.0);
     int hits = 0;
     if (r_is_objc_ptr(win)) blurrybadges_scan_and_tint(win, red, 0, &hits);

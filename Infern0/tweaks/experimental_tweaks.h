@@ -42,6 +42,7 @@
 #import "experimental/pancake.h"
 #import "experimental/cylinderlite.h"
 #import "experimental/barmoji.h"
+#import "experimental/iconstyles.h"
 #import "experimental/blurrybadges.h"
 #import "experimental/snapper.h"
 #import "experimental/pullover.h"

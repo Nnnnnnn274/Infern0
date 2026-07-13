@@ -1,5 +1,6 @@
 #import "betterccicons.h"
 #import "../remote_objc.h"
+#import "../sb_walk.h"
 #import "../../TaskRop/RemoteCall.h"
 
 #import <Foundation/Foundation.h>
@@ -54,7 +55,7 @@ static void betterccicons_scan(uint64_t parent, double radius, int depth, int *h
 bool betterccicons_apply_in_session(void)
 {
     printf("[BETTERCCICONS] apply\n");
-    uint64_t win = betterccicons_key_window();
+    uint64_t win = sb_frontmost_window();
     if (!r_is_objc_ptr(win)) return false;
     int hits = 0;
     betterccicons_scan(win, (double)gBetterCCIconsCornerRadius, 0, &hits);
@@ -65,7 +66,7 @@ bool betterccicons_apply_in_session(void)
 bool betterccicons_stop_in_session(void)
 {
     printf("[BETTERCCICONS] stop\n");
-    uint64_t win = betterccicons_key_window();
+    uint64_t win = sb_frontmost_window();
     int hits = 0;
     if (r_is_objc_ptr(win)) betterccicons_scan(win, 12.0, 0, &hits);
     gBetterCCIconsApplied = false;

@@ -1,5 +1,6 @@
 #import "alkaline.h"
 #import "../remote_objc.h"
+#import "../sb_walk.h"
 #import "../../TaskRop/RemoteCall.h"
 
 #import <Foundation/Foundation.h>
@@ -73,7 +74,7 @@ static void alkaline_scan_and_tint(uint64_t parent, uint64_t color, int depth, i
 bool alkaline_apply_in_session(void)
 {
     printf("[ALKALINE] apply\n");
-    uint64_t win = alkaline_key_window();
+    uint64_t win = sb_frontmost_window();
     if (!r_is_objc_ptr(win)) return false;
     gAlkalineTint = alkaline_color((double)gAlkalineRed / 255.0,
                                    (double)gAlkalineGreen / 255.0,
@@ -88,7 +89,7 @@ bool alkaline_apply_in_session(void)
 bool alkaline_stop_in_session(void)
 {
     printf("[ALKALINE] stop\n");
-    uint64_t win = alkaline_key_window();
+    uint64_t win = sb_frontmost_window();
     uint64_t white = alkaline_color(1, 1, 1, 1);
     int hits = 0;
     if (r_is_objc_ptr(win)) alkaline_scan_and_tint(win, white, 0, &hits);

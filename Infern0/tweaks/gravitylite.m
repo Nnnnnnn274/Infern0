@@ -473,23 +473,17 @@ static uint64_t gl_overlay_for_list_view(uint64_t listView, GL_CGRect *overlayFr
 
 static uint64_t gl_overlay_for_list_view_ios26_legacy(uint64_t listView, GL_CGRect *overlayFrameOut)
 {
-    uint64_t window = gl_view_window(listView);
-    if (!r_is_objc_ptr(window)) return 0;
-
     GL_CGRect listBounds;
-    GL_CGRect overlayFrame;
     if (!gl_get_rect(listView, "bounds", &listBounds) || !gl_rect_valid(listBounds)) return 0;
-    if (!gl_convert_rect_to_view(listView, listBounds, window, &overlayFrame) ||
-        !gl_rect_valid(overlayFrame)) {
-        return 0;
-    }
-
-    uint64_t overlay = gl_view_with_frame(overlayFrame);
+    uint64_t overlay = gl_view_with_frame(listBounds);
     if (!r_is_objc_ptr(overlay)) return 0;
+    gl_set_integer(overlay, "setTag:", kGravityLiteOverlayTag);
     gl_set_bool(overlay, "setClipsToBounds:", true);
-    gl_set_bool(overlay, "setUserInteractionEnabled:", false);
-    r_msg2_main(window, "addSubview:", overlay, 0, 0, 0);
-    if (overlayFrameOut) *overlayFrameOut = overlayFrame;
+    gl_set_bool(overlay, "setUserInteractionEnabled:", true);
+    r_msg2_main(listView, "addSubview:", overlay, 0, 0, 0);
+    if (r_responds_main(listView, "bringSubviewToFront:"))
+        r_msg2_main(listView, "bringSubviewToFront:", overlay, 0, 0, 0);
+    if (overlayFrameOut) *overlayFrameOut = listBounds;
     return overlay;
 }
 
@@ -1072,6 +1066,7 @@ static bool gl_build_group_ios26_per_icon(uint64_t groups,
         if (!r_is_objc_ptr(frameValue)) continue;
 
         gl_reset_transform(icon);
+        gl_set_bool(icon, "setUserInteractionEnabled:", true);
         gl_array_add(liveItems, icon);
         gl_array_add(liveParents, parent);
         gl_array_add(liveFrames, frameValue);
@@ -1487,9 +1482,7 @@ bool gravitylite_apply_in_session(GravityLiteConfig config)
         return false;
     }
     int iosMajor = gl_remote_ios_major();
-    bool ios26Detected = iosMajor >= 26;
-    bool ios17Detected = iosMajor == 17;
-    bool useLiveIconPath = ios26Detected || ios17Detected;
+    bool useLiveIconPath = true;
     printf("[GRAVITY] Using iOS %d %s path.\n",
            iosMajor > 0 ? iosMajor : 0,
            useLiveIconPath
@@ -1550,17 +1543,16 @@ bool gravitylite_apply_in_session(GravityLiteConfig config)
             }
         }
 
-        for (int i = 0; i < count && !homeBuilt; i++) {
+        for (int i = 0; i < count; i++) {
             uint64_t listView = listViews[i];
             if (!r_is_objc_ptr(listView)) continue;
             if (gl_ptr_seen(listView, processed, processedCount)) continue;
 
             bool isDock = (dockListView && listView == dockListView);
             if (isDock) continue;
-            if (!gl_view_has_visible_window_rect(listView)) continue;
             if (processedCount < LV_CAP) processed[processedCount++] = listView;
 
-            printf("[GRAVITY] Capturing visible home screen page %d/%d...\n",
+            printf("[GRAVITY] Capturing discovered home screen page %d/%d...\n",
                    i + 1, count);
             if (gl_build_group(groups, listView, iconViewCls, config, false, true)) {
                 built++;

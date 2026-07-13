@@ -1,5 +1,6 @@
 #import "sugarcane.h"
 #import "../remote_objc.h"
+#import "../sb_walk.h"
 #import "../../TaskRop/RemoteCall.h"
 
 #import <Foundation/Foundation.h>
@@ -9,6 +10,7 @@
 typedef struct { double x; double y; double width; double height; } SugarCaneRect;
 
 static uint64_t gSugarCaneLabels[8] = {0};
+static uint64_t gSugarCaneHosts[8] = {0};
 static int gSugarCaneLabelCount = 0;
 static bool gSugarCaneShowBrightness = true;
 static bool gSugarCaneShowVolume = true;
@@ -65,8 +67,40 @@ static void sugarcane_remove_labels(void)
             r_msg2_main(gSugarCaneLabels[i], "removeFromSuperview", 0, 0, 0, 0);
         }
         gSugarCaneLabels[i] = 0;
+        gSugarCaneHosts[i] = 0;
     }
     gSugarCaneLabelCount = 0;
+}
+
+static bool sugarcane_read_percent(uint64_t host, int *percent)
+{
+    if (!r_is_objc_ptr(host) || !percent) return false;
+    float value = 0.0f;
+    bool ok = r_responds_main(host, "value") &&
+              r_msg2_main_struct_ret(host, "value", &value, sizeof(value),
+                                     NULL, 0, NULL, 0, NULL, 0, NULL, 0);
+    if (!ok && r_responds_main(host, "sliderValue")) {
+        ok = r_msg2_main_struct_ret(host, "sliderValue", &value, sizeof(value),
+                                    NULL, 0, NULL, 0, NULL, 0, NULL, 0);
+    }
+    if (!ok) return false;
+    if (value < 0.0f) value = 0.0f;
+    if (value > 1.0f) value = 1.0f;
+    *percent = (int)(value * 100.0f + 0.5f);
+    return true;
+}
+
+static void sugarcane_update_label(uint64_t label, uint64_t host)
+{
+    int percent = 0;
+    if (!r_is_objc_ptr(label) || !sugarcane_read_percent(host, &percent)) return;
+    char text[16] = {0};
+    snprintf(text, sizeof(text), "%d%%", percent);
+    uint64_t str = r_nsstr_retained(text);
+    if (r_is_objc_ptr(str)) {
+        r_msg2_main(label, "setText:", str, 0, 0, 0);
+        r_msg2_main(str, "release", 0, 0, 0, 0);
+    }
 }
 
 static uint64_t sugarcane_alloc_percent_label(uint64_t host, const char *text)
@@ -121,11 +155,16 @@ static void sugarcane_scan_sliders(uint64_t parent, int depth, int *hits)
     bool isSlider = strstr(cls, "Slider") != NULL;
     if (((isBrightness && gSugarCaneShowBrightness) || (isVolume && gSugarCaneShowVolume) ||
          (isSlider && (gSugarCaneShowBrightness || gSugarCaneShowVolume))) && gSugarCaneLabelCount < 8) {
-        const char *text = isVolume ? "50%" : "50%";
+        int percent = 0;
+        bool readValue = sugarcane_read_percent(parent, &percent);
+        char text[16] = "--%";
+        if (readValue) snprintf(text, sizeof(text), "%d%%", percent);
         uint64_t label = sugarcane_alloc_percent_label(parent, text);
         if (r_is_objc_ptr(label)) {
             r_msg2_main(parent, "addSubview:", label, 0, 0, 0);
-            gSugarCaneLabels[gSugarCaneLabelCount++] = label;
+            gSugarCaneLabels[gSugarCaneLabelCount] = label;
+            gSugarCaneHosts[gSugarCaneLabelCount] = parent;
+            gSugarCaneLabelCount++;
             if (hits) (*hits)++;
         }
     }
@@ -140,13 +179,22 @@ static void sugarcane_scan_sliders(uint64_t parent, int depth, int *hits)
 
 bool sugarcane_apply_in_session(void)
 {
-    printf("[SUGARCANE] apply\n");
+    int liveLabels = 0;
+    for (int i = 0; i < gSugarCaneLabelCount && i < 8; i++) {
+        uint64_t superview = r_is_objc_ptr(gSugarCaneLabels[i]) ?
+            r_msg2_main(gSugarCaneLabels[i], "superview", 0, 0, 0, 0) : 0;
+        if (r_is_objc_ptr(superview) && r_is_objc_ptr(gSugarCaneHosts[i])) {
+            sugarcane_update_label(gSugarCaneLabels[i], gSugarCaneHosts[i]);
+            liveLabels++;
+        }
+    }
+    if (liveLabels > 0) return true;
     sugarcane_remove_labels();
-    uint64_t win = sugarcane_key_window();
+    uint64_t win = sb_frontmost_window();
     if (!r_is_objc_ptr(win)) return false;
     int hits = 0;
     sugarcane_scan_sliders(win, 0, &hits);
-    printf("[SUGARCANE] added %d slider percent labels\n", hits);
+    if (hits > 0) printf("[SUGARCANE] added %d slider percent labels\n", hits);
     return hits > 0;
 }
 
@@ -168,6 +216,9 @@ void sugarcane_configure(bool showBrightness, bool showVolume, int fontSize)
 
 void sugarcane_forget_remote_state(void)
 {
-    for (int i = 0; i < 8; i++) gSugarCaneLabels[i] = 0;
+    for (int i = 0; i < 8; i++) {
+        gSugarCaneLabels[i] = 0;
+        gSugarCaneHosts[i] = 0;
+    }
     gSugarCaneLabelCount = 0;
 }

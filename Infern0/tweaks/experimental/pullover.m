@@ -1,5 +1,6 @@
 #import "pullover.h"
 #import "../remote_objc.h"
+#import "../sb_walk.h"
 #import "../../TaskRop/RemoteCall.h"
 
 #import <Foundation/Foundation.h>
@@ -124,7 +125,7 @@ bool pullover_apply_in_session(void)
         r_msg2_main(gPullOverView, "removeFromSuperview", 0, 0, 0, 0);
         gPullOverView = 0;
     }
-    uint64_t win = pullover_key_window();
+    uint64_t win = sb_frontmost_window();
     if (!r_is_objc_ptr(win)) return false;
     PullOverRect bounds = pullover_bounds_for_view(win);
     double trayHeight = bounds.height - 260.0;

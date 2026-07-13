@@ -98,6 +98,8 @@ extern NSString * const kSettingsFakeClockUpSpeed;
 extern NSString * const kSettingsPancakeEnabled;
 extern NSString * const kSettingsCylinderLiteEnabled;
 extern NSString * const kSettingsBarmojiEnabled;
+extern NSString * const kSettingsRoundedIconsEnabled;
+extern NSString * const kSettingsWatchLayoutEnabled;
 extern NSString * const kSettingsBlurryBadgesEnabled;
 extern NSString * const kSettingsSnapperEnabled;
 extern NSString * const kSettingsPullOverEnabled;

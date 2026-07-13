@@ -1,5 +1,6 @@
 #import "modulespacing.h"
 #import "../remote_objc.h"
+#import "../sb_walk.h"
 #import "../../TaskRop/RemoteCall.h"
 
 #import <Foundation/Foundation.h>
@@ -56,7 +57,7 @@ static void modulespacing_scan(uint64_t parent, double radius, int depth, int *h
 bool modulespacing_apply_in_session(void)
 {
     printf("[MODULESPACING] apply\n");
-    uint64_t win = modulespacing_key_window();
+    uint64_t win = sb_frontmost_window();
     if (!r_is_objc_ptr(win)) return false;
     int hits = 0;
     modulespacing_scan(win, (double)gModuleSpacingCornerRadius, 0, &hits);
@@ -67,7 +68,7 @@ bool modulespacing_apply_in_session(void)
 bool modulespacing_stop_in_session(void)
 {
     printf("[MODULESPACING] stop\n");
-    uint64_t win = modulespacing_key_window();
+    uint64_t win = sb_frontmost_window();
     int hits = 0;
     if (r_is_objc_ptr(win)) modulespacing_scan(win, 18.0, 0, &hits);
     gModuleSpacingApplied = false;

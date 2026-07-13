@@ -51,7 +51,7 @@ bool realcc_apply(bool disableWifi, bool disableBt)
 
     if (disableBt) {
         BOOL ok = realcc_write_plist_bool(@"/private/var/preferences/SystemConfiguration/com.apple.Bluetooth.plist",
-                                           @"BluetoothState", @NO);
+                                           @"BluetoothState", NO);
         if (ok) {
             realcc_kill_daemon("bluetoothd");
         }
@@ -75,7 +75,7 @@ bool realcc_restore(void)
 
     if (gRealccBtDisabled) {
         realcc_write_plist_bool(@"/private/var/preferences/SystemConfiguration/com.apple.Bluetooth.plist",
-                                @"BluetoothState", @YES);
+                                @"BluetoothState", YES);
         realcc_kill_daemon("bluetoothd");
         gRealccBtDisabled = false;
     }

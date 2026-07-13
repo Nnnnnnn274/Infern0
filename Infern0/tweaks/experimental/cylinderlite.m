@@ -1,5 +1,6 @@
 #import "cylinderlite.h"
 #import "../remote_objc.h"
+#import "../sb_walk.h"
 #import "../../TaskRop/RemoteCall.h"
 #import "../../LogTextView.h"
 
@@ -11,7 +12,7 @@ static bool gCyApplied = false;
 static uint64_t gCyLastIconListView = 0;
 static int gCyDepth = -10;
 static int gCyPerspectiveDistance = 650;
-static int gCyMaxIcons = 128;
+static int gCyMaxIcons = 512;
 
 typedef struct {
     double m11, m12, m13, m14;
@@ -46,113 +47,54 @@ bool cylinderlite_apply_in_session(void)
 {
     printf("[CYLINDER] apply\n");
 
-    uint64_t UIApplication = r_class("UIApplication");
-    if (!r_is_objc_ptr(UIApplication)) return false;
-    uint64_t app = r_msg2_main(UIApplication, "sharedApplication", 0, 0, 0, 0);
-    if (!r_is_objc_ptr(app)) return false;
+    uint64_t iconViews[512] = {0};
+    uint64_t listViews[64] = {0};
+    uint64_t iconClass = r_class("SBIconView");
+    uint64_t listClass = r_class("SBIconListView");
+    if (!r_is_objc_ptr(iconClass) || !r_is_objc_ptr(listClass)) return false;
 
-    uint64_t windows = r_msg2_main(app, "windows", 0, 0, 0, 0);
-    if (!r_is_objc_ptr(windows)) return false;
-    uint64_t winCount = r_msg2_main(windows, "count", 0, 0, 0, 0);
-    if (winCount > 32) winCount = 32;
-
-    uint64_t iconListView = 0;
-    for (uint64_t i = 0; i < winCount; i++) {
-        uint64_t win = r_msg2_main(windows, "objectAtIndex:", i, 0, 0, 0);
-        if (!r_is_objc_ptr(win)) continue;
-        uint64_t root = r_msg2_main(win, "rootViewController", 0, 0, 0, 0);
-        if (!r_is_objc_ptr(root)) continue;
-
-        char cls[128] = {0};
-        uint64_t rCls = r_dlsym_call(R_TIMEOUT, "object_getClass", root, 0, 0, 0, 0, 0, 0, 0);
-        if (r_is_objc_ptr(rCls)) {
-            uint64_t name = r_dlsym_call(R_TIMEOUT, "class_getName", rCls, 0, 0, 0, 0, 0, 0, 0);
-            if (name) {
-                uint64_t buf = r_dlsym_call(R_TIMEOUT, "strdup", name, 0, 0, 0, 0, 0, 0, 0);
-                if (buf) {
-                    remote_read(buf, cls, sizeof(cls) - 1);
-                    r_free(buf);
-                }
-            }
-        }
-
-        if (strstr(cls, "SBIconController") || strstr(cls, "SBRootFolder")) {
-            iconListView = r_msg2_main(root, "currentIconListView", 0, 0, 0, 0);
-            if (r_is_objc_ptr(iconListView)) break;
-
-            uint64_t folder = r_msg2_main(root, "rootFolder", 0, 0, 0, 0);
-            if (!r_is_objc_ptr(folder)) folder = r_ivar_value(root, "_rootFolder");
-            if (r_is_objc_ptr(folder)) {
-                uint64_t listViews = r_msg2_main(folder, "iconListViews", 0, 0, 0, 0);
-                if (!r_is_objc_ptr(listViews)) listViews = r_ivar_value(folder, "_iconListViews");
-                if (r_is_objc_ptr(listViews)) {
-                    uint64_t lvCount = r_msg2_main(listViews, "count", 0, 0, 0, 0);
-                    if (lvCount > 0) {
-                        iconListView = r_msg2_main(listViews, "firstObject", 0, 0, 0, 0);
-                        if (r_is_objc_ptr(iconListView)) break;
-                    }
-                }
-            }
-        }
+    int iconCount = sb_collect_views_in_windows(iconClass, iconViews, gCyMaxIcons);
+    int listCount = sb_collect_views_in_windows(listClass, listViews, 64);
+    double z = (double)gCyDepth;
+    for (int i = 0; i < iconCount; i++) {
+        r_msg2_main(iconViews[i], "setUserInteractionEnabled:", 1, 0, 0, 0);
+        uint64_t layer = r_msg2_main(iconViews[i], "layer", 0, 0, 0, 0);
+        if (r_is_objc_ptr(layer))
+            r_msg2_main_raw(layer, "setZPosition:", &z, sizeof(z), NULL, 0, NULL, 0, NULL, 0);
     }
-
-    if (!r_is_objc_ptr(iconListView)) {
-        printf("[CYLINDER] no icon list view found\n");
-        return false;
-    }
-    gCyLastIconListView = iconListView;
-
-    uint64_t subviews = r_msg2_main(iconListView, "subviews", 0, 0, 0, 0);
-    if (!r_is_objc_ptr(subviews)) return false;
-    uint64_t iconCount = r_msg2_main(subviews, "count", 0, 0, 0, 0);
-    if (iconCount > (uint64_t)gCyMaxIcons) iconCount = (uint64_t)gCyMaxIcons;
-
-    for (uint64_t i = 0; i < iconCount; i++) {
-        uint64_t sv = r_msg2_main(subviews, "objectAtIndex:", i, 0, 0, 0);
-        if (!r_is_objc_ptr(sv)) continue;
-
-        char cls[128] = {0};
-        uint64_t rCls = r_dlsym_call(R_TIMEOUT, "object_getClass", sv, 0, 0, 0, 0, 0, 0, 0);
-        if (r_is_objc_ptr(rCls)) {
-            uint64_t name = r_dlsym_call(R_TIMEOUT, "class_getName", rCls, 0, 0, 0, 0, 0, 0, 0);
-            if (name) {
-                uint64_t buf = r_dlsym_call(R_TIMEOUT, "strdup", name, 0, 0, 0, 0, 0, 0, 0);
-                if (buf) {
-                    remote_read(buf, cls, sizeof(cls) - 1);
-                    r_free(buf);
-                }
-            }
-        }
-
-        if (strstr(cls, "SBIconView") || strstr(cls, "SBIcon")) {
-            uint64_t layer = r_msg2_main(sv, "layer", 0, 0, 0, 0);
-            if (r_is_objc_ptr(layer)) {
-                double z = (double)gCyDepth;
-                r_msg2_main_raw(layer, "setZPosition:", &z, sizeof(z), NULL, 0, NULL, 0, NULL, 0);
-                printf("[CYLINDER] set depth on icon 0x%llx\n", sv);
-            }
-        }
-    }
-
-    printf("[CYLINDER] applied depth transforms to %llu icon views\n", iconCount);
-
-    uint64_t layer = r_msg2_main(iconListView, "layer", 0, 0, 0, 0);
-    if (r_is_objc_ptr(layer)) {
+    for (int i = 0; i < listCount; i++) {
+        r_msg2_main(listViews[i], "setUserInteractionEnabled:", 1, 0, 0, 0);
+        uint64_t layer = r_msg2_main(listViews[i], "layer", 0, 0, 0, 0);
         cy_apply_perspective_to_layer(layer, true);
-        printf("[CYLINDER] set perspective transform on list view\n");
     }
+    gCyLastIconListView = listCount > 0 ? listViews[0] : 0;
+    printf("[CYLINDER] transformed icons=%d lists=%d scanLimit=%d pages=all-discovered taps=preserved\n",
+           iconCount, listCount, gCyMaxIcons);
 
-    gCyApplied = true;
-    return true;
+    gCyApplied = iconCount > 0 && listCount > 0;
+    return gCyApplied;
 }
 
 bool cylinderlite_stop_in_session(void)
 {
     printf("[CYLINDER] stop\n");
-    if (r_is_objc_ptr(gCyLastIconListView)) {
-        uint64_t layer = r_msg2_main(gCyLastIconListView, "layer", 0, 0, 0, 0);
+    uint64_t iconViews[512] = {0};
+    uint64_t listViews[64] = {0};
+    uint64_t iconClass = r_class("SBIconView");
+    uint64_t listClass = r_class("SBIconListView");
+    int iconCount = r_is_objc_ptr(iconClass) ? sb_collect_views_in_windows(iconClass, iconViews, 512) : 0;
+    int listCount = r_is_objc_ptr(listClass) ? sb_collect_views_in_windows(listClass, listViews, 64) : 0;
+    double z = 0.0;
+    for (int i = 0; i < iconCount; i++) {
+        uint64_t layer = r_msg2_main(iconViews[i], "layer", 0, 0, 0, 0);
+        if (r_is_objc_ptr(layer))
+            r_msg2_main_raw(layer, "setZPosition:", &z, sizeof(z), NULL, 0, NULL, 0, NULL, 0);
+    }
+    for (int i = 0; i < listCount; i++) {
+        uint64_t layer = r_msg2_main(listViews[i], "layer", 0, 0, 0, 0);
         cy_apply_perspective_to_layer(layer, false);
     }
+    gCyLastIconListView = 0;
     gCyApplied = false;
     return true;
 }
@@ -163,8 +105,8 @@ void cylinderlite_configure(int depth, int perspectiveDistance, int maxIcons)
     if (depth < -80) depth = -80;
     if (perspectiveDistance < 250) perspectiveDistance = 250;
     if (perspectiveDistance > 1600) perspectiveDistance = 1600;
-    if (maxIcons < 8) maxIcons = 8;
-    if (maxIcons > 256) maxIcons = 256;
+    if (maxIcons < 512) maxIcons = 512;
+    if (maxIcons > 512) maxIcons = 512;
     gCyDepth = depth;
     gCyPerspectiveDistance = perspectiveDistance;
     gCyMaxIcons = maxIcons;
