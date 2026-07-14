@@ -6605,7 +6605,9 @@ static void settings_configure_control_center_tweaks(NSUserDefaults *d)
     blurrybadges_configure((int)[d integerForKey:kSettingsBlurryBadgesRed],
                            (int)[d integerForKey:kSettingsBlurryBadgesGreen],
                            (int)[d integerForKey:kSettingsBlurryBadgesBlue],
-                           (int)[d integerForKey:kSettingsBlurryBadgesAlphaPct]);
+                           (int)[d integerForKey:kSettingsBlurryBadgesAlphaPct],
+                           true,
+                           160);
     snapper_configure((int)[d integerForKey:kSettingsSnapperX],
                       (int)[d integerForKey:kSettingsSnapperY],
                       (int)[d integerForKey:kSettingsSnapperWidth],
@@ -12230,7 +12232,7 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
             case SectionCCStatus: case SectionHapticCC: case SectionSecureCC:
                 destination = RootSectionControlCenter; break;
             case SectionStatBar: case SectionNSBar: case SectionNiceBarLite:
-            case SectionRSSIDisplay: case SectionZeppelinLite: case SectionAlkaline:
+            case SectionRSSI: case SectionZeppelinLite: case SectionAlkaline:
                 destination = RootSectionStatusBar; break;
             case SectionAppSwitcherGrid: case SectionPancake: case SectionPullOver:
             case SectionStageStrip:
