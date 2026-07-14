@@ -855,11 +855,9 @@ NSString * const kSettingsSBCDockIcons  = @"SBCDockIcons";
 NSString * const kSettingsSBCCols       = @"SBCCols";
 NSString * const kSettingsSBCRows       = @"SBCRows";
 NSString * const kSettingsSBCHideLabels = @"SBCHideLabels";
-static NSString * const kSettingsSBCHideBadges = @"SBCHideBadges";
-static NSString * const kSettingsSBCHidePageDots = @"SBCHidePageDots";
-static NSString * const kSettingsSBCHideFolderBackground = @"SBCHideFolderBackground";
-static NSString * const kSettingsSBCHideDockBackground = @"SBCHideDockBackground";
-static NSString * const kSettingsSBCIconAlphaPct = @"SBCIconAlphaPct";
+static NSString * const kSettingsSBCIPadDockEnabled = @"SBCIPadDockEnabled";
+static NSString * const kSettingsSBCDockRecentsEnabled = @"SBCDockRecentsEnabled";
+static NSString * const kSettingsSBCDockAppLibraryEnabled = @"SBCDockAppLibraryEnabled";
 
 NSString * const kSettingsPowercuffEnabled = @"PowercuffEnabled";
 NSString * const kSettingsPowercuffLevel   = @"PowercuffLevel";
@@ -882,8 +880,6 @@ NSString * const kSettingsLayoutHomeExtraBottom = @"LayoutHomeExtraBottom";
 NSString * const kSettingsLayoutDockExtraHorizontal = @"LayoutDockExtraHorizontal";
 NSString * const kSettingsLayoutHomeScalePct    = @"LayoutHomeScalePct";
 NSString * const kSettingsLayoutDockScalePct    = @"LayoutDockScalePct";
-static NSString * const kSettingsLayoutApplyHomeControls = @"LayoutApplyHomeControls";
-static NSString * const kSettingsLayoutApplyDockControls = @"LayoutApplyDockControls";
 
 static double settings_number_row_normalized_value(NSDictionary *row, double value)
 {
@@ -994,6 +990,12 @@ NSString * const kSettingsVelvetTitleColor = @"VelvetTitleColor";
 NSString * const kSettingsVelvetMessageColor = @"VelvetMessageColor";
 NSString * const kSettingsVelvetDateColor = @"VelvetDateColor";
 NSString * const kSettingsVelvetCornerRadius = @"VelvetCornerRadius";
+static NSString * const kSettingsVelvetBannerScalePct = @"VelvetBannerScalePct";
+static NSString * const kSettingsVelvetBannerAlphaPct = @"VelvetBannerAlphaPct";
+static NSString * const kSettingsVelvetEdgeGlowEnabled = @"VelvetEdgeGlowEnabled";
+static NSString * const kSettingsVelvetEdgeGlowTopOnly = @"VelvetEdgeGlowTopOnly";
+static NSString * const kSettingsVelvetEdgeGlowColor = @"VelvetEdgeGlowColor";
+static NSString * const kSettingsVelvetEdgeGlowThickness = @"VelvetEdgeGlowThickness";
 
 NSString * const kSettingsCleanNCEnabled = @"CleanNCEnabled";
 NSString * const kSettingsUnderTimeEnabled = @"UnderTimeEnabled";
@@ -1020,11 +1022,16 @@ static NSString * const kSettingsSugarCaneFontSize = @"SugarCaneFontSize";
 NSString * const kSettingsBetterCCXIEnabled = @"BetterCCXIEnabled";
 static NSString * const kSettingsBetterCCXIZLift = @"BetterCCXIZLift";
 static NSString * const kSettingsBetterCCXIDepthLimit = @"BetterCCXIDepthLimit";
+static NSString * const kSettingsBetterCCXIModuleScalePct = @"BetterCCXIModuleScalePct";
 NSString * const kSettingsMagmaEnabled = @"MagmaEnabled";
 static NSString * const kSettingsMagmaRed = @"MagmaRed";
 static NSString * const kSettingsMagmaGreen = @"MagmaGreen";
 static NSString * const kSettingsMagmaBlue = @"MagmaBlue";
 static NSString * const kSettingsMagmaAlphaPct = @"MagmaAlphaPct";
+static NSString * const kSettingsMagmaColorToggles = @"MagmaColorToggles";
+static NSString * const kSettingsMagmaColorSliders = @"MagmaColorSliders";
+static NSString * const kSettingsMagmaColorMedia = @"MagmaColorMedia";
+static NSString * const kSettingsMagmaColorBackground = @"MagmaColorBackground";
 NSString * const kSettingsBetterCCIconsEnabled = @"BetterCCIconsEnabled";
 static NSString * const kSettingsBetterCCIconsCornerRadius = @"BetterCCIconsCornerRadius";
 NSString * const kSettingsCCNoPlatterDimEnabled = @"CCNoPlatterDimEnabled";
@@ -1066,17 +1073,31 @@ static NSString * const kSettingsLockCustomizerYOffset = @"LockCustomizerYOffset
 static NSString * const kSettingsLockCustomizerHideQuickActions = @"LockCustomizerHideQuickActions";
 static NSString * const kSettingsLockCustomizerHidePageDots = @"LockCustomizerHidePageDots";
 static NSString * const kSettingsLockCustomizerContentAlphaPct = @"LockCustomizerContentAlphaPct";
+static NSString * const kSettingsLockCustomizerMediaScalePct = @"LockCustomizerMediaScalePct";
+static NSString * const kSettingsLockCustomizerHideMediaArtwork = @"LockCustomizerHideMediaArtwork";
+static NSString * const kSettingsLockCustomizerMetalLightEnabled = @"LockCustomizerMetalLightEnabled";
+static NSString * const kSettingsLockCustomizerMetalLightIntensityPct = @"LockCustomizerMetalLightIntensityPct";
+static NSString * const kSettingsLockCustomizerMetalLightThickness = @"LockCustomizerMetalLightThickness";
+static NSString * const kSettingsLockCustomizerMetalLightStyle = @"LockCustomizerMetalLightStyle";
 NSString * const kSettingsFreePlacementEnabled = @"FreePlacementEnabled";
 static NSString * const kSettingsFreePlacementHorizontalStep = @"FreePlacementHorizontalStep";
 static NSString * const kSettingsFreePlacementVerticalStep = @"FreePlacementVerticalStep";
 static NSString * const kSettingsFreePlacementStaggerPct = @"FreePlacementStaggerPct";
+NSString * const kSettingsCopypastaLiteEnabled = @"CopypastaLiteEnabled";
+static NSString * const kSettingsCopypastaSnippet1 = @"CopypastaSnippet1";
+static NSString * const kSettingsCopypastaSnippet2 = @"CopypastaSnippet2";
+static NSString * const kSettingsCopypastaSnippet3 = @"CopypastaSnippet3";
+NSString * const kSettingsAppLibraryStudioEnabled = @"AppLibraryStudioEnabled";
+static NSString * const kSettingsAppLibraryStudioScalePct = @"AppLibraryStudioScalePct";
+static NSString * const kSettingsAppLibraryStudioHorizontalSpacing = @"AppLibraryStudioHorizontalSpacing";
+static NSString * const kSettingsAppLibraryStudioVerticalSpacing = @"AppLibraryStudioVerticalSpacing";
+static NSString * const kSettingsAppLibraryStudioHideLabels = @"AppLibraryStudioHideLabels";
+static NSString * const kSettingsAppLibraryStudioDisableTodayView = @"AppLibraryStudioDisableTodayView";
 NSString * const kSettingsBlurryBadgesEnabled = @"BlurryBadgesEnabled";
 static NSString * const kSettingsBlurryBadgesRed = @"BlurryBadgesRed";
 static NSString * const kSettingsBlurryBadgesGreen = @"BlurryBadgesGreen";
 static NSString * const kSettingsBlurryBadgesBlue = @"BlurryBadgesBlue";
 static NSString * const kSettingsBlurryBadgesAlphaPct = @"BlurryBadgesAlphaPct";
-static NSString * const kSettingsBlurryBadgesGrowEnabled = @"BlurryBadgesGrowEnabled";
-static NSString * const kSettingsBlurryBadgesMaxScalePct = @"BlurryBadgesMaxScalePct";
 NSString * const kSettingsSnapperEnabled = @"SnapperEnabled";
 static NSString * const kSettingsSnapperX = @"SnapperX";
 static NSString * const kSettingsSnapperY = @"SnapperY";
@@ -1113,6 +1134,8 @@ NSString * const kSettingsGravityLiteResistancePct = @"GravityLiteResistancePct"
 NSString * const kSettingsGravityLiteAngularResistancePct = @"GravityLiteAngularResistancePct";
 
 NSString * const kSettingsStageStripEnabled = @"StageStripEnabled";
+static NSString * const kSettingsStageStripConcurrentWindows = @"StageStripConcurrentWindows";
+static NSString * const kSettingsStageStripIncludeSystemApps = @"StageStripIncludeSystemApps";
 
 NSString * const kSettingsLocationSimEnabled = @"LocationSimEnabled";
 NSString * const kSettingsLocationSimLatitude = @"LocationSimLatitude";
@@ -1141,6 +1164,10 @@ NSString * const kSettingsSnowBoardLiteSelectedThemeID = @"SnowBoardLiteSelected
 
 NSString * const kSettingsLiveWPEnabled = @"LiveWPEnabled";
 NSString * const kSettingsLiveWPVideoPath = @"LiveWPVideoPath";
+static NSString * const kSettingsLiveWPMoodMode = @"LiveWPMoodMode";
+static NSString * const kSettingsLiveWPMoodImagePaths = @"LiveWPMoodImagePaths";
+static NSString * const kSettingsLiveWPMoodDuration = @"LiveWPMoodDuration";
+static NSString * const kSettingsLiveWPMoodTiltDegrees = @"LiveWPMoodTiltDegrees";
 
 NSString * const kSettingsQuickLoaderEnabled = @"QuickLoaderEnabled";
 
@@ -1593,6 +1620,18 @@ static bool settings_stop_roundedicons_registered(BOOL springboardWillDie)
     return roundedicons_stop_in_session();
 }
 
+static bool settings_stop_watchlayout_registered(BOOL springboardWillDie)
+{
+    (void)springboardWillDie;
+    return watchlayout_stop_in_session();
+}
+
+static bool settings_stop_applibrarystudio_registered(BOOL springboardWillDie)
+{
+    (void)springboardWillDie;
+    return applibrarystudio_stop_in_session();
+}
+
 static bool settings_stop_lockcustomizer_registered(BOOL springboardWillDie)
 {
     (void)springboardWillDie;
@@ -1603,12 +1642,6 @@ static bool settings_stop_freeplacement_registered(BOOL springboardWillDie)
 {
     (void)springboardWillDie;
     return freeplacement_stop_in_session();
-}
-
-static bool settings_stop_watchlayout_registered(BOOL springboardWillDie)
-{
-    (void)springboardWillDie;
-    return watchlayout_stop_in_session();
 }
 
 static bool settings_stop_blurrybadges_registered(BOOL springboardWillDie)
@@ -1679,7 +1712,7 @@ static void settings_each_springboard_cleanup_entry(void (^block)(const Settings
         { kSettingsLiveWPEnabled, "LiveWP", settings_request_livewp_stop, settings_stop_livewp_registered, livewp_forget_remote_state, settings_livewp_running, YES, YES },
         { kSettingsStageStripEnabled, "Stage Strip", settings_request_stagestrip_stop, settings_stop_stagestrip_registered, stagestrip_forget_remote_state, NULL, YES, YES },
         { kSettingsFastLockXLiteEnabled, "FastLockX Lite", NULL, settings_stop_fastlockx_lite_registered, fastlockx_lite_forget_remote_state, NULL, NO, YES },
-        { kSettingsVelvetEnabled, "Velvet", settings_request_velvet_stop, settings_stop_velvet_registered, velvet_forget_remote_state, settings_velvet_running, YES, YES },
+        { kSettingsVelvetEnabled, "Velvet + Edge Glow", settings_request_velvet_stop, settings_stop_velvet_registered, velvet_forget_remote_state, settings_velvet_running, YES, YES },
         { kSettingsCleanNCEnabled, "CleanNC", NULL, settings_stop_cleannc_registered, cleannc_forget_remote_state, NULL, YES, YES },
         { kSettingsUnderTimeEnabled, "UnderTime", NULL, settings_stop_undertime_registered, undertime_forget_remote_state, NULL, YES, YES },
         { kSettingsZeppelinLiteEnabled, "Zeppelin Lite", NULL, settings_stop_zeppelinlite_registered, zeppelinlite_forget_remote_state, NULL, YES, YES },
@@ -1702,9 +1735,10 @@ static void settings_each_springboard_cleanup_entry(void (^block)(const Settings
         { kSettingsCylinderLiteEnabled, "Cylinder Lite", NULL, settings_stop_cylinderlite_registered, cylinderlite_forget_remote_state, NULL, YES, YES },
         { kSettingsBarmojiEnabled, "Barmoji", NULL, settings_stop_barmoji_registered, barmoji_forget_remote_state, NULL, YES, YES },
         { kSettingsRoundedIconsEnabled, "Rounded Icons", NULL, settings_stop_roundedicons_registered, roundedicons_forget_remote_state, NULL, YES, YES },
-        { kSettingsFreePlacementEnabled, "Free Placement Lite", NULL, settings_stop_freeplacement_registered, freeplacement_forget_remote_state, NULL, YES, YES },
         { kSettingsWatchLayoutEnabled, "Watch Layout", NULL, settings_stop_watchlayout_registered, watchlayout_forget_remote_state, NULL, YES, YES },
+        { kSettingsAppLibraryStudioEnabled, "App Library Studio", NULL, settings_stop_applibrarystudio_registered, applibrarystudio_forget_remote_state, NULL, YES, YES },
         { kSettingsLockCustomizerEnabled, "Lock Screen Customizer", NULL, settings_stop_lockcustomizer_registered, lockcustomizer_forget_remote_state, NULL, YES, YES },
+        { kSettingsFreePlacementEnabled, "Free Placement Lite", NULL, settings_stop_freeplacement_registered, freeplacement_forget_remote_state, NULL, YES, YES },
         { kSettingsBlurryBadgesEnabled, "BlurryBadges", NULL, settings_stop_blurrybadges_registered, blurrybadges_forget_remote_state, NULL, YES, YES },
         { kSettingsSnapperEnabled, "Snapper", NULL, settings_stop_snapper_registered, snapper_forget_remote_state, NULL, YES, YES },
         { kSettingsPullOverEnabled, "PullOver", NULL, settings_stop_pullover_registered, pullover_forget_remote_state, NULL, YES, YES },
@@ -3394,40 +3428,16 @@ void settings_destroy_springboard_remote_call(void)
 
 static bool settings_apply_sbc_from_defaults_locked(NSUserDefaults *d)
 {
-    if (![d boolForKey:kSettingsSBCEnabled]) {
-        NSInteger oldAlpha = [d objectForKey:kSettingsSBCIconAlphaPct] ? [d integerForKey:kSettingsSBCIconAlphaPct] : 100;
-        BOOL hadAppearanceChanges = [d boolForKey:kSettingsSBCHideBadges] ||
-                                    [d boolForKey:kSettingsSBCHidePageDots] ||
-                                    [d boolForKey:kSettingsSBCHideFolderBackground] ||
-                                    [d boolForKey:kSettingsSBCHideDockBackground] || oldAlpha != 100;
-        if (hadAppearanceChanges) homecustom_stop_in_session();
-        printf("[SBCUSTOMIZER] disabled; atriaExtrasRestored=%d\n", hadAppearanceChanges);
-        return false;
-    }
+    if (![d boolForKey:kSettingsSBCEnabled]) return false;
 
-    NSInteger iconAlpha = [d objectForKey:kSettingsSBCIconAlphaPct] ? [d integerForKey:kSettingsSBCIconAlphaPct] : 100;
-    homecustom_configure([d boolForKey:kSettingsSBCHideBadges],
-                         [d boolForKey:kSettingsSBCHidePageDots],
-                         [d boolForKey:kSettingsSBCHideFolderBackground],
-                         [d boolForKey:kSettingsSBCHideDockBackground],
-                         (int)iconAlpha);
-    bool layoutOK = sbcustomizer_apply_in_session((int)[d integerForKey:kSettingsSBCDockIcons],
-                                                  (int)[d integerForKey:kSettingsSBCCols],
-                                                  (int)[d integerForKey:kSettingsSBCRows],
-                                                  [d boolForKey:kSettingsSBCHideLabels]);
-    bool appearanceOK = homecustom_apply_in_session();
-    printf("[SBCUSTOMIZER] layout=%d atriaExtras=%d\n", layoutOK, appearanceOK);
-    log_user("[SBCUSTOMIZER] dock=%ld grid=%ldx%ld labelsHidden=%d badgesHidden=%d pageDotsHidden=%d folderBackgroundHidden=%d dockBackgroundHidden=%d iconOpacity=%ld%% layoutResult=%d appearanceResult=%d.\n",
-             (long)[d integerForKey:kSettingsSBCDockIcons],
-             (long)[d integerForKey:kSettingsSBCCols],
-             (long)[d integerForKey:kSettingsSBCRows],
-             [d boolForKey:kSettingsSBCHideLabels],
-             [d boolForKey:kSettingsSBCHideBadges],
-             [d boolForKey:kSettingsSBCHidePageDots],
-             [d boolForKey:kSettingsSBCHideFolderBackground],
-             [d boolForKey:kSettingsSBCHideDockBackground],
-             (long)iconAlpha, layoutOK, appearanceOK);
-    return layoutOK || appearanceOK;
+    sbcustomizer_configure_ipad_dock([d boolForKey:kSettingsSBCIPadDockEnabled],
+                                     [d boolForKey:kSettingsSBCDockRecentsEnabled],
+                                     [d boolForKey:kSettingsSBCDockAppLibraryEnabled]);
+
+    return sbcustomizer_apply_in_session((int)[d integerForKey:kSettingsSBCDockIcons],
+                                         (int)[d integerForKey:kSettingsSBCCols],
+                                         (int)[d integerForKey:kSettingsSBCRows],
+                                         [d boolForKey:kSettingsSBCHideLabels]);
 }
 
 static NSString *settings_nicebar_key(NSString *prefix, NSInteger slot)
@@ -3949,14 +3959,8 @@ static bool settings_apply_layout_extras_from_defaults_locked(NSUserDefaults *d)
     double dockExH = (double)[d integerForKey:kSettingsLayoutDockExtraHorizontal];
     NSInteger hsPct = [d integerForKey:kSettingsLayoutHomeScalePct];
     NSInteger dkPct = [d integerForKey:kSettingsLayoutDockScalePct];
-    BOOL applyHome = [d objectForKey:kSettingsLayoutApplyHomeControls] ? [d boolForKey:kSettingsLayoutApplyHomeControls] : YES;
-    BOOL applyDock = [d objectForKey:kSettingsLayoutApplyDockControls] ? [d boolForKey:kSettingsLayoutApplyDockControls] : YES;
-    if (!applyHome) { exL = 0; exR = 0; exT = 0; exB = 0; hsPct = 100; }
-    if (!applyDock) { dockExH = 0; dkPct = 100; }
     double homeScale = (hsPct > 0) ? (double)hsPct / 100.0 : 1.0;
     double dockScale = (dkPct > 0) ? (double)dkPct / 100.0 : 1.0;
-    log_user("[HOME EXTRAS] homeControls=%d dockControls=%d insets=%.0f/%.0f/%.0f/%.0f dockExtra=%.0f scales=%.0f%%/%.0f%%.\n",
-             applyHome, applyDock, exL, exR, exT, exB, dockExH, homeScale * 100.0, dockScale * 100.0);
     return darksword_layout_apply_in_session(exL, exR, exT, exB, dockExH, homeScale, dockScale);
 }
 
@@ -4052,6 +4056,19 @@ static VelvetStyle settings_velvet_style_from_defaults(NSUserDefaults *d)
     style.dateColor = settings_velvet_color_from_hex([d stringForKey:kSettingsVelvetDateColor] ?: @"#888888");
     style.cornerRadius = (CGFloat)[d doubleForKey:kSettingsVelvetCornerRadius];
     style.hasCornerRadius = true;
+    style.bannerScale = (double)[d integerForKey:kSettingsVelvetBannerScalePct] / 100.0;
+    style.bannerAlpha = (double)[d integerForKey:kSettingsVelvetBannerAlphaPct] / 100.0;
+    style.edgeGlowEnabled = [d boolForKey:kSettingsVelvetEdgeGlowEnabled];
+    style.edgeGlowTopOnly = [d boolForKey:kSettingsVelvetEdgeGlowTopOnly];
+    style.edgeGlowColor = settings_velvet_color_from_hex([d stringForKey:kSettingsVelvetEdgeGlowColor] ?: @"#00D9FFFF");
+    style.edgeGlowThickness = [d doubleForKey:kSettingsVelvetEdgeGlowThickness];
+    log_user("[VELVET] config bg=%s border=%s width=%.1f radius=%.1f bannerScale=%.0f%% bannerAlpha=%.0f%% edgeGlow=%d topOnly=%d edgeColor=%s edgeWidth=%.1f.\n",
+             ([d stringForKey:kSettingsVelvetBgColor] ?: @"#1E1E1E").UTF8String,
+             ([d stringForKey:kSettingsVelvetBorderColor] ?: @"#3A3A3A").UTF8String,
+             style.borderWidth, style.cornerRadius, style.bannerScale * 100.0, style.bannerAlpha * 100.0,
+             style.edgeGlowEnabled, style.edgeGlowTopOnly,
+             ([d stringForKey:kSettingsVelvetEdgeGlowColor] ?: @"#00D9FFFF").UTF8String,
+             style.edgeGlowThickness);
     return style;
 }
 
@@ -4345,11 +4362,9 @@ static void settings_reset_sbc_defaults(void)
     [d setInteger:kSBCDefaultCols forKey:kSettingsSBCCols];
     [d setInteger:kSBCDefaultRows forKey:kSettingsSBCRows];
     [d setBool:kSBCDefaultHideLabels forKey:kSettingsSBCHideLabels];
-    [d setBool:NO forKey:kSettingsSBCHideBadges];
-    [d setBool:NO forKey:kSettingsSBCHidePageDots];
-    [d setBool:NO forKey:kSettingsSBCHideFolderBackground];
-    [d setBool:NO forKey:kSettingsSBCHideDockBackground];
-    [d setInteger:100 forKey:kSettingsSBCIconAlphaPct];
+    [d setBool:NO forKey:kSettingsSBCIPadDockEnabled];
+    [d setBool:YES forKey:kSettingsSBCDockRecentsEnabled];
+    [d setBool:YES forKey:kSettingsSBCDockAppLibraryEnabled];
     [d synchronize];
 
     printf("[SETTINGS] SBC reset defaults dock=%ld hs=%ldx%ld hideLabels=%d rcReady=%d\n",
@@ -5887,6 +5902,7 @@ static BOOL settings_visual_refresh_enabled(NSUserDefaults *d)
            [d boolForKey:kSettingsMagmaEnabled] ||
            [d boolForKey:kSettingsBetterCCIconsEnabled] ||
            [d boolForKey:kSettingsCCNoPlatterDimEnabled] ||
+           [d boolForKey:kSettingsCCStatusEnabled] ||
            [d boolForKey:kSettingsHapticCCEnabled] ||
            [d boolForKey:kSettingsSecureCCEnabled] ||
            [d boolForKey:kSettingsCylinderLiteEnabled] ||
@@ -5894,6 +5910,7 @@ static BOOL settings_visual_refresh_enabled(NSUserDefaults *d)
            [d boolForKey:kSettingsAlkalineEnabled] ||
            [d boolForKey:kSettingsRoundedIconsEnabled] ||
            [d boolForKey:kSettingsWatchLayoutEnabled] ||
+           [d boolForKey:kSettingsAppLibraryStudioEnabled] ||
            [d boolForKey:kSettingsLockCustomizerEnabled] ||
            [d boolForKey:kSettingsFreePlacementEnabled];
 }
@@ -5921,6 +5938,8 @@ static void settings_visual_refresh_tick(NSUserDefaults *d, BOOL fullScan)
         settings_visual_refresh_mark_if_ready(kSettingsBetterCCIconsEnabled, betterccicons_apply_in_session());
     if (fullScan && [d boolForKey:kSettingsCCNoPlatterDimEnabled])
         settings_visual_refresh_mark_if_ready(kSettingsCCNoPlatterDimEnabled, ccnoplatterdim_apply_in_session());
+    if (fullScan && [d boolForKey:kSettingsCCStatusEnabled])
+        settings_visual_refresh_mark_if_ready(kSettingsCCStatusEnabled, ccstatus_apply_in_session());
     if ([d boolForKey:kSettingsHapticCCEnabled])
         settings_visual_refresh_mark_if_ready(kSettingsHapticCCEnabled, hapticcc_apply_in_session());
     if ([d boolForKey:kSettingsSecureCCEnabled])
@@ -5935,6 +5954,8 @@ static void settings_visual_refresh_tick(NSUserDefaults *d, BOOL fullScan)
         settings_visual_refresh_mark_if_ready(kSettingsRoundedIconsEnabled, roundedicons_apply_in_session());
     if (fullScan && [d boolForKey:kSettingsWatchLayoutEnabled])
         settings_visual_refresh_mark_if_ready(kSettingsWatchLayoutEnabled, watchlayout_apply_in_session());
+    if (fullScan && [d boolForKey:kSettingsAppLibraryStudioEnabled])
+        settings_visual_refresh_mark_if_ready(kSettingsAppLibraryStudioEnabled, applibrarystudio_apply_in_session());
     if (fullScan && [d boolForKey:kSettingsLockCustomizerEnabled])
         settings_visual_refresh_mark_if_ready(kSettingsLockCustomizerEnabled, lockcustomizer_apply_in_session());
     if (fullScan && [d boolForKey:kSettingsFreePlacementEnabled])
@@ -6335,11 +6356,9 @@ static BOOL settings_key_is_sbc(NSString *key)
            [key isEqualToString:kSettingsSBCCols] ||
            [key isEqualToString:kSettingsSBCRows] ||
            [key isEqualToString:kSettingsSBCHideLabels] ||
-           [key isEqualToString:kSettingsSBCHideBadges] ||
-           [key isEqualToString:kSettingsSBCHidePageDots] ||
-           [key isEqualToString:kSettingsSBCHideFolderBackground] ||
-           [key isEqualToString:kSettingsSBCHideDockBackground] ||
-           [key isEqualToString:kSettingsSBCIconAlphaPct];
+           [key isEqualToString:kSettingsSBCIPadDockEnabled] ||
+           [key isEqualToString:kSettingsSBCDockRecentsEnabled] ||
+           [key isEqualToString:kSettingsSBCDockAppLibraryEnabled];
 }
 
 static BOOL settings_key_is_sbc_configuration(NSString *key)
@@ -6348,11 +6367,9 @@ static BOOL settings_key_is_sbc_configuration(NSString *key)
            [key isEqualToString:kSettingsSBCCols] ||
            [key isEqualToString:kSettingsSBCRows] ||
            [key isEqualToString:kSettingsSBCHideLabels] ||
-           [key isEqualToString:kSettingsSBCHideBadges] ||
-           [key isEqualToString:kSettingsSBCHidePageDots] ||
-           [key isEqualToString:kSettingsSBCHideFolderBackground] ||
-           [key isEqualToString:kSettingsSBCHideDockBackground] ||
-           [key isEqualToString:kSettingsSBCIconAlphaPct];
+           [key isEqualToString:kSettingsSBCIPadDockEnabled] ||
+           [key isEqualToString:kSettingsSBCDockRecentsEnabled] ||
+           [key isEqualToString:kSettingsSBCDockAppLibraryEnabled];
 }
 
 static void settings_note_package_configuration_changed(NSString *key)
@@ -6366,6 +6383,11 @@ static void settings_note_package_configuration_changed(NSString *key)
         printf("[SETTINGS] SBC config changed via %s; marked layout refresh pending\n",
                key.UTF8String);
         log_user("[SBCUSTOMIZER] Settings changed — layout refresh is pending.\n");
+        settings_notify_package_queue_changed_async();
+    } else if ([key isEqualToString:kSettingsStageStripConcurrentWindows] ||
+               [key isEqualToString:kSettingsStageStripIncludeSystemApps]) {
+        settings_mark_tweak_applied(kSettingsStageStripEnabled, NO);
+        log_user("[MILKYWAY] Settings changed; floating-window refresh is pending.\n");
         settings_notify_package_queue_changed_async();
     }
 }
@@ -6449,7 +6471,13 @@ static BOOL settings_key_is_velvet(NSString *key)
            [key isEqualToString:kSettingsVelvetTitleColor] ||
            [key isEqualToString:kSettingsVelvetMessageColor] ||
            [key isEqualToString:kSettingsVelvetDateColor] ||
-           [key isEqualToString:kSettingsVelvetCornerRadius];
+           [key isEqualToString:kSettingsVelvetCornerRadius] ||
+           [key isEqualToString:kSettingsVelvetBannerScalePct] ||
+           [key isEqualToString:kSettingsVelvetBannerAlphaPct] ||
+           [key isEqualToString:kSettingsVelvetEdgeGlowEnabled] ||
+           [key isEqualToString:kSettingsVelvetEdgeGlowTopOnly] ||
+           [key isEqualToString:kSettingsVelvetEdgeGlowColor] ||
+           [key isEqualToString:kSettingsVelvetEdgeGlowThickness];
 }
 
 static BOOL settings_key_is_cleannc(NSString *key)
@@ -6552,11 +6580,16 @@ static void settings_configure_control_center_tweaks(NSUserDefaults *d)
                         [d boolForKey:kSettingsSugarCaneShowVolume],
                         (int)[d integerForKey:kSettingsSugarCaneFontSize]);
     betterccxi_configure((int)[d integerForKey:kSettingsBetterCCXIZLift],
-                         (int)[d integerForKey:kSettingsBetterCCXIDepthLimit]);
+                         (int)[d integerForKey:kSettingsBetterCCXIDepthLimit],
+                         (int)[d integerForKey:kSettingsBetterCCXIModuleScalePct]);
     magma_configure((int)[d integerForKey:kSettingsMagmaRed],
                     (int)[d integerForKey:kSettingsMagmaGreen],
                     (int)[d integerForKey:kSettingsMagmaBlue],
-                    (int)[d integerForKey:kSettingsMagmaAlphaPct]);
+                    (int)[d integerForKey:kSettingsMagmaAlphaPct],
+                    [d boolForKey:kSettingsMagmaColorToggles],
+                    [d boolForKey:kSettingsMagmaColorSliders],
+                    [d boolForKey:kSettingsMagmaColorMedia],
+                    [d boolForKey:kSettingsMagmaColorBackground]);
     betterccicons_configure((int)[d integerForKey:kSettingsBetterCCIconsCornerRadius]);
     ccnoplatterdim_configure((int)[d integerForKey:kSettingsCCNoPlatterDimVisibleAlphaPct]);
     ccstatus_configure([d boolForKey:kSettingsCCStatusShowWifi],
@@ -6572,9 +6605,7 @@ static void settings_configure_control_center_tweaks(NSUserDefaults *d)
     blurrybadges_configure((int)[d integerForKey:kSettingsBlurryBadgesRed],
                            (int)[d integerForKey:kSettingsBlurryBadgesGreen],
                            (int)[d integerForKey:kSettingsBlurryBadgesBlue],
-                           (int)[d integerForKey:kSettingsBlurryBadgesAlphaPct],
-                           [d boolForKey:kSettingsBlurryBadgesGrowEnabled],
-                           (int)[d integerForKey:kSettingsBlurryBadgesMaxScalePct]);
+                           (int)[d integerForKey:kSettingsBlurryBadgesAlphaPct]);
     snapper_configure((int)[d integerForKey:kSettingsSnapperX],
                       (int)[d integerForKey:kSettingsSnapperY],
                       (int)[d integerForKey:kSettingsSnapperWidth],
@@ -6600,11 +6631,22 @@ static void settings_configure_control_center_tweaks(NSUserDefaults *d)
                              (int)[d integerForKey:kSettingsLockCustomizerYOffset],
                              [d boolForKey:kSettingsLockCustomizerHideQuickActions],
                              [d boolForKey:kSettingsLockCustomizerHidePageDots],
-                             (int)lockAlpha);
+                             (int)lockAlpha,
+                             (int)[d integerForKey:kSettingsLockCustomizerMediaScalePct],
+                             [d boolForKey:kSettingsLockCustomizerHideMediaArtwork],
+                             [d boolForKey:kSettingsLockCustomizerMetalLightEnabled],
+                             (int)[d integerForKey:kSettingsLockCustomizerMetalLightIntensityPct],
+                             (int)[d integerForKey:kSettingsLockCustomizerMetalLightThickness],
+                             (int)[d integerForKey:kSettingsLockCustomizerMetalLightStyle]);
     NSInteger freeX = [d objectForKey:kSettingsFreePlacementHorizontalStep] ? [d integerForKey:kSettingsFreePlacementHorizontalStep] : 8;
     NSInteger freeY = [d objectForKey:kSettingsFreePlacementVerticalStep] ? [d integerForKey:kSettingsFreePlacementVerticalStep] : 5;
     NSInteger freeStagger = [d objectForKey:kSettingsFreePlacementStaggerPct] ? [d integerForKey:kSettingsFreePlacementStaggerPct] : 35;
     freeplacement_configure((int)freeX, (int)freeY, (int)freeStagger);
+    applibrarystudio_configure((int)[d integerForKey:kSettingsAppLibraryStudioScalePct],
+                               (int)[d integerForKey:kSettingsAppLibraryStudioHorizontalSpacing],
+                               (int)[d integerForKey:kSettingsAppLibraryStudioVerticalSpacing],
+                               [d boolForKey:kSettingsAppLibraryStudioHideLabels],
+                               [d boolForKey:kSettingsAppLibraryStudioDisableTodayView]);
 }
 
 static void settings_log_split_tweak_config(NSString *masterKey, NSUserDefaults *d, const char *prefix)
@@ -6626,15 +6668,20 @@ static void settings_log_split_tweak_config(NSString *masterKey, NSUserDefaults 
                  [d boolForKey:kSettingsSugarCaneShowVolume],
                  (long)[d integerForKey:kSettingsSugarCaneFontSize]);
     } else if ([masterKey isEqualToString:kSettingsBetterCCXIEnabled]) {
-        log_user("[%s] BetterCCXI config: zLift=%ld depthLimit=%ld.\n", tag,
+        log_user("[%s] BetterCCXI/Prysm config: zLift=%ld depthLimit=%ld moduleScale=%ld%%.\n", tag,
                  (long)[d integerForKey:kSettingsBetterCCXIZLift],
-                 (long)[d integerForKey:kSettingsBetterCCXIDepthLimit]);
+                 (long)[d integerForKey:kSettingsBetterCCXIDepthLimit],
+                 (long)[d integerForKey:kSettingsBetterCCXIModuleScalePct]);
     } else if ([masterKey isEqualToString:kSettingsMagmaEnabled]) {
-        log_user("[%s] Magma config: rgba=%ld/%ld/%ld/%ld%%.\n", tag,
+        log_user("[%s] Magma Evo config: rgba=%ld/%ld/%ld/%ld%% toggles=%d sliders=%d media=%d background=%d.\n", tag,
                  (long)[d integerForKey:kSettingsMagmaRed],
                  (long)[d integerForKey:kSettingsMagmaGreen],
                  (long)[d integerForKey:kSettingsMagmaBlue],
-                 (long)[d integerForKey:kSettingsMagmaAlphaPct]);
+                 (long)[d integerForKey:kSettingsMagmaAlphaPct],
+                 [d boolForKey:kSettingsMagmaColorToggles],
+                 [d boolForKey:kSettingsMagmaColorSliders],
+                 [d boolForKey:kSettingsMagmaColorMedia],
+                 [d boolForKey:kSettingsMagmaColorBackground]);
     } else if ([masterKey isEqualToString:kSettingsBetterCCIconsEnabled]) {
         log_user("[%s] BetterCCIcons config: radius=%ldpt.\n", tag,
                  (long)[d integerForKey:kSettingsBetterCCIconsCornerRadius]);
@@ -6660,13 +6707,11 @@ static void settings_log_split_tweak_config(NSString *masterKey, NSUserDefaults 
                  (long)[d integerForKey:kSettingsBarmojiFontSize],
                  (long)[d integerForKey:kSettingsBarmojiBackgroundAlphaPct]);
     } else if ([masterKey isEqualToString:kSettingsBlurryBadgesEnabled]) {
-        log_user("[%s] Badge Studio config: rgba=%ld/%ld/%ld/%ld%% grow=%d maxScale=%ld%%.\n", tag,
+        log_user("[%s] BlurryBadges config: rgba=%ld/%ld/%ld/%ld%%.\n", tag,
                  (long)[d integerForKey:kSettingsBlurryBadgesRed],
                  (long)[d integerForKey:kSettingsBlurryBadgesGreen],
                  (long)[d integerForKey:kSettingsBlurryBadgesBlue],
-                 (long)[d integerForKey:kSettingsBlurryBadgesAlphaPct],
-                 [d boolForKey:kSettingsBlurryBadgesGrowEnabled],
-                 (long)[d integerForKey:kSettingsBlurryBadgesMaxScalePct]);
+                 (long)[d integerForKey:kSettingsBlurryBadgesAlphaPct]);
     } else if ([masterKey isEqualToString:kSettingsSnapperEnabled]) {
         log_user("[%s] Snapper config: frame=%ld,%ld %ldx%ld border=%ld radius=%ld.\n", tag,
                  (long)[d integerForKey:kSettingsSnapperX],
@@ -6692,22 +6737,35 @@ static void settings_log_split_tweak_config(NSString *masterKey, NSUserDefaults 
         log_user("[%s] Rounded Icons config: continuousRadius=%ldpt pages=all discovered.\n", tag,
                  (long)[d integerForKey:kSettingsRoundedIconsRadius]);
     } else if ([masterKey isEqualToString:kSettingsWatchLayoutEnabled]) {
-        log_user("[%s] Watch Layout config: compact=%ld%% scale=%ld%% circular=1 pages=all discovered.\n", tag,
+        log_user("[%s] Watch Layout config: geometry=honeycomb compact=%ld%% scale=%ld%% circular=1 stagger=half-slot dockExcluded=1 appLibraryExcluded=1 pages=all discovered.\n", tag,
                  (long)[d integerForKey:kSettingsWatchLayoutCompactPct],
                  (long)[d integerForKey:kSettingsWatchLayoutScalePct]);
     } else if ([masterKey isEqualToString:kSettingsLockCustomizerEnabled]) {
-        log_user("[%s] Lock Customizer config: clockScale=%ld%% x=%ld y=%ld quickActionsHidden=%d pageDotsHidden=%d alpha=%ld%%.\n", tag,
+        log_user("[%s] Lock Customizer config: clockScale=%ld%% x=%ld y=%ld quickActionsHidden=%d pageDotsHidden=%d alpha=%ld%% mediaScale=%ld%% artworkHidden=%d metalLight=%d intensity=%ld%% thickness=%ld style=%ld.\n", tag,
                  (long)[d integerForKey:kSettingsLockCustomizerClockScalePct],
                  (long)[d integerForKey:kSettingsLockCustomizerXOffset],
                  (long)[d integerForKey:kSettingsLockCustomizerYOffset],
                  [d boolForKey:kSettingsLockCustomizerHideQuickActions],
                  [d boolForKey:kSettingsLockCustomizerHidePageDots],
-                 (long)[d integerForKey:kSettingsLockCustomizerContentAlphaPct]);
+                 (long)[d integerForKey:kSettingsLockCustomizerContentAlphaPct],
+                 (long)[d integerForKey:kSettingsLockCustomizerMediaScalePct],
+                 [d boolForKey:kSettingsLockCustomizerHideMediaArtwork],
+                 [d boolForKey:kSettingsLockCustomizerMetalLightEnabled],
+                 (long)[d integerForKey:kSettingsLockCustomizerMetalLightIntensityPct],
+                 (long)[d integerForKey:kSettingsLockCustomizerMetalLightThickness],
+                 (long)[d integerForKey:kSettingsLockCustomizerMetalLightStyle]);
     } else if ([masterKey isEqualToString:kSettingsFreePlacementEnabled]) {
         log_user("[%s] Free Placement Lite config: horizontalStep=%ld verticalStep=%ld stagger=%ld%%; live icon taps preserved.\n", tag,
                  (long)[d integerForKey:kSettingsFreePlacementHorizontalStep],
                  (long)[d integerForKey:kSettingsFreePlacementVerticalStep],
                  (long)[d integerForKey:kSettingsFreePlacementStaggerPct]);
+    } else if ([masterKey isEqualToString:kSettingsAppLibraryStudioEnabled]) {
+        log_user("[%s] App Library Studio config: scale=%ld%% horizontalSpacing=%ldpt verticalSpacing=%ldpt labelsHidden=%d todayViewDisabled=%d; live App Library icons remain pressable; Today View restore requires respring.\n", tag,
+                 (long)[d integerForKey:kSettingsAppLibraryStudioScalePct],
+                 (long)[d integerForKey:kSettingsAppLibraryStudioHorizontalSpacing],
+                 (long)[d integerForKey:kSettingsAppLibraryStudioVerticalSpacing],
+                 [d boolForKey:kSettingsAppLibraryStudioHideLabels],
+                 [d boolForKey:kSettingsAppLibraryStudioDisableTodayView]);
     }
 }
 
@@ -6726,12 +6784,17 @@ static NSString *settings_split_tweak_master_key_for_key(NSString *key)
         [key isEqualToString:kSettingsSugarCaneFontSize]) return kSettingsSugarCaneEnabled;
     if ([key isEqualToString:kSettingsBetterCCXIEnabled] ||
         [key isEqualToString:kSettingsBetterCCXIZLift] ||
-        [key isEqualToString:kSettingsBetterCCXIDepthLimit]) return kSettingsBetterCCXIEnabled;
+        [key isEqualToString:kSettingsBetterCCXIDepthLimit] ||
+        [key isEqualToString:kSettingsBetterCCXIModuleScalePct]) return kSettingsBetterCCXIEnabled;
     if ([key isEqualToString:kSettingsMagmaEnabled] ||
         [key isEqualToString:kSettingsMagmaRed] ||
         [key isEqualToString:kSettingsMagmaGreen] ||
         [key isEqualToString:kSettingsMagmaBlue] ||
-        [key isEqualToString:kSettingsMagmaAlphaPct]) return kSettingsMagmaEnabled;
+        [key isEqualToString:kSettingsMagmaAlphaPct] ||
+        [key isEqualToString:kSettingsMagmaColorToggles] ||
+        [key isEqualToString:kSettingsMagmaColorSliders] ||
+        [key isEqualToString:kSettingsMagmaColorMedia] ||
+        [key isEqualToString:kSettingsMagmaColorBackground]) return kSettingsMagmaEnabled;
     if ([key isEqualToString:kSettingsBetterCCIconsEnabled] ||
         [key isEqualToString:kSettingsBetterCCIconsCornerRadius]) return kSettingsBetterCCIconsEnabled;
     if ([key isEqualToString:kSettingsCCNoPlatterDimEnabled] ||
@@ -6754,9 +6817,7 @@ static NSString *settings_split_tweak_master_key_for_key(NSString *key)
         [key isEqualToString:kSettingsBlurryBadgesRed] ||
         [key isEqualToString:kSettingsBlurryBadgesGreen] ||
         [key isEqualToString:kSettingsBlurryBadgesBlue] ||
-        [key isEqualToString:kSettingsBlurryBadgesAlphaPct] ||
-        [key isEqualToString:kSettingsBlurryBadgesGrowEnabled] ||
-        [key isEqualToString:kSettingsBlurryBadgesMaxScalePct]) return kSettingsBlurryBadgesEnabled;
+        [key isEqualToString:kSettingsBlurryBadgesAlphaPct]) return kSettingsBlurryBadgesEnabled;
     if ([key isEqualToString:kSettingsSnapperEnabled] ||
         [key isEqualToString:kSettingsSnapperX] ||
         [key isEqualToString:kSettingsSnapperY] ||
@@ -6786,11 +6847,23 @@ static NSString *settings_split_tweak_master_key_for_key(NSString *key)
         [key isEqualToString:kSettingsLockCustomizerYOffset] ||
         [key isEqualToString:kSettingsLockCustomizerHideQuickActions] ||
         [key isEqualToString:kSettingsLockCustomizerHidePageDots] ||
-        [key isEqualToString:kSettingsLockCustomizerContentAlphaPct]) return kSettingsLockCustomizerEnabled;
+        [key isEqualToString:kSettingsLockCustomizerContentAlphaPct] ||
+        [key isEqualToString:kSettingsLockCustomizerMediaScalePct] ||
+        [key isEqualToString:kSettingsLockCustomizerHideMediaArtwork] ||
+        [key isEqualToString:kSettingsLockCustomizerMetalLightEnabled] ||
+        [key isEqualToString:kSettingsLockCustomizerMetalLightIntensityPct] ||
+        [key isEqualToString:kSettingsLockCustomizerMetalLightThickness] ||
+        [key isEqualToString:kSettingsLockCustomizerMetalLightStyle]) return kSettingsLockCustomizerEnabled;
     if ([key isEqualToString:kSettingsFreePlacementEnabled] ||
         [key isEqualToString:kSettingsFreePlacementHorizontalStep] ||
         [key isEqualToString:kSettingsFreePlacementVerticalStep] ||
         [key isEqualToString:kSettingsFreePlacementStaggerPct]) return kSettingsFreePlacementEnabled;
+    if ([key isEqualToString:kSettingsAppLibraryStudioEnabled] ||
+        [key isEqualToString:kSettingsAppLibraryStudioScalePct] ||
+        [key isEqualToString:kSettingsAppLibraryStudioHorizontalSpacing] ||
+        [key isEqualToString:kSettingsAppLibraryStudioVerticalSpacing] ||
+        [key isEqualToString:kSettingsAppLibraryStudioHideLabels] ||
+        [key isEqualToString:kSettingsAppLibraryStudioDisableTodayView]) return kSettingsAppLibraryStudioEnabled;
     return nil;
 }
 
@@ -7289,6 +7362,23 @@ static BOOL settings_key_affects_package_state(NSString *key)
     return [settings_rc_backed_tweak_keys() containsObject:key];
 }
 
+// Both ports save and rewrite SBIconView frames. Letting them run together
+// makes whichever stops last restore stale frames over the other layout.
+static NSString *settings_resolve_icon_layout_conflict(NSUserDefaults *d, NSString *preferredKey)
+{
+    if (![d boolForKey:kSettingsWatchLayoutEnabled] ||
+        ![d boolForKey:kSettingsFreePlacementEnabled]) return nil;
+
+    NSString *disabledKey = [preferredKey isEqualToString:kSettingsFreePlacementEnabled]
+        ? kSettingsWatchLayoutEnabled
+        : kSettingsFreePlacementEnabled;
+    [d setBool:NO forKey:disabledKey];
+    [d synchronize];
+    log_user("[COMPAT] %s disabled because Watch Layout and Free Placement Lite both own live icon frames; preferred=%s.\n",
+             disabledKey.UTF8String, (preferredKey ?: kSettingsWatchLayoutEnabled).UTF8String);
+    return disabledKey;
+}
+
 static void settings_schedule_live_apply_for_key(NSString *key)
 {
     if (settings_cleanup_in_progress()) {
@@ -7303,6 +7393,11 @@ static void settings_schedule_live_apply_for_key(NSString *key)
     }
 
     NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
+    NSString *layoutKeyToStop = nil;
+    if (([key isEqualToString:kSettingsWatchLayoutEnabled] ||
+         [key isEqualToString:kSettingsFreePlacementEnabled]) && [d boolForKey:key]) {
+        layoutKeyToStop = settings_resolve_icon_layout_conflict(d, key);
+    }
     if (settings_key_is_location_sim(key)) {
         BOOL locsimStarted = [d boolForKey:kSettingsLocationSimStarted];
         if ([key isEqualToString:kSettingsLocationSimEnabled]) {
@@ -7827,6 +7922,13 @@ static void settings_schedule_live_apply_for_key(NSString *key)
             dispatch_async(dispatch_get_global_queue(0, 0), ^{
                 @synchronized (settings_rc_lock()) {
                     if (settings_cleanup_in_progress() || !g_springboard_rc_ready) return;
+                    if ([layoutKeyToStop isEqualToString:kSettingsWatchLayoutEnabled]) {
+                        watchlayout_stop_in_session();
+                        settings_mark_tweak_applied(kSettingsWatchLayoutEnabled, NO);
+                    } else if ([layoutKeyToStop isEqualToString:kSettingsFreePlacementEnabled]) {
+                        freeplacement_stop_in_session();
+                        settings_mark_tweak_applied(kSettingsFreePlacementEnabled, NO);
+                    }
                     settings_configure_control_center_tweaks(d);
                     settings_log_split_tweak_config(masterKey, d, "LIVE");
                     bool ok = true;
@@ -7884,6 +7986,9 @@ static void settings_schedule_live_apply_for_key(NSString *key)
                     } else if ([masterKey isEqualToString:kSettingsWatchLayoutEnabled]) {
                         ok = [d boolForKey:kSettingsWatchLayoutEnabled] ? watchlayout_apply_in_session() : watchlayout_stop_in_session();
                         settings_mark_tweak_applied(kSettingsWatchLayoutEnabled, ok && [d boolForKey:kSettingsWatchLayoutEnabled]);
+                    } else if ([masterKey isEqualToString:kSettingsAppLibraryStudioEnabled]) {
+                        ok = [d boolForKey:kSettingsAppLibraryStudioEnabled] ? applibrarystudio_apply_in_session() : applibrarystudio_stop_in_session();
+                        settings_mark_tweak_applied(kSettingsAppLibraryStudioEnabled, ok && [d boolForKey:kSettingsAppLibraryStudioEnabled]);
                     } else if ([masterKey isEqualToString:kSettingsLockCustomizerEnabled]) {
                         ok = [d boolForKey:kSettingsLockCustomizerEnabled] ? lockcustomizer_apply_in_session() : lockcustomizer_stop_in_session();
                         settings_mark_tweak_applied(kSettingsLockCustomizerEnabled, ok && [d boolForKey:kSettingsLockCustomizerEnabled]);
@@ -8006,7 +8111,18 @@ static void settings_schedule_live_apply_for_key(NSString *key)
         return;
     }
 
-    if ([key isEqualToString:kSettingsLiveWPVideoPath]) {
+    if ([key isEqualToString:kSettingsLiveWPVideoPath] ||
+        [key isEqualToString:kSettingsLiveWPMoodImagePaths]) {
+        settings_notify_package_queue_changed_async();
+        return;
+    }
+
+    if ([key isEqualToString:kSettingsLiveWPMoodMode] ||
+        [key isEqualToString:kSettingsLiveWPMoodDuration] ||
+        [key isEqualToString:kSettingsLiveWPMoodTiltDegrees]) {
+        settings_mark_tweak_applied(kSettingsLiveWPEnabled, NO);
+        if ([d boolForKey:kSettingsLiveWPEnabled])
+            settings_schedule_live_apply_for_key(kSettingsLiveWPEnabled);
         settings_notify_package_queue_changed_async();
         return;
     }
@@ -8355,11 +8471,9 @@ void settings_register_defaults(void)
         kSettingsSBCCols:       @(kSBCDefaultCols),
         kSettingsSBCRows:       @(kSBCDefaultRows),
         kSettingsSBCHideLabels: @(kSBCDefaultHideLabels),
-        kSettingsSBCHideBadges: @NO,
-        kSettingsSBCHidePageDots: @NO,
-        kSettingsSBCHideFolderBackground: @NO,
-        kSettingsSBCHideDockBackground: @NO,
-        kSettingsSBCIconAlphaPct: @100,
+        kSettingsSBCIPadDockEnabled: @NO,
+        kSettingsSBCDockRecentsEnabled: @YES,
+        kSettingsSBCDockAppLibraryEnabled: @YES,
 
         kSettingsPowercuffEnabled: @NO,
         kSettingsPowercuffLevel:   @"nominal",
@@ -8381,8 +8495,6 @@ void settings_register_defaults(void)
         kSettingsLayoutDockExtraHorizontal: @0,
         kSettingsLayoutHomeScalePct:        @100,
         kSettingsLayoutDockScalePct:        @100,
-        kSettingsLayoutApplyHomeControls:   @YES,
-        kSettingsLayoutApplyDockControls:   @YES,
 
         kSettingsStatBarEnabled: @NO,
         kSettingsStatBarCelsius: @NO,
@@ -8442,6 +8554,12 @@ void settings_register_defaults(void)
         kSettingsVelvetMessageColor: @"#CCCCCC",
         kSettingsVelvetDateColor: @"#888888",
         kSettingsVelvetCornerRadius: @13.0,
+        kSettingsVelvetBannerScalePct: @92,
+        kSettingsVelvetBannerAlphaPct: @96,
+        kSettingsVelvetEdgeGlowEnabled: @NO,
+        kSettingsVelvetEdgeGlowTopOnly: @NO,
+        kSettingsVelvetEdgeGlowColor: @"#00D9FFFF",
+        kSettingsVelvetEdgeGlowThickness: @4.0,
 
         kSettingsCleanNCEnabled: @NO,
         kSettingsUnderTimeEnabled: @NO,
@@ -8474,10 +8592,15 @@ void settings_register_defaults(void)
         kSettingsSugarCaneFontSize: @13,
         kSettingsBetterCCXIZLift: @4,
         kSettingsBetterCCXIDepthLimit: @12,
+        kSettingsBetterCCXIModuleScalePct: @96,
         kSettingsMagmaRed: @255,
         kSettingsMagmaGreen: @71,
         kSettingsMagmaBlue: @20,
         kSettingsMagmaAlphaPct: @100,
+        kSettingsMagmaColorToggles: @YES,
+        kSettingsMagmaColorSliders: @YES,
+        kSettingsMagmaColorMedia: @YES,
+        kSettingsMagmaColorBackground: @NO,
         kSettingsBetterCCIconsCornerRadius: @22,
         kSettingsCCNoPlatterDimVisibleAlphaPct: @96,
         kSettingsCCStatusShowWifi: @YES,
@@ -8514,17 +8637,31 @@ void settings_register_defaults(void)
         kSettingsLockCustomizerHideQuickActions: @NO,
         kSettingsLockCustomizerHidePageDots: @NO,
         kSettingsLockCustomizerContentAlphaPct: @100,
+        kSettingsLockCustomizerMediaScalePct: @92,
+        kSettingsLockCustomizerHideMediaArtwork: @NO,
+        kSettingsLockCustomizerMetalLightEnabled: @NO,
+        kSettingsLockCustomizerMetalLightIntensityPct: @72,
+        kSettingsLockCustomizerMetalLightThickness: @5,
+        kSettingsLockCustomizerMetalLightStyle: @0,
         kSettingsFreePlacementEnabled: @NO,
         kSettingsFreePlacementHorizontalStep: @8,
         kSettingsFreePlacementVerticalStep: @5,
         kSettingsFreePlacementStaggerPct: @35,
+        kSettingsCopypastaLiteEnabled: @NO,
+        kSettingsCopypastaSnippet1: @"Thanks!",
+        kSettingsCopypastaSnippet2: @"I’ll get back to you shortly.",
+        kSettingsCopypastaSnippet3: @"Sent from infern0 Copypasta Lite",
+        kSettingsAppLibraryStudioEnabled: @NO,
+        kSettingsAppLibraryStudioScalePct: @92,
+        kSettingsAppLibraryStudioHorizontalSpacing: @0,
+        kSettingsAppLibraryStudioVerticalSpacing: @0,
+        kSettingsAppLibraryStudioHideLabels: @NO,
+        kSettingsAppLibraryStudioDisableTodayView: @YES,
         kSettingsBlurryBadgesEnabled: @NO,
         kSettingsBlurryBadgesRed: @59,
         kSettingsBlurryBadgesGreen: @140,
         kSettingsBlurryBadgesBlue: @255,
         kSettingsBlurryBadgesAlphaPct: @92,
-        kSettingsBlurryBadgesGrowEnabled: @YES,
-        kSettingsBlurryBadgesMaxScalePct: @160,
         kSettingsSnapperEnabled: @NO,
         kSettingsSnapperX: @44,
         kSettingsSnapperY: @160,
@@ -8554,6 +8691,8 @@ void settings_register_defaults(void)
         kSettingsGravityLiteAngularResistancePct: @0,
 
         kSettingsStageStripEnabled: @NO,
+        kSettingsStageStripConcurrentWindows: @2,
+        kSettingsStageStripIncludeSystemApps: @YES,
 
         kSettingsLocationSimEnabled: @NO,
         kSettingsLocationSimLatitude: @(kLocationSimDefaultLatitude),
@@ -8581,6 +8720,10 @@ void settings_register_defaults(void)
 
         kSettingsLiveWPEnabled: @NO,
         kSettingsLiveWPVideoPath: @"",
+        kSettingsLiveWPMoodMode: @NO,
+        kSettingsLiveWPMoodImagePaths: @[],
+        kSettingsLiveWPMoodDuration: @7,
+        kSettingsLiveWPMoodTiltDegrees: @3,
 
         kSettingsAppSwitcherGridEnabled: @NO,
 
@@ -8628,6 +8771,7 @@ void settings_register_defaults(void)
             kSettingsBarmojiEnabled,
             kSettingsRoundedIconsEnabled,
             kSettingsWatchLayoutEnabled,
+            kSettingsAppLibraryStudioEnabled,
             kSettingsLockCustomizerEnabled,
             kSettingsFreePlacementEnabled,
             kSettingsBlurryBadgesEnabled,
@@ -8678,7 +8822,7 @@ static void settings_log_tweak_plan_details(NSUserDefaults *d, BOOL pendingOnly)
         { kSettingsAxonLiteEnabled, "Axon Lite", "groups visible Notification Center requests by application" },
         { kSettingsTypeBannerEnabled, "TypeBanner", "polls imagent and presents typing indicators below the Dynamic Island" },
         { kSettingsNotificationIslandEnabled, "Notification Island", "mirrors SpringBoard notification banners through ActivityKit" },
-        { kSettingsVelvetEnabled, "Velvet", "restyles visible notification backgrounds, borders, corners, and text" },
+        { kSettingsVelvetEnabled, "Velvet + Edge Glow", "restyles notifications and optionally lights the screen edge or top outline for active banners" },
         { kSettingsCleanNCEnabled, "CleanNC", "removes supported Notification Center visual clutter" },
         { kSettingsUnderTimeEnabled, "UnderTime", "adds a secondary live time label under the status-bar clock" },
         { kSettingsZeppelinLiteEnabled, "Zeppelin Lite", "replaces supported carrier labels with the configured text" },
@@ -8688,8 +8832,8 @@ static void settings_log_tweak_plan_details(NSUserDefaults *d, BOOL pendingOnly)
         { kSettingsFUGapEnabled, "FUGap", "moves visible Control Center containers by the configured offset" },
         { kSettingsModuleSpacingEnabled, "ModuleSpacing", "applies the configured Control Center module radius" },
         { kSettingsSugarCaneEnabled, "SugarCane", "adds live percentage labels to brightness and volume controls" },
-        { kSettingsBetterCCXIEnabled, "BetterCCXI", "applies the configured Control Center depth and lift pass" },
-        { kSettingsMagmaEnabled, "Magma", "tints visible Control Center glyphs with the configured color" },
+        { kSettingsBetterCCXIEnabled, "BetterCCXI / Prysm Lite", "applies configurable Control Center module scale, depth, and lift" },
+        { kSettingsMagmaEnabled, "Magma Evo Lite", "colors selected Control Center toggle, slider, media, and background groups" },
         { kSettingsBetterCCIconsEnabled, "BetterCCIcons", "rounds visible Control Center icon and module layers" },
         { kSettingsCCNoPlatterDimEnabled, "CCNoPlatterDim", "reduces dimming on expanded Control Center platters" },
         { kSettingsCCStatusEnabled, "CCStatus", "adds the configured network status header to Control Center" },
@@ -8701,20 +8845,21 @@ static void settings_log_tweak_plan_details(NSUserDefaults *d, BOOL pendingOnly)
         { kSettingsCylinderLiteEnabled, "Cylinder Lite", "applies perspective depth to visible home-screen icons" },
         { kSettingsBarmojiEnabled, "Barmoji", "adds the configured emoji strip overlay to SpringBoard" },
         { kSettingsRoundedIconsEnabled, "Rounded Icons", "applies a continuous corner mask to every discovered Home Screen icon" },
-        { kSettingsWatchLayoutEnabled, "Watch Layout", "compacts every discovered icon page into a circular Apple Watch-style grid" },
-        { kSettingsLockCustomizerEnabled, "Lock Screen Customizer", "moves and scales the live clock and optionally hides quick actions and page dots" },
-        { kSettingsFreePlacementEnabled, "Free Placement Lite", "applies configurable free-form offsets to live icons while preserving taps" },
-        { kSettingsBlurryBadgesEnabled, "Badge Studio", "tints icon badges and scales them from their live notification counts" },
+        { kSettingsWatchLayoutEnabled, "Watch Layout", "reflows each Home Screen page into a staggered Apple Watch-style honeycomb of circular live icons" },
+        { kSettingsAppLibraryStudioEnabled, "App Library Studio", "resizes and spaces live App Library icons and optionally removes the leading Today View page" },
+        { kSettingsLockCustomizerEnabled, "Lock Screen Customizer", "moves live Lock Screen content and adds configurable Metal Lock Light edge lighting" },
+        { kSettingsFreePlacementEnabled, "Free Placement Lite", "offsets live Home Screen icons with a reversible staggered layout" },
+        { kSettingsBlurryBadgesEnabled, "BlurryBadges", "tints visible notification badges with the configured color" },
         { kSettingsSnapperEnabled, "Snapper", "shows the configured crop-frame overlay" },
         { kSettingsPullOverEnabled, "PullOver", "shows the configured slide-over tray shell" },
         { kSettingsAlkalineEnabled, "Alkaline", "tints visible battery views with the configured color" },
         { kSettingsAppSwitcherGridEnabled, "App Switcher Grid", "patches SpringBoard's app-switcher layout in memory" },
-        { kSettingsGravityLiteEnabled, "Gravity Lite", "adds gravity, collision, bounce, and motion steering to icon snapshots" },
+        { kSettingsGravityLiteEnabled, "Gravity Lite", "gives every Home Screen page an isolated live-icon gravity, collision, bounce, and motion-steering simulation" },
         { kSettingsLayoutExtrasEnabled, "Home Layout Extras", "adds the configured padding and scaling to home and dock icons" },
         { kSettingsThemerEnabled, "Themer", "replaces app icon imagery using the selected local theme" },
         { kSettingsSnowBoardLiteEnabled, "SnowBoard Lite", "applies the selected SnowBoard/IconBundles theme" },
         { kSettingsLiveWPEnabled, "LiveWP", "plays the selected video behind SpringBoard" },
-        { kSettingsStageStripEnabled, "Dynamic Stage Lite", "installs the picker and two floating application scene hosts" },
+        { kSettingsStageStripEnabled, "MilkyWay Lite / Dynamic Stage", "installs the picker and one or two floating application scene hosts, including supported system apps" },
         { kSettingsFastLockXLiteEnabled, "FastLockX Lite", "arms the configured lock-screen authentication and unlock behavior" },
         { kSettingsTweakLoaderEnabled, "TweakLoader", "runs all registered precompiled RemoteCall tweaks" },
         { kSettingsQuickLoaderEnabled, "QuickLoader", "executes the selected local JavaScript tweak" },
@@ -8760,6 +8905,10 @@ static void settings_run_actions_internal(BOOL pendingOnly)
         BOOL runHadBlockingFailure = NO;
         NSString *runCompletionMessage = @"Run failed. Check the log for details.";
         @try {
+            // Repair preferences created by older builds that allowed both
+            // frame-owning icon layouts to be enabled together. The normal
+            // disabled-tweak cleanup below restores the displaced layout first.
+            settings_resolve_icon_layout_conflict(d, kSettingsWatchLayoutEnabled);
             BOOL patchSandboxExt = [d boolForKey:kSettingsRunPatchSandboxExt];
             BOOL runPowercuff = settings_enabled_tweak_should_run(d, kSettingsPowercuffEnabled, pendingOnly);
             BOOL forceSpringBoardRefresh = runPowercuff &&
@@ -8823,8 +8972,9 @@ static void settings_run_actions_internal(BOOL pendingOnly)
             BOOL runBarmoji = settings_barmoji_install_allowed() && settings_enabled_tweak_should_run(d, kSettingsBarmojiEnabled, springBoardPendingOnly);
             BOOL runRoundedIcons = settings_enabled_tweak_should_run(d, kSettingsRoundedIconsEnabled, springBoardPendingOnly);
             BOOL runWatchLayout = settings_enabled_tweak_should_run(d, kSettingsWatchLayoutEnabled, springBoardPendingOnly);
-            BOOL runLockCustomizer = cyanide_experimental_tweaks_available() && settings_enabled_tweak_should_run(d, kSettingsLockCustomizerEnabled, springBoardPendingOnly);
-            BOOL runFreePlacement = cyanide_experimental_tweaks_available() && settings_enabled_tweak_should_run(d, kSettingsFreePlacementEnabled, springBoardPendingOnly);
+            BOOL runAppLibraryStudio = settings_enabled_tweak_should_run(d, kSettingsAppLibraryStudioEnabled, springBoardPendingOnly);
+            BOOL runLockCustomizer = settings_enabled_tweak_should_run(d, kSettingsLockCustomizerEnabled, springBoardPendingOnly);
+            BOOL runFreePlacement = settings_enabled_tweak_should_run(d, kSettingsFreePlacementEnabled, springBoardPendingOnly);
             BOOL runBlurryBadges = settings_blurrybadges_install_allowed() && settings_enabled_tweak_should_run(d, kSettingsBlurryBadgesEnabled, springBoardPendingOnly);
             BOOL runSnapper = settings_snapper_install_allowed() && settings_enabled_tweak_should_run(d, kSettingsSnapperEnabled, springBoardPendingOnly);
             BOOL runPullOver = settings_pullover_install_allowed() && settings_enabled_tweak_should_run(d, kSettingsPullOverEnabled, springBoardPendingOnly);
@@ -8845,7 +8995,7 @@ static void settings_run_actions_internal(BOOL pendingOnly)
                 settings_note_themer_stage_conflict(YES);
             }
             BOOL cleanupDisabledSpringBoardTweaks = settings_disabled_applied_springboard_cleanup_needed(d);
-            BOOL needsSpringBoardWork = runSBC || runDarkTweaks || runStatBar || runNSBar || runNiceBarLite || runRSSI || runAxonLite || runGravityLite || runLayoutExtras || runTypeBanner || runNotificationIsland || runVelvet || runCleanNC || runUnderTime || runZeppelinLite || runCleanHomeScreen || runRealCC || runCleanCC || runFUGap || runModuleSpacing || runSugarCane || runBetterCCXI || runMagma || runBetterCCIcons || runCCNoPlatterDim || runCCStatus || runHapticCC || runSecureCC || runHideLabels || runFakeClockUp || runPancake || runCylinderLite || runBarmoji || runRoundedIcons || runWatchLayout || runLockCustomizer || runFreePlacement || runBlurryBadges || runSnapper || runPullOver || runAlkaline || runTweakLoader || runAppSwitcherGrid || runThemer || runSnowBoardLite || runLiveWP || runStageStrip || runFastLockXLite || runQuickLoader || runRepoTweaks || cleanupDisabledSpringBoardTweaks;
+            BOOL needsSpringBoardWork = runSBC || runDarkTweaks || runStatBar || runNSBar || runNiceBarLite || runRSSI || runAxonLite || runGravityLite || runLayoutExtras || runTypeBanner || runNotificationIsland || runVelvet || runCleanNC || runUnderTime || runZeppelinLite || runCleanHomeScreen || runRealCC || runCleanCC || runFUGap || runModuleSpacing || runSugarCane || runBetterCCXI || runMagma || runBetterCCIcons || runCCNoPlatterDim || runCCStatus || runHapticCC || runSecureCC || runHideLabels || runFakeClockUp || runPancake || runCylinderLite || runBarmoji || runRoundedIcons || runWatchLayout || runAppLibraryStudio || runLockCustomizer || runFreePlacement || runBlurryBadges || runSnapper || runPullOver || runAlkaline || runTweakLoader || runAppSwitcherGrid || runThemer || runSnowBoardLite || runLiveWP || runStageStrip || runFastLockXLite || runQuickLoader || runRepoTweaks || cleanupDisabledSpringBoardTweaks;
             BOOL runSandboxEscape = [d boolForKey:kSettingsRunSandboxEscape] && (!pendingOnly || needsSpringBoardWork);
             // TypeBanner prewarms its hidden SpringBoard window during Apply
             // and reuses the open SpringBoard session for text-only updates.
@@ -8901,6 +9051,7 @@ static void settings_run_actions_internal(BOOL pendingOnly)
             if (runBarmoji) total++;
             if (runRoundedIcons) total++;
             if (runWatchLayout) total++;
+            if (runAppLibraryStudio) total++;
             if (runLockCustomizer) total++;
             if (runFreePlacement) total++;
             if (runBlurryBadges) total++;
@@ -8951,8 +9102,9 @@ static void settings_run_actions_internal(BOOL pendingOnly)
             if (runBarmoji) [enabledTweaks addObject:@"barmoji"];
             if (runRoundedIcons) [enabledTweaks addObject:@"rounded-icons"];
             if (runWatchLayout) [enabledTweaks addObject:@"watch-layout"];
+            if (runAppLibraryStudio) [enabledTweaks addObject:@"app-library-studio"];
             if (runLockCustomizer) [enabledTweaks addObject:@"lock-customizer"];
-            if (runFreePlacement) [enabledTweaks addObject:@"free-placement-lite"];
+            if (runFreePlacement) [enabledTweaks addObject:@"free-placement"];
             if (runBlurryBadges) [enabledTweaks addObject:@"blurrybadges"];
             if (runSnapper) [enabledTweaks addObject:@"snapper"];
             if (runPullOver) [enabledTweaks addObject:@"pullover"];
@@ -9089,12 +9241,15 @@ static void settings_run_actions_internal(BOOL pendingOnly)
                         bool ok = settings_apply_sbc_from_defaults_locked(d);
                         settings_mark_tweak_applied(kSettingsSBCEnabled,
                                                     ok && [d boolForKey:kSettingsSBCEnabled]);
-                        log_user("%s Home screen layout %s; dock=%ld home=%ldx%ld.\n",
+                        log_user("%s Home screen layout %s; dock=%ld home=%ldx%ld iPadDock=%d recents=%d appLibraryAccess=%d.\n",
                                  ok ? "[OK]" : "[WARN]",
                                  ok ? "applied" : "may need a refresh",
                                  (long)[d integerForKey:kSettingsSBCDockIcons],
                                  (long)[d integerForKey:kSettingsSBCCols],
-                                 (long)[d integerForKey:kSettingsSBCRows]);
+                                 (long)[d integerForKey:kSettingsSBCRows],
+                                 [d boolForKey:kSettingsSBCIPadDockEnabled],
+                                 [d boolForKey:kSettingsSBCDockRecentsEnabled],
+                                 [d boolForKey:kSettingsSBCDockAppLibraryEnabled]);
                         cyanide_upload_log_milestone(ok ? @"sbc-applied" : @"sbc-warning");
                     }
 
@@ -9314,7 +9469,7 @@ static void settings_run_actions_internal(BOOL pendingOnly)
                     }
 
                     if (runVelvet) {
-                        settings_progress(&step, total, "Applying Velvet notification backgrounds");
+                        settings_progress(&step, total, "Applying Velvet + Edge Glow");
                         VelvetStyle style = settings_velvet_style_from_defaults(d);
                         velvet_set_global_style(&style);
                         bool ok = velvet_apply_in_session();
@@ -9323,7 +9478,7 @@ static void settings_run_actions_internal(BOOL pendingOnly)
                         printf("[SETTINGS] Velvet result=%d\n", ok);
                         log_user("%s Velvet %s.\n",
                                  ok ? "[OK]" : "[WARN]",
-                                 ok ? "notification backgrounds active" : "did not start cleanly");
+                                 ok ? "notification styling and glow watcher active" : "did not start cleanly");
                         cyanide_upload_log_milestone(ok ? @"velvet-initial-applied" :
                                                          @"velvet-initial-failed");
                     }
@@ -9419,22 +9574,22 @@ static void settings_run_actions_internal(BOOL pendingOnly)
                     }
 
                     if (runBetterCCXI) {
-                        settings_progress(&step, total, "Applying BetterCCXI");
+                        settings_progress(&step, total, "Applying BetterCCXI / Prysm Lite");
                         settings_log_split_tweak_config(kSettingsBetterCCXIEnabled, d, "RUN");
                         bool ok = betterccxi_apply_in_session();
                         settings_mark_tweak_applied(kSettingsBetterCCXIEnabled, ok && [d boolForKey:kSettingsBetterCCXIEnabled]);
                         printf("[SETTINGS] BetterCCXI result=%d\n", ok);
-                        log_user("%s BetterCCXI %s.\n", ok ? "[OK]" : "[WARN]", ok ? "active" : "did not start cleanly");
+                        log_user("%s BetterCCXI / Prysm Lite %s.\n", ok ? "[OK]" : "[WARN]", ok ? "module scale and depth active" : "did not find module containers");
                         cyanide_upload_log_milestone(ok ? @"betterccxi-applied" : @"betterccxi-failed");
                     }
 
                     if (runMagma) {
-                        settings_progress(&step, total, "Applying Magma");
+                        settings_progress(&step, total, "Applying Magma Evo Lite");
                         settings_log_split_tweak_config(kSettingsMagmaEnabled, d, "RUN");
                         bool ok = magma_apply_in_session();
                         settings_mark_tweak_applied(kSettingsMagmaEnabled, ok && [d boolForKey:kSettingsMagmaEnabled]);
                         printf("[SETTINGS] Magma result=%d\n", ok);
-                        log_user("%s Magma %s.\n", ok ? "[OK]" : "[WARN]", ok ? "active" : "did not start cleanly");
+                        log_user("%s Magma Evo Lite %s.\n", ok ? "[OK]" : "[WARN]", ok ? "selected Control Center groups colored" : "did not find Control Center views");
                         cyanide_upload_log_milestone(ok ? @"magma-applied" : @"magma-failed");
                     }
 
@@ -9551,7 +9706,17 @@ static void settings_run_actions_internal(BOOL pendingOnly)
                         settings_log_split_tweak_config(kSettingsWatchLayoutEnabled, d, "RUN");
                         bool ok = watchlayout_apply_in_session();
                         settings_mark_tweak_applied(kSettingsWatchLayoutEnabled, ok && [d boolForKey:kSettingsWatchLayoutEnabled]);
-                        log_user("%s Watch Layout %s.\n", ok ? "[OK]" : "[WARN]", ok ? "active with tappable circular icons" : "found no icon views");
+                        log_user("%s Watch Layout %s.\n", ok ? "[OK]" : "[WARN]", ok ? "active with a pressable staggered honeycomb" : "found no eligible Home Screen icon views");
+                    }
+
+                    if (runAppLibraryStudio) {
+                        settings_progress(&step, total, "Applying App Library Studio and Today View policy");
+                        settings_log_split_tweak_config(kSettingsAppLibraryStudioEnabled, d, "RUN");
+                        bool ok = applibrarystudio_apply_in_session();
+                        settings_mark_tweak_applied(kSettingsAppLibraryStudioEnabled, ok && [d boolForKey:kSettingsAppLibraryStudioEnabled]);
+                        log_user("%s App Library Studio %s.\n", ok ? "[OK]" : "[WARN]",
+                                 ok ? "applied; App Library controls are live and Today View policy was processed" : "did not find the expected SpringBoard layout/page controllers yet");
+                        cyanide_upload_log_milestone(ok ? @"app-library-studio-applied" : @"app-library-studio-warning");
                     }
 
                     if (runLockCustomizer) {
@@ -9559,7 +9724,7 @@ static void settings_run_actions_internal(BOOL pendingOnly)
                         settings_log_split_tweak_config(kSettingsLockCustomizerEnabled, d, "RUN");
                         bool ok = lockcustomizer_apply_in_session();
                         settings_mark_tweak_applied(kSettingsLockCustomizerEnabled, ok && [d boolForKey:kSettingsLockCustomizerEnabled]);
-                        log_user("%s Lock Screen Customizer %s.\n", ok ? "[OK]" : "[WARN]", ok ? "updated live clock and controls" : "found no matching lock-screen views yet");
+                        log_user("%s Lock Screen Customizer %s.\n", ok ? "[OK]" : "[WARN]", ok ? "applied to matched live views" : "found no supported Lock Screen views yet");
                     }
 
                     if (runFreePlacement) {
@@ -9567,16 +9732,16 @@ static void settings_run_actions_internal(BOOL pendingOnly)
                         settings_log_split_tweak_config(kSettingsFreePlacementEnabled, d, "RUN");
                         bool ok = freeplacement_apply_in_session();
                         settings_mark_tweak_applied(kSettingsFreePlacementEnabled, ok && [d boolForKey:kSettingsFreePlacementEnabled]);
-                        log_user("%s Free Placement Lite %s.\n", ok ? "[OK]" : "[WARN]", ok ? "moved discovered live icons and preserved taps" : "found no icon views");
+                        log_user("%s Free Placement Lite %s.\n", ok ? "[OK]" : "[WARN]", ok ? "applied with pressable Home Screen icons" : "found no supported Home Screen icon views");
                     }
 
                     if (runBlurryBadges) {
-                        settings_progress(&step, total, "Applying Badge Studio");
+                        settings_progress(&step, total, "Applying BlurryBadges");
                         settings_log_split_tweak_config(kSettingsBlurryBadgesEnabled, d, "RUN");
                         bool ok = blurrybadges_apply_in_session();
                         settings_mark_tweak_applied(kSettingsBlurryBadgesEnabled, ok && [d boolForKey:kSettingsBlurryBadgesEnabled]);
-                        printf("[SETTINGS] Badge Studio result=%d\n", ok);
-                        log_user("%s Badge Studio %s.\n", ok ? "[OK]" : "[WARN]", ok ? "tint and count growth active" : "did not find icon badge views yet");
+                        printf("[SETTINGS] BlurryBadges result=%d\n", ok);
+                        log_user("%s BlurryBadges %s.\n", ok ? "[OK]" : "[WARN]", ok ? "active" : "did not find badge views yet");
                         cyanide_upload_log_milestone(ok ? @"blurrybadges-applied" : @"blurrybadges-failed");
                     }
 
@@ -9663,20 +9828,25 @@ static void settings_run_actions_internal(BOOL pendingOnly)
                     }
 
                     if (runStageStrip) {
-                        settings_progress(&step, total, "Installing Dynamic Stage Lite");
+                        settings_progress(&step, total, "Installing MilkyWay Lite / Dynamic Stage");
                         BOOL skipStageDeferredLibrary = settings_fastlockx_lite_install_allowed() &&
                             [d boolForKey:kSettingsFastLockXLiteEnabled];
                         if (skipStageDeferredLibrary) {
                             log_user("[COMPAT] Dynamic Stage Lite will skip background App Library tile fill-in while FastLockX Lite is active.\n");
                         }
+                        stagestrip_configure((int)[d integerForKey:kSettingsStageStripConcurrentWindows],
+                                             [d boolForKey:kSettingsStageStripIncludeSystemApps]);
+                        log_user("[MILKYWAY] Applying with %ld concurrent window(s); systemApps=%d.\n",
+                                 (long)[d integerForKey:kSettingsStageStripConcurrentWindows],
+                                 [d boolForKey:kSettingsStageStripIncludeSystemApps]);
                         stagestrip_set_deferred_library_build_enabled(!skipStageDeferredLibrary);
                         bool ok = stagestrip_apply_in_session(4);
                         stagestrip_set_deferred_library_build_enabled(true);
                         startStageStripControlLoopAfterInstall = ok;
                         settings_mark_tweak_applied(kSettingsStageStripEnabled,
                                                     ok && [d boolForKey:kSettingsStageStripEnabled]);
-                        printf("[SETTINGS] Dynamic Stage Lite result=%d\n", ok);
-                        log_user("%s Dynamic Stage Lite %s.\n",
+                        printf("[SETTINGS] MilkyWay Lite / Dynamic Stage result=%d\n", ok);
+                        log_user("%s MilkyWay Lite / Dynamic Stage %s.\n",
                                  ok ? "[OK]" : "[WARN]",
                                  ok ? "overlay active" : "did not install cleanly");
                         cyanide_upload_log_milestone(ok ? @"stagestrip-initial-applied" : @"stagestrip-initial-failed");
@@ -9888,14 +10058,22 @@ typedef NS_ENUM(NSInteger, SettingsSection) {
     SectionWatchLayout,
     SectionLockCustomizer,
     SectionFreePlacement,
+    SectionCopypastaLite,
+    SectionAppLibraryStudio,
     SectionCount,
 };
 
 typedef NS_ENUM(NSInteger, RootSection) {
     RootSectionChangelog = 0,
     RootSectionActions,
-    RootSectionTweakBundles,
-    RootSectionSystemBundles,
+    RootSectionHomeScreen,
+    RootSectionLockAndNotifications,
+    RootSectionControlCenter,
+    RootSectionStatusBar,
+    RootSectionMultitasking,
+    RootSectionThemesAndVisuals,
+    RootSectionUtilities,
+    RootSectionSystem,
     RootSectionAbout,
     RootSectionWarning,
     RootSectionCount,
@@ -10656,17 +10834,14 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
 - (NSArray<NSDictionary *> *)sbcRows
 {
     return @[
-        @{ @"kind": @"stepper", @"key": kSettingsSBCDockIcons,  @"title": @"Dock icons", @"min": @4, @"max": @7, @"default": @(kSBCDefaultDockIcons) },
+        @{ @"kind": @"toggle", @"key": kSettingsSBCIPadDockEnabled, @"title": @"iPad-style floating Dock" },
+        @{ @"kind": @"toggle", @"key": kSettingsSBCDockRecentsEnabled, @"title": @"Show recent apps in Dock" },
+        @{ @"kind": @"toggle", @"key": kSettingsSBCDockAppLibraryEnabled, @"title": @"Show App Library access" },
+        @{ @"kind": @"info", @"title": @"iPad-Style Dock", @"subtitle": @"Uses the live floating-dock paths available on the current iOS build, keeps icons pressable, and logs every supported selector it changes." },
+        @{ @"kind": @"stepper", @"key": kSettingsSBCDockIcons,  @"title": @"Dock icons", @"min": @4, @"max": @12, @"default": @(kSBCDefaultDockIcons) },
         @{ @"kind": @"stepper", @"key": kSettingsSBCCols,       @"title": @"Home columns", @"min": @3, @"max": @7, @"default": @(kSBCDefaultCols) },
         @{ @"kind": @"stepper", @"key": kSettingsSBCRows,       @"title": @"Home rows", @"min": @4, @"max": @8, @"default": @(kSBCDefaultRows) },
         @{ @"kind": @"toggle",  @"key": kSettingsSBCHideLabels, @"title": @"Hide icon labels" },
-        @{ @"kind": @"toggle",  @"key": kSettingsSBCHideBadges, @"title": @"Hide icon badges" },
-        @{ @"kind": @"toggle",  @"key": kSettingsSBCHidePageDots, @"title": @"Hide page dots" },
-        @{ @"kind": @"toggle",  @"key": kSettingsSBCHideFolderBackground, @"title": @"Hide folder backgrounds" },
-        @{ @"kind": @"toggle",  @"key": kSettingsSBCHideDockBackground, @"title": @"Hide dock background" },
-        @{ @"kind": @"slider", @"key": kSettingsSBCIconAlphaPct, @"title": @"Icon opacity", @"min": @20, @"max": @100, @"step": @1, @"default": @100, @"unit": @"%" },
-        @{ @"kind": @"info", @"title": @"Atria Lite controls", @"subtitle": @"These appearance controls are part of SBCustomizer and scan every discovered Home Screen window." },
-        @{ @"kind": @"button", @"title": @"View Detailed Activity Log", @"action": @"view-log" },
         @{ @"kind": @"button",  @"title": @"Reset to Defaults" },
     ];
 }
@@ -10743,8 +10918,6 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
 - (NSArray<NSDictionary *> *)darkSwordTweakRows
 {
     return @[
-        @{ @"kind": @"toggle", @"key": kSettingsLayoutApplyHomeControls, @"title": @"Apply Home Screen controls" },
-        @{ @"kind": @"toggle", @"key": kSettingsLayoutApplyDockControls, @"title": @"Apply Dock controls" },
         @{ @"kind": @"info", @"title": @"Runtime behavior",
            @"subtitle": @"The installed DarkSword patch changes SpringBoard in memory. A respring restores stock behavior." },
         @{ @"kind": @"button", @"title": @"View Detailed Activity Log", @"action": @"view-log" },
@@ -10780,8 +10953,6 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
            @"title": @"Home icon scale",   @"min": @25, @"max": @250, @"step": @1, @"unit": @"%", @"default": @100 },
         @{ @"kind": @"number", @"key": kSettingsLayoutDockScalePct,
            @"title": @"Dock icon scale",   @"min": @25, @"max": @250, @"step": @1, @"unit": @"%", @"default": @100 },
-        @{ @"kind": @"info", @"title": @"Atria Lite groups", @"subtitle": @"Home and Dock controls can now be toggled independently without losing the configured values." },
-        @{ @"kind": @"button", @"title": @"View Detailed Activity Log", @"action": @"view-log" },
     ];
 }
 
@@ -10859,7 +11030,9 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
 - (NSArray<NSDictionary *> *)stageStripRows
 {
     return @[
-        @{ @"kind": @"info", @"title": @"Floating windows", @"subtitle": @"Hosts up to two movable, resizable application scenes from the bottom-right picker." },
+        @{ @"kind": @"stepper", @"key": kSettingsStageStripConcurrentWindows, @"title": @"Concurrent floating windows", @"min": @1, @"max": @2, @"default": @2 },
+        @{ @"kind": @"toggle", @"key": kSettingsStageStripIncludeSystemApps, @"title": @"Include Safari, Photos, and Camera" },
+        @{ @"kind": @"info", @"title": @"MilkyWay Lite", @"subtitle": @"Hosts one or two movable, resizable live application scenes. The picker explicitly includes supported Apple system apps when enabled." },
         @{ @"kind": @"info", @"title": @"First-run scan", @"subtitle": @"The initial run builds the installed-app picker cache; later runs reuse it." },
         @{ @"kind": @"button", @"title": @"View Detailed Activity Log", @"action": @"view-log" },
     ];
@@ -10896,14 +11069,23 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
 - (NSArray<NSDictionary *> *)velvetRows
 {
     return @[
-        @{ @"kind": @"toggle", @"key": kSettingsVelvetEnabled, @"title": @"Enable Velvet" },
-        @{ @"kind": @"info",   @"title": @"Background Color", @"subtitle": @"Customize via hex in UserDefaults key VelvetBgColor" },
-        @{ @"kind": @"info",   @"title": @"Border Color",     @"subtitle": @"Customize via hex in UserDefaults key VelvetBorderColor" },
+        @{ @"kind": @"toggle", @"key": kSettingsVelvetEnabled, @"title": @"Enable Velvet + Edge Glow" },
+        @{ @"kind": @"button", @"action": @"velvet-color-bg", @"title": @"Background Color", @"subtitle": [NSUserDefaults.standardUserDefaults stringForKey:kSettingsVelvetBgColor] ?: @"#1E1E1E" },
+        @{ @"kind": @"button", @"action": @"velvet-color-border", @"title": @"Border Color", @"subtitle": [NSUserDefaults.standardUserDefaults stringForKey:kSettingsVelvetBorderColor] ?: @"#3A3A3A" },
         @{ @"kind": @"slider", @"key": kSettingsVelvetBorderWidth, @"title": @"Border Width", @"min": @0, @"max": @5, @"step": @0.5, @"default": @1.0 },
         @{ @"kind": @"slider", @"key": kSettingsVelvetCornerRadius, @"title": @"Corner Radius", @"min": @0, @"max": @25, @"step": @1, @"default": @13 },
-        @{ @"kind": @"info",   @"title": @"Title Color",      @"subtitle": @"Customize via hex in UserDefaults key VelvetTitleColor" },
-        @{ @"kind": @"info",   @"title": @"Message Color",    @"subtitle": @"Customize via hex in UserDefaults key VelvetMessageColor" },
-        @{ @"kind": @"info",   @"title": @"Date Color",       @"subtitle": @"Customize via hex in UserDefaults key VelvetDateColor" },
+        @{ @"kind": @"slider", @"key": kSettingsVelvetBannerScalePct, @"title": @"TinyBanners size", @"min": @70, @"max": @110, @"step": @1, @"default": @92, @"unit": @"%" },
+        @{ @"kind": @"slider", @"key": kSettingsVelvetBannerAlphaPct, @"title": @"Banner opacity", @"min": @30, @"max": @100, @"step": @1, @"default": @96, @"unit": @"%" },
+        @{ @"kind": @"button", @"action": @"velvet-color-title", @"title": @"Title Color", @"subtitle": [NSUserDefaults.standardUserDefaults stringForKey:kSettingsVelvetTitleColor] ?: @"#FFFFFF" },
+        @{ @"kind": @"button", @"action": @"velvet-color-message", @"title": @"Message Color", @"subtitle": [NSUserDefaults.standardUserDefaults stringForKey:kSettingsVelvetMessageColor] ?: @"#CCCCCC" },
+        @{ @"kind": @"button", @"action": @"velvet-color-date", @"title": @"Date Color", @"subtitle": [NSUserDefaults.standardUserDefaults stringForKey:kSettingsVelvetDateColor] ?: @"#888888" },
+        @{ @"kind": @"info", @"title": @"Velvet + TinyBanners", @"subtitle": @"Incoming banner roots receive the configured compact scale and opacity. Stop restores identity transform, full opacity, and border width." },
+        @{ @"kind": @"toggle", @"key": kSettingsVelvetEdgeGlowEnabled, @"title": @"Enable Edge Glow Lite" },
+        @{ @"kind": @"toggle", @"key": kSettingsVelvetEdgeGlowTopOnly, @"title": @"Notchification top-only mode" },
+        @{ @"kind": @"button", @"action": @"velvet-color-edge", @"title": @"Notification Glow Color", @"subtitle": [NSUserDefaults.standardUserDefaults stringForKey:kSettingsVelvetEdgeGlowColor] ?: @"#00D9FFFF" },
+        @{ @"kind": @"slider", @"key": kSettingsVelvetEdgeGlowThickness, @"title": @"Glow thickness", @"min": @1, @"max": @12, @"step": @0.5, @"default": @4.0, @"unit": @"pt" },
+        @{ @"kind": @"info", @"title": @"Edge / Notchification Lite", @"subtitle": @"Shows a non-interactive colored outline only while an incoming SpringBoard banner is active. Full-edge and compact top-outline modes are available." },
+        @{ @"kind": @"button", @"title": @"View Detailed Activity Log", @"action": @"view-log" },
     ];
 }
 
@@ -10989,6 +11171,9 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
         @{ @"kind": @"toggle", @"key": kSettingsBetterCCXIEnabled, @"title": @"Enable BetterCCXI" },
         @{ @"kind": @"slider", @"key": kSettingsBetterCCXIZLift, @"title": @"Module lift", @"min": @0, @"max": @20, @"step": @1, @"default": @4, @"unit": @"z" },
         @{ @"kind": @"slider", @"key": kSettingsBetterCCXIDepthLimit, @"title": @"Scan depth", @"min": @4, @"max": @16, @"step": @1, @"default": @12 },
+        @{ @"kind": @"slider", @"key": kSettingsBetterCCXIModuleScalePct, @"title": @"Cohesive module scale", @"min": @75, @"max": @115, @"step": @1, @"default": @96, @"unit": @"%" },
+        @{ @"kind": @"info", @"title": @"Prysm-ish Lite", @"subtitle": @"Applies one reversible scale and depth treatment to module, media, and Now Playing containers without rewriting persistent Control Center preferences." },
+        @{ @"kind": @"button", @"title": @"View Detailed Activity Log", @"action": @"view-log" },
     ];
 }
 
@@ -11000,6 +11185,12 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
         @{ @"kind": @"slider", @"key": kSettingsMagmaGreen, @"title": @"Green", @"min": @0, @"max": @255, @"step": @1, @"default": @71 },
         @{ @"kind": @"slider", @"key": kSettingsMagmaBlue, @"title": @"Blue", @"min": @0, @"max": @255, @"step": @1, @"default": @20 },
         @{ @"kind": @"slider", @"key": kSettingsMagmaAlphaPct, @"title": @"Tint alpha", @"min": @5, @"max": @100, @"step": @1, @"default": @100, @"unit": @"%" },
+        @{ @"kind": @"toggle", @"key": kSettingsMagmaColorToggles, @"title": @"Color toggles and glyphs" },
+        @{ @"kind": @"toggle", @"key": kSettingsMagmaColorSliders, @"title": @"Color brightness and volume sliders" },
+        @{ @"kind": @"toggle", @"key": kSettingsMagmaColorMedia, @"title": @"Color media controls" },
+        @{ @"kind": @"toggle", @"key": kSettingsMagmaColorBackground, @"title": @"Color module backgrounds" },
+        @{ @"kind": @"info", @"title": @"Magma Evo Lite", @"subtitle": @"Each Control Center group can be colored independently. All discovered SpringBoard windows are scanned and changes are session-only." },
+        @{ @"kind": @"button", @"title": @"View Detailed Activity Log", @"action": @"view-log" },
     ];
 }
 
@@ -11109,9 +11300,11 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
 {
     return @[
         @{ @"kind": @"toggle", @"key": kSettingsWatchLayoutEnabled, @"title": @"Enable Watch Layout" },
-        @{ @"kind": @"slider", @"key": kSettingsWatchLayoutCompactPct, @"title": @"Grid compactness", @"min": @60, @"max": @100, @"step": @1, @"default": @82, @"unit": @"%" },
+        @{ @"kind": @"slider", @"key": kSettingsWatchLayoutCompactPct, @"title": @"Honeycomb compactness", @"min": @60, @"max": @100, @"step": @1, @"default": @82, @"unit": @"%" },
         @{ @"kind": @"slider", @"key": kSettingsWatchLayoutScalePct, @"title": @"Circular icon size", @"min": @60, @"max": @110, @"step": @1, @"default": @88, @"unit": @"%" },
-        @{ @"kind": @"info", @"title": @"Interaction", @"subtitle": @"Uses live SBIconViews instead of snapshots, so transformed icons still launch normally." },
+        @{ @"kind": @"info", @"title": @"Beehive geometry", @"subtitle": @"Preserves each page's stock icon order, compresses vertical spacing using the hex-grid ratio, and offsets alternating rows by half a slot." },
+        @{ @"kind": @"info", @"title": @"Interaction", @"subtitle": @"Uses live SBIconViews instead of snapshots, so every honeycomb icon still launches normally. Dock and App Library icons stay untouched." },
+        @{ @"kind": @"info", @"title": @"Layout safety", @"subtitle": @"Watch Layout and Free Placement are mutually exclusive because both own the same live icon frames. Enabling either one cleanly disables the other." },
         @{ @"kind": @"button", @"title": @"View Detailed Activity Log", @"action": @"view-log" },
     ];
 }
@@ -11126,6 +11319,14 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
         @{ @"kind": @"slider", @"key": kSettingsLockCustomizerContentAlphaPct, @"title": @"Clock opacity", @"min": @20, @"max": @100, @"step": @1, @"default": @100, @"unit": @"%" },
         @{ @"kind": @"toggle", @"key": kSettingsLockCustomizerHideQuickActions, @"title": @"Hide camera and flashlight" },
         @{ @"kind": @"toggle", @"key": kSettingsLockCustomizerHidePageDots, @"title": @"Hide lock-screen page dots" },
+        @{ @"kind": @"slider", @"key": kSettingsLockCustomizerMediaScalePct, @"title": @"Kumquat media-player scale", @"min": @65, @"max": @115, @"step": @1, @"default": @92, @"unit": @"%" },
+        @{ @"kind": @"toggle", @"key": kSettingsLockCustomizerHideMediaArtwork, @"title": @"Hide media artwork" },
+        @{ @"kind": @"info", @"title": @"Kumquat Lite", @"subtitle": @"Applies a compact scale to lock-screen MediaControls and Now Playing containers while preserving their live buttons." },
+        @{ @"kind": @"toggle", @"key": kSettingsLockCustomizerMetalLightEnabled, @"title": @"Metal Lock Light" },
+        @{ @"kind": @"slider", @"key": kSettingsLockCustomizerMetalLightIntensityPct, @"title": @"Edge-light intensity", @"min": @10, @"max": @100, @"step": @1, @"default": @72, @"unit": @"%" },
+        @{ @"kind": @"slider", @"key": kSettingsLockCustomizerMetalLightThickness, @"title": @"Edge-light thickness", @"min": @1, @"max": @14, @"step": @1, @"default": @5, @"unit": @"pt" },
+        @{ @"kind": @"stepper", @"key": kSettingsLockCustomizerMetalLightStyle, @"title": @"Light style (0 ice, 1 violet, 2 gold)", @"min": @0, @"max": @2, @"default": @0 },
+        @{ @"kind": @"info", @"title": @"Metal Lock Light", @"subtitle": @"Adds a noninteractive glowing metal edge to the live Lock Screen. Uninstall removes the overlay without touching wallpaper files." },
         @{ @"kind": @"info", @"title": @"Safe restore", @"subtitle": @"Uninstall restores stock transforms and visibility for all matched live lock-screen views." },
         @{ @"kind": @"button", @"title": @"View Detailed Activity Log", @"action": @"view-log" },
     ];
@@ -11139,6 +11340,44 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
         @{ @"kind": @"slider", @"key": kSettingsFreePlacementVerticalStep, @"title": @"Vertical offset step", @"min": @-40, @"max": @40, @"step": @1, @"default": @5, @"unit": @"pt" },
         @{ @"kind": @"slider", @"key": kSettingsFreePlacementStaggerPct, @"title": @"Alternate-icon stagger", @"min": @0, @"max": @100, @"step": @1, @"default": @35, @"unit": @"%" },
         @{ @"kind": @"info", @"title": @"First port", @"subtitle": @"Builds a configurable free-form offset pattern across all discovered live icons. Taps work; per-icon dragging is not included yet." },
+        @{ @"kind": @"info", @"title": @"Layout safety", @"subtitle": @"Free Placement and Watch Layout are mutually exclusive because both own the same live icon frames. Enabling either one cleanly disables the other." },
+        @{ @"kind": @"button", @"title": @"View Detailed Activity Log", @"action": @"view-log" },
+    ];
+}
+
+- (NSArray<NSDictionary *> *)copypastaLiteRows
+{
+    NSUserDefaults *d = NSUserDefaults.standardUserDefaults;
+    NSString *s1 = [d stringForKey:kSettingsCopypastaSnippet1] ?: @"";
+    NSString *s2 = [d stringForKey:kSettingsCopypastaSnippet2] ?: @"";
+    NSString *s3 = [d stringForKey:kSettingsCopypastaSnippet3] ?: @"";
+    return @[
+        @{ @"kind": @"toggle", @"key": kSettingsCopypastaLiteEnabled, @"title": @"Enable Copypasta Lite" },
+        @{ @"kind": @"button", @"action": @"copypasta-copy-1", @"title": @"Copy Snippet 1", @"subtitle": s1 },
+        @{ @"kind": @"button", @"action": @"copypasta-capture-1", @"title": @"Save Current Clipboard as Snippet 1" },
+        @{ @"kind": @"button", @"action": @"copypasta-edit-1", @"title": @"Edit Snippet 1" },
+        @{ @"kind": @"button", @"action": @"copypasta-copy-2", @"title": @"Copy Snippet 2", @"subtitle": s2 },
+        @{ @"kind": @"button", @"action": @"copypasta-capture-2", @"title": @"Save Current Clipboard as Snippet 2" },
+        @{ @"kind": @"button", @"action": @"copypasta-edit-2", @"title": @"Edit Snippet 2" },
+        @{ @"kind": @"button", @"action": @"copypasta-copy-3", @"title": @"Copy Snippet 3", @"subtitle": s3 },
+        @{ @"kind": @"button", @"action": @"copypasta-capture-3", @"title": @"Save Current Clipboard as Snippet 3" },
+        @{ @"kind": @"button", @"action": @"copypasta-edit-3", @"title": @"Edit Snippet 3" },
+        @{ @"kind": @"info", @"title": @"System pasteboard", @"subtitle": @"Copy writes directly to UIPasteboard. Switch to any app and use its normal Paste command; no third-party keyboard injection is required." },
+        @{ @"kind": @"button", @"title": @"View Detailed Activity Log", @"action": @"view-log" },
+    ];
+}
+
+- (NSArray<NSDictionary *> *)appLibraryStudioRows
+{
+    return @[
+        @{ @"kind": @"toggle", @"key": kSettingsAppLibraryStudioEnabled, @"title": @"Enable App Library Studio" },
+        @{ @"kind": @"slider", @"key": kSettingsAppLibraryStudioScalePct, @"title": @"App Library icon size", @"min": @65, @"max": @120, @"step": @1, @"default": @92, @"unit": @"%" },
+        @{ @"kind": @"slider", @"key": kSettingsAppLibraryStudioHorizontalSpacing, @"title": @"Horizontal spacing", @"min": @-30, @"max": @30, @"step": @1, @"default": @0, @"unit": @"pt" },
+        @{ @"kind": @"slider", @"key": kSettingsAppLibraryStudioVerticalSpacing, @"title": @"Vertical spacing", @"min": @-30, @"max": @30, @"step": @1, @"default": @0, @"unit": @"pt" },
+        @{ @"kind": @"toggle", @"key": kSettingsAppLibraryStudioHideLabels, @"title": @"Hide App Library labels" },
+        @{ @"kind": @"toggle", @"key": kSettingsAppLibraryStudioDisableTodayView, @"title": @"Disable Today View" },
+        @{ @"kind": @"info", @"title": @"Pressable layout", @"subtitle": @"Resizes and spaces the live App Library icon views, so apps and category pods remain interactive." },
+        @{ @"kind": @"info", @"title": @"Today View", @"subtitle": @"Removes SpringBoard's leading Today page instead of hiding its contents. Turning this part off requires a respring to rebuild the native page controller." },
         @{ @"kind": @"button", @"title": @"View Detailed Activity Log", @"action": @"view-log" },
     ];
 }
@@ -11151,10 +11390,6 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
         @{ @"kind": @"slider", @"key": kSettingsBlurryBadgesGreen, @"title": @"Green", @"min": @0, @"max": @255, @"step": @1, @"default": @140 },
         @{ @"kind": @"slider", @"key": kSettingsBlurryBadgesBlue, @"title": @"Blue", @"min": @0, @"max": @255, @"step": @1, @"default": @255 },
         @{ @"kind": @"slider", @"key": kSettingsBlurryBadgesAlphaPct, @"title": @"Tint alpha", @"min": @10, @"max": @100, @"step": @1, @"default": @92, @"unit": @"%" },
-        @{ @"kind": @"toggle", @"key": kSettingsBlurryBadgesGrowEnabled, @"title": @"Grow badges with notification count" },
-        @{ @"kind": @"slider", @"key": kSettingsBlurryBadgesMaxScalePct, @"title": @"Maximum badge size", @"min": @100, @"max": @220, @"step": @1, @"default": @160, @"unit": @"%" },
-        @{ @"kind": @"info", @"title": @"Growing Badges+", @"subtitle": @"Reads each live badge value and scales larger counts toward the configured maximum. All discovered SpringBoard windows are scanned." },
-        @{ @"kind": @"button", @"title": @"View Detailed Activity Log", @"action": @"view-log" },
     ];
 }
 
@@ -11227,6 +11462,9 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
 - (NSArray<NSDictionary *> *)gravityLiteRows
 {
     return @[
+        @{ @"kind": @"info",
+           @"title": @"Page-isolated physics",
+           @"subtitle": @"Every Home Screen page owns its live icons, overlay, collision bounds, and animator. Swiping pages no longer merges icons into the current page." },
         @{ @"kind": @"toggle",
            @"key": kSettingsGravityLiteDockEnabled,
            @"title": @"Include Dock" },
@@ -11391,8 +11629,8 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
                            @"subtitle": @"Reads the app bundle and reports the main Mach-O FairPlay encryption command.",
                            @"action": @"ipadec-probe" }];
         [rows addObject:@{ @"kind": @"button",
-                           @"title": @"Start Decrypt",
-                           @"subtitle": @"Runs the in-dev pipeline. Dump and IPA writer stages are still being wired.",
+                           @"title": @"Decrypt / Export (Beta)",
+                           @"subtitle": @"Exports only verified unencrypted executables. Encrypted targets stop safely until in-memory dumping is implemented.",
                            @"action": @"ipadec-start" }];
     }
     return rows;
@@ -11458,7 +11696,16 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
 
 - (NSArray<NSDictionary *> *)liveWPRows
 {
+    NSUserDefaults *d = NSUserDefaults.standardUserDefaults;
+    NSArray *moodImages = [d arrayForKey:kSettingsLiveWPMoodImagePaths] ?: @[];
     NSMutableArray<NSDictionary *> *rows = [NSMutableArray arrayWithArray:@[
+        @{ @"kind": @"toggle", @"key": kSettingsLiveWPMoodMode, @"title": @"Use Mood Wallpaper" },
+        @{ @"kind": @"info", @"title": @"Mood Images",
+           @"subtitle": [NSString stringWithFormat:@"%lu of 8 selected", (unsigned long)MIN((NSUInteger)8, moodImages.count)] },
+        @{ @"kind": @"button", @"title": @"Choose Mood Images...", @"action": @"moodwp-select-images" },
+        @{ @"kind": @"slider", @"key": kSettingsLiveWPMoodDuration, @"title": @"Image transition time", @"min": @2, @"max": @20, @"step": @1, @"default": @7, @"unit": @"s" },
+        @{ @"kind": @"slider", @"key": kSettingsLiveWPMoodTiltDegrees, @"title": @"Wallpaper tilt angle", @"min": @1, @"max": @8, @"step": @0.5, @"default": @3, @"unit": @"deg" },
+        @{ @"kind": @"info", @"title": @"Mood Wallpaper", @"subtitle": @"Crossfades up to eight images while each layer slowly scales and tilts. Disable Mood mode to use the selected video instead." },
         @{ @"kind": @"info",
            @"title": @"Selected Video",
            @"subtitle": settings_livewp_video_detail() },
@@ -11471,6 +11718,10 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
                            @"title": @"Clear Selected Video",
                            @"action": @"livewp-clear",
                            @"destructive": @YES }];
+    }
+    if (moodImages.count > 0) {
+        [rows addObject:@{ @"kind": @"button", @"title": @"Clear Mood Images",
+                           @"action": @"moodwp-clear", @"destructive": @YES }];
     }
     return rows;
 }
@@ -11586,7 +11837,7 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
     } else if (section == SectionVelvet) {
         BOOL intent = [d boolForKey:kSettingsVelvetEnabled];
         BOOL applied = settings_tweak_is_applied(kSettingsVelvetEnabled);
-        [out addObject:@{@"title": @"Velvet",
+        [out addObject:@{@"title": @"Velvet + Edge Glow",
                          @"value": applied ? @"Active" : (intent ? @"Queued" : @"Off")}];
     } else if (section == SectionCleanNC) {
         BOOL intent = [d boolForKey:kSettingsCleanNCEnabled];
@@ -11823,6 +12074,8 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
         case SectionWatchLayout: return self.watchLayoutRows;
         case SectionLockCustomizer: return cyanide_experimental_tweaks_available() ? self.lockCustomizerRows : @[];
         case SectionFreePlacement: return cyanide_experimental_tweaks_available() ? self.freePlacementRows : @[];
+        case SectionCopypastaLite: return self.copypastaLiteRows;
+        case SectionAppLibraryStudio: return cyanide_experimental_tweaks_available() ? self.appLibraryStudioRows : @[];
         default: return @[];
     }
 }
@@ -11848,7 +12101,7 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
 #if CYANIDE_EXPERIMENTAL_TWEAKS_AVAILABLE
         @{ @"title": @"TypeBanner",         @"icon": @"ellipsis.bubble.fill",                @"color": [UIColor systemTealColor],   @"section": @(SectionTypeBanner), @"indev": @YES },
         @{ @"title": @"Notification Island", @"icon": @"bell.and.waves.left.and.right.fill",  @"color": [UIColor systemOrangeColor], @"section": @(SectionNotificationIsland), @"indev": @YES },
-        @{ @"title": @"IPA Decryptor",      @"icon": @"lock.open.fill",                      @"color": [UIColor systemPurpleColor], @"section": @(SectionIPADecryptor), @"indev": @YES },
+        @{ @"title": @"IPA Decryptor (Beta)", @"icon": @"lock.open.fill",                    @"color": [UIColor systemPurpleColor], @"section": @(SectionIPADecryptor), @"indev": @YES },
         @{ @"title": @"FastLockX Lite",     @"icon": @"lock.open.fill",                      @"color": [UIColor systemGreenColor],  @"section": @(SectionFastLockXLite) },
         @{ @"title": @"CleanNC",            @"icon": @"rectangle.3.group.fill",              @"color": [UIColor systemPurpleColor], @"section": @(SectionCleanNC) },
         @{ @"title": @"UnderTime",          @"icon": @"clock.fill",                          @"color": [UIColor systemRedColor],   @"section": @(SectionUnderTime) },
@@ -11859,8 +12112,8 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
         @{ @"title": @"FUGap",              @"icon": @"arrow.up.to.line.compact",             @"color": [UIColor systemRedColor],   @"section": @(SectionFUGap) },
         @{ @"title": @"ModuleSpacing",      @"icon": @"rectangle.grid.2x2",                  @"color": [UIColor systemIndigoColor], @"section": @(SectionModuleSpacing) },
         @{ @"title": @"SugarCane",          @"icon": @"percent",                              @"color": [UIColor systemYellowColor], @"section": @(SectionSugarCane) },
-        @{ @"title": @"BetterCCXI",         @"icon": @"rectangle.grid.3x2.fill",             @"color": [UIColor systemPurpleColor], @"section": @(SectionBetterCCXI) },
-        @{ @"title": @"Magma",              @"icon": @"flame.fill",                           @"color": [UIColor systemOrangeColor], @"section": @(SectionMagma) },
+        @{ @"title": @"BetterCCXI / Prysm Lite", @"icon": @"rectangle.grid.3x2.fill",         @"color": [UIColor systemPurpleColor], @"section": @(SectionBetterCCXI) },
+        @{ @"title": @"Magma Evo Lite",     @"icon": @"flame.fill",                           @"color": [UIColor systemOrangeColor], @"section": @(SectionMagma) },
         @{ @"title": @"BetterCCIcons",      @"icon": @"circle.grid.2x2.fill",                @"color": [UIColor systemOrangeColor],   @"section": @(SectionBetterCCIcons) },
         @{ @"title": @"CCNoPlatterDim",     @"icon": @"sun.max.fill",                         @"color": [UIColor systemGreenColor],  @"section": @(SectionCCNoPlatterDim) },
         @{ @"title": @"CCStatus",           @"icon": @"info.circle.fill",                     @"color": [UIColor systemRedColor],   @"section": @(SectionCCStatus) },
@@ -11876,7 +12129,7 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
         @{ @"title": @"PullOver",           @"icon": @"sidebar.right",                       @"color": [UIColor systemIndigoColor], @"section": @(SectionPullOver) },
         @{ @"title": @"Alkaline",           @"icon": @"battery.100.bolt",                    @"color": [UIColor systemGreenColor],  @"section": @(SectionAlkaline) },
         @{ @"title": @"TweakLoader",        @"icon": @"arrow.down.circle.dotted",            @"color": [UIColor systemOrangeColor], @"section": @(SectionTweakLoader) },
-        @{ @"title": @"Velvet",             @"icon": @"rectangle.3.group.fill",              @"color": [UIColor systemPurpleColor], @"section": @(SectionVelvet), @"indev": @YES },
+        @{ @"title": @"Velvet + Edge Glow", @"icon": @"rectangle.3.group.fill",              @"color": [UIColor systemPurpleColor], @"section": @(SectionVelvet), @"indev": @YES },
 #endif
         @{ @"title": @"Gravity Lite",       @"icon": @"arrow.down.circle.fill",              @"color": [UIColor systemGreenColor],  @"section": @(SectionGravityLite) },
         @{ @"title": @"App Switcher Grid",  @"icon": @"square.grid.2x2.fill",                @"color": [UIColor systemOrangeColor], @"section": @(SectionAppSwitcherGrid) },
@@ -11890,12 +12143,14 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
         @{ @"title": @"Drag Coefficient",   @"icon": @"dial.medium.fill",                    @"color": [UIColor systemIndigoColor], @"section": @(SectionDragCoefficient) },
         @{ @"title": @"Home Layout Extras", @"icon": @"square.dashed.inset.filled",          @"color": [UIColor systemPurpleColor], @"section": @(SectionLayoutExtras) },
 #if CYANIDE_EXPERIMENTAL_TWEAKS_AVAILABLE
-        @{ @"title": @"Dynamic Stage Lite", @"icon": @"sidebar.left", @"color": [UIColor systemBlueColor], @"section": @(SectionStageStrip), @"indev": @YES },
+        @{ @"title": @"MilkyWay Lite / Dynamic Stage", @"icon": @"sidebar.left", @"color": [UIColor systemBlueColor], @"section": @(SectionStageStrip), @"indev": @YES },
 #endif
         @{ @"title": @"Rounded Icons", @"icon": @"app.fill", @"color": [UIColor systemBlueColor], @"section": @(SectionRoundedIcons) },
         @{ @"title": @"Watch Layout", @"icon": @"circle.grid.3x3.fill", @"color": [UIColor systemGreenColor], @"section": @(SectionWatchLayout) },
         @{ @"title": @"Lock Screen Customizer", @"icon": @"lock.rectangle", @"color": [UIColor systemIndigoColor], @"section": @(SectionLockCustomizer), @"experimental": @YES },
         @{ @"title": @"Free Placement Lite", @"icon": @"move.3d", @"color": [UIColor systemPinkColor], @"section": @(SectionFreePlacement), @"experimental": @YES },
+        @{ @"title": @"Copypasta Lite", @"icon": @"doc.on.clipboard", @"color": [UIColor systemTealColor], @"section": @(SectionCopypastaLite) },
+        @{ @"title": @"App Library Studio", @"icon": @"square.grid.3x3.square", @"color": [UIColor systemBlueColor], @"section": @(SectionAppLibraryStudio), @"experimental": @YES },
     ];
 }
 
@@ -11903,7 +12158,7 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
 {
     return @[
         @{ @"title": @"OTA Updates",       @"icon": @"icloud.slash.fill",    @"color": [UIColor systemGrayColor],   @"section": @(SectionOTA) },
-        @{ @"title": @"IPA Decryptor",     @"icon": @"lock.open.fill",       @"color": [UIColor systemGreenColor],  @"section": @(SectionIPADecryptor) },
+        @{ @"title": @"IPA Decryptor (Beta)", @"icon": @"lock.open.fill",    @"color": [UIColor systemGreenColor],  @"section": @(SectionIPADecryptor) },
         @{ @"title": @"Watch Pairing",     @"icon": @"applewatch.radiowaves.left.and.right", @"color": [UIColor systemPurpleColor], @"section": @(SectionNanoRegistry) },
         @{ @"title": @"Call Recording Sound", @"icon": @"speaker.slash.fill", @"color": [UIColor systemOrangeColor], @"section": @(SectionCallRecordingSound) },
         @{ @"title": @"Hide Home Bar", @"icon": @"line.3.horizontal", @"color": [UIColor systemGrayColor], @"section": @(SectionHideHomeBar) },
@@ -11950,9 +12205,50 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
 
 - (NSArray<NSDictionary *> *)bundleRowsForRootSection:(RootSection)section
 {
-    if (section == RootSectionTweakBundles)  return self.tweakBundleRows;
-    if (section == RootSectionSystemBundles) return self.systemBundleRows;
-    return @[];
+    NSMutableArray<NSDictionary *> *all = [NSMutableArray arrayWithArray:self.tweakBundleRows];
+    [all addObjectsFromArray:self.systemBundleRows];
+    NSMutableArray<NSDictionary *> *out = [NSMutableArray array];
+    NSMutableSet<NSNumber *> *seen = [NSMutableSet set];
+    for (NSDictionary *bundle in all) {
+        NSNumber *sectionNumber = bundle[@"section"];
+        if ([seen containsObject:sectionNumber]) continue;
+        NSInteger s = sectionNumber.integerValue;
+        RootSection destination = RootSectionUtilities;
+        switch (s) {
+            case SectionSBC: case SectionLayoutExtras: case SectionGravityLite:
+            case SectionRoundedIcons: case SectionWatchLayout: case SectionFreePlacement:
+            case SectionAppLibraryStudio: case SectionCylinderLite: case SectionHideLabels:
+            case SectionCleanHomeScreen: case SectionBlurryBadges:
+                destination = RootSectionHomeScreen; break;
+            case SectionLockCustomizer: case SectionFastLockXLite: case SectionAxonLite:
+            case SectionVelvet: case SectionCleanNC: case SectionTypeBanner:
+            case SectionNotificationIsland: case SectionUnderTime:
+                destination = RootSectionLockAndNotifications; break;
+            case SectionRealCC: case SectionCleanCC: case SectionFUGap:
+            case SectionModuleSpacing: case SectionSugarCane: case SectionBetterCCXI:
+            case SectionMagma: case SectionBetterCCIcons: case SectionCCNoPlatterDim:
+            case SectionCCStatus: case SectionHapticCC: case SectionSecureCC:
+                destination = RootSectionControlCenter; break;
+            case SectionStatBar: case SectionNSBar: case SectionNiceBarLite:
+            case SectionRSSIDisplay: case SectionZeppelinLite: case SectionAlkaline:
+                destination = RootSectionStatusBar; break;
+            case SectionAppSwitcherGrid: case SectionPancake: case SectionPullOver:
+            case SectionStageStrip:
+                destination = RootSectionMultitasking; break;
+            case SectionThemer: case SectionSnowBoardLite: case SectionLiveWP:
+            case SectionBarmoji:
+                destination = RootSectionThemesAndVisuals; break;
+            case SectionPowercuff: case SectionDarkSwordTweaks: case SectionDragCoefficient:
+            case SectionNanoRegistry: case SectionCallRecordingSound: case SectionHideHomeBar:
+                destination = RootSectionSystem; break;
+            default:
+                destination = RootSectionUtilities; break;
+        }
+        if (destination != section) continue;
+        [seen addObject:sectionNumber];
+        [out addObject:bundle];
+    }
+    return out;
 }
 
 #pragma mark - Table data
@@ -11974,8 +12270,15 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
             return self.changelogExpanded ? n + 2 : 1;
         }
         case RootSectionActions:        return 4;
-        case RootSectionTweakBundles:   return (NSInteger)self.tweakBundleRows.count;
-        case RootSectionSystemBundles:  return (NSInteger)self.systemBundleRows.count;
+        case RootSectionHomeScreen:
+        case RootSectionLockAndNotifications:
+        case RootSectionControlCenter:
+        case RootSectionStatusBar:
+        case RootSectionMultitasking:
+        case RootSectionThemesAndVisuals:
+        case RootSectionUtilities:
+        case RootSectionSystem:
+            return (NSInteger)[self bundleRowsForRootSection:(RootSection)section].count;
         case RootSectionAbout:          return 6;
         case RootSectionWarning:        return 0;
         case RootSectionCount:          return 0;
@@ -11989,8 +12292,14 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
     switch ((RootSection)section) {
         case RootSectionChangelog:      return self.changelogExpanded ? @"What's New" : nil;
         case RootSectionActions:        return @"Quick Actions";
-        case RootSectionTweakBundles:   return self.tweakBundleRows.count   > 0 ? @"Tweaks" : nil;
-        case RootSectionSystemBundles:  return self.systemBundleRows.count  > 0 ? @"System" : nil;
+        case RootSectionHomeScreen:     return [self bundleRowsForRootSection:section].count ? @"Home Screen & Dock" : nil;
+        case RootSectionLockAndNotifications: return [self bundleRowsForRootSection:section].count ? @"Lock Screen & Notifications" : nil;
+        case RootSectionControlCenter:  return [self bundleRowsForRootSection:section].count ? @"Control Center" : nil;
+        case RootSectionStatusBar:      return [self bundleRowsForRootSection:section].count ? @"Status Bar" : nil;
+        case RootSectionMultitasking:   return [self bundleRowsForRootSection:section].count ? @"Multitasking" : nil;
+        case RootSectionThemesAndVisuals: return [self bundleRowsForRootSection:section].count ? @"Themes & Visuals" : nil;
+        case RootSectionUtilities:      return [self bundleRowsForRootSection:section].count ? @"Utilities & Experiments" : nil;
+        case RootSectionSystem:         return [self bundleRowsForRootSection:section].count ? @"System" : nil;
         case RootSectionAbout:          return @"About";
         default:                        return nil;
     }
@@ -12013,7 +12322,7 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
         return @"kexploit_opa334 runs once per app lifetime. Keep Alive applies only while infern0 is minimized; an App Switcher kill still terminates the process.";
     }
     if (s == SectionSBC) {
-        return [NSString stringWithFormat:@"Stock iOS defaults: dock %ld, columns %ld, rows %ld.",
+        return [NSString stringWithFormat:@"Stock iOS defaults: dock %ld, columns %ld, rows %ld. iPad-style Dock mode is best-effort across iOS versions: unsupported floating-dock selectors are skipped and listed in the activity log.",
                 (long)kSBCDefaultDockIcons, (long)kSBCDefaultCols, (long)kSBCDefaultRows];
     }
     if (s == SectionDarkSwordTweaks) {
@@ -12078,7 +12387,7 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
         return @"Experimental Dynamic Island notification route. infern0 polls SpringBoard's active banner request through the shared RemoteCall session, then mirrors it through the app's ActivityKit Live Activity.";
     }
     if (s == SectionVelvet) {
-        return @"Custom notification background styles. Velvet applies background color, border, corner radius, and text colors to notification banners and Notification Center cells through SpringBoard's RemoteCall session. Experimental — may need reapply after respring.";
+        return @"Custom notification backgrounds plus Edge / Notchification Lite. The non-interactive outline follows active incoming banners and can cover the full screen edge or only the top island/notch area. Experimental — may need reapply after respring.";
     }
     if (s == SectionCleanNC) {
         return @"Cleans up the Notification Center interface by removing visual clutter.";
@@ -12108,10 +12417,10 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
         return @"Adds a first-pass percentage text overlay for brightness and volume style modules.";
     }
     if (s == SectionBetterCCXI) {
-        return @"Applies a first-pass layout emphasis pass for larger Control Center module presentation.";
+        return @"Prysm-ish session treatment for module scale, depth, and lift without persistent Control Center preference rewrites.";
     }
     if (s == SectionMagma) {
-        return @"Tints visible Control Center glyphs with a Magma-style active color.";
+        return @"Granular session-only coloring for Control Center toggles, sliders, media controls, and module backgrounds.";
     }
     if (s == SectionBetterCCIcons) {
         return @"Rounds visible Control Center module/icon layers for a softer icon style.";
@@ -12155,6 +12464,9 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
     if (s == SectionFreePlacement) {
         return @"Applies a configurable staggered offset pattern to every discovered live Home Screen icon. Icons remain pressable and saved stock frames are restored on uninstall; per-icon dragging is not included yet.";
     }
+    if (s == SectionCopypastaLite) {
+        return @"An editable clipboard shelf that writes selected snippets to the system pasteboard. It works with normal Paste in every app without cross-process keyboard hooks.";
+    }
     if (s == SectionBlurryBadges) {
         return @"Badge Studio combines configurable BlurryBadges tinting with Growing Badges+ scaling based on each live notification count.";
     }
@@ -12174,7 +12486,7 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
         return @"Runtime patch. It changes SpringBoard's app switcher style in memory, writes no system files, and a respring restores stock. Unsupported builds may glitch the app switcher or crash SpringBoard.";
     }
     if (s == SectionGravityLite) {
-        return @"RemoteCall-only core port of Julio Verne's Gravity. Run applies UIDynamicAnimator gravity, collision, bounce, friction, optional dock physics, and accelerometer steering to SpringBoard icon snapshots. It can restore the icon layout or fire a manual explosion pulse while the SpringBoard session is active.\n\nNot included in this core port: Activator/Home-button hooks, drag gestures, automatic shake effects, and preference-daemon notifications.";
+        return @"RemoteCall-only core port of Julio Verne's Gravity. Run gives every Home Screen page a separate overlay, animator, collision boundary, and saved live-icon layout, while the optional dock receives its own simulation. Icons remain pressable and attached to their original page while gravity, bounce, friction, resistance, and accelerometer steering are active. Restore resets every captured page, and Explosion Pulse affects every active page independently.\n\nNot included in this core port: Activator/Home-button hooks, drag gestures, automatic shake effects, and preference-daemon notifications.";
     }
     if (s == SectionLocationSim) {
         return @"Beta CoreLocation simulation. Requires Apple Maps installed and set up — Maps is the RemoteCall host process that drives the simulation.\n\nThis is a manual tool, not an installable package. Use Simulate Current Target to start; use Restore Real Location to stop simulation and return CoreLocation to the device's real providers. Each run opens the activity log and marks completion when the request returns.\n\nNot all apps respect the simulated location. Apps that use their own location validation or additional signals may ignore it.\n\nCredits: kolbicz for the RemoteCall/CLSimulationManager GPS spoofer prototype, and ezzuldinSt's LSpoof for picker/route references.\n\nWarning: this can affect more than maps. Location-tied system behavior, including time zone and date/time handling, may behave unexpectedly. Only use this if you know what you're doing.";
@@ -12192,7 +12504,7 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
         return @"SnowBoard/IconBundles importer ported from d1y/cyanide-ios. Folder imports are copied into infern0's Documents/SnowBoardLite library and applied through the existing icon replacement pipeline.\n\nThe import copies theme assets into infern0's local storage so the original theme in Files is not changed.\n\nCompatibility: SnowBoard Lite keeps live icon repair active and reuses the SpringBoard RemoteCall channel between repair ticks. Re-run it after a respring if icons reset.";
     }
     if (s == SectionLiveWP) {
-        return @"Video wallpaper ported from d1y/cyanide-ios. Select an MP4, MOV, or M4V; infern0 copies it into Documents/LiveWP and plays it in SpringBoard while the RemoteCall session stays alive.";
+        return @"Choose video mode or Mood Wallpaper. Video mode copies an MP4, MOV, or M4V into Documents/LiveWP. Mood mode copies up to eight images and crossfades them with adjustable timing and tilt. Both run in SpringBoard only while the RemoteCall session stays alive and clean up without changing system wallpaper files.";
     }
     return nil;
 }
@@ -12202,8 +12514,9 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
     if (!self.detailMode) {
         if ((RootSection)section == RootSectionWarning) return CGFLOAT_MIN;
         if ((RootSection)section == RootSectionChangelog     && settings_changelog_entries().count == 0) return CGFLOAT_MIN;
-        if ((RootSection)section == RootSectionTweakBundles  && self.tweakBundleRows.count  == 0) return CGFLOAT_MIN;
-        if ((RootSection)section == RootSectionSystemBundles && self.systemBundleRows.count == 0) return CGFLOAT_MIN;
+        RootSection root = (RootSection)section;
+        if (root >= RootSectionHomeScreen && root <= RootSectionSystem &&
+            [self bundleRowsForRootSection:root].count == 0) return CGFLOAT_MIN;
     }
     return 46.0;
 }
@@ -12649,7 +12962,38 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
 
     PHPickerViewController *picker = [[PHPickerViewController alloc] initWithConfiguration:config];
     picker.delegate = self;
+    self.pendingThemeImportMode = @"livewp";
     [self presentViewController:picker animated:YES completion:nil];
+}
+
+- (void)presentMoodWallpaperPhotosPicker
+{
+    PHPickerConfiguration *config = [[PHPickerConfiguration alloc] init];
+    config.filter = [PHPickerFilter imagesFilter];
+    config.selectionLimit = 8;
+    config.preferredAssetRepresentationMode = PHPickerConfigurationAssetRepresentationModeCurrent;
+    PHPickerViewController *picker = [[PHPickerViewController alloc] initWithConfiguration:config];
+    picker.delegate = self;
+    self.pendingThemeImportMode = @"moodwallpaper";
+    [self presentViewController:picker animated:YES completion:nil];
+}
+
+- (NSString *)importMoodWallpaperImageAtURL:(NSURL *)url error:(NSError **)error
+{
+    NSString *docs = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
+    if (docs.length == 0 || !url) return nil;
+    NSString *dir = [docs stringByAppendingPathComponent:@"MoodWallpaper"];
+    NSFileManager *fm = NSFileManager.defaultManager;
+    if (![fm createDirectoryAtPath:dir withIntermediateDirectories:YES attributes:nil error:error]) return nil;
+    NSString *ext = url.pathExtension.lowercaseString;
+    if (ext.length == 0) ext = @"jpg";
+    NSString *name = [NSString stringWithFormat:@"mood-%llu-%u.%@",
+                      (unsigned long long)(NSDate.date.timeIntervalSince1970 * 1000.0),
+                      arc4random_uniform(100000), ext];
+    NSString *dest = [dir stringByAppendingPathComponent:name];
+    if (![fm copyItemAtURL:url toURL:[NSURL fileURLWithPath:dest] error:error]) return nil;
+    log_user("[MOODWP] Imported image %s.\n", name.UTF8String);
+    return [@"MoodWallpaper" stringByAppendingPathComponent:name];
 }
 
 - (NSArray<UTType *> *)liveWPVideoDocumentTypes
@@ -12801,6 +13145,53 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
 didFinishPicking:(NSArray<PHPickerResult *> *)results
 {
     [picker dismissViewControllerAnimated:YES completion:nil];
+    NSString *mode = self.pendingThemeImportMode;
+    self.pendingThemeImportMode = nil;
+    if ([mode isEqualToString:@"moodwallpaper"]) {
+        if (results.count == 0) return;
+        dispatch_group_t group = dispatch_group_create();
+        NSMutableArray<NSString *> *imported = [NSMutableArray array];
+        NSMutableArray<NSString *> *errors = [NSMutableArray array];
+        for (PHPickerResult *item in [results subarrayWithRange:NSMakeRange(0, MIN((NSUInteger)8, results.count))]) {
+            NSItemProvider *provider = item.itemProvider;
+            NSString *identifier = nil;
+            for (NSString *candidate in @[@"public.image", @"public.jpeg", @"public.png", @"public.heic"]) {
+                if ([provider hasItemConformingToTypeIdentifier:candidate]) { identifier = candidate; break; }
+            }
+            if (!identifier) continue;
+            dispatch_group_enter(group);
+            [provider loadFileRepresentationForTypeIdentifier:identifier completionHandler:^(NSURL *url, NSError *error) {
+                NSError *copyError = error;
+                NSString *relative = url ? [self importMoodWallpaperImageAtURL:url error:&copyError] : nil;
+                @synchronized (imported) {
+                    if (relative) [imported addObject:relative];
+                    else if (copyError.localizedDescription) [errors addObject:copyError.localizedDescription];
+                }
+                dispatch_group_leave(group);
+            }];
+        }
+        dispatch_group_notify(group, dispatch_get_main_queue(), ^{
+            if (imported.count > 0) {
+                NSUserDefaults *d = NSUserDefaults.standardUserDefaults;
+                [d setObject:[imported copy] forKey:kSettingsLiveWPMoodImagePaths];
+                [d setBool:YES forKey:kSettingsLiveWPMoodMode];
+                [d synchronize];
+                settings_mark_tweak_applied(kSettingsLiveWPEnabled, NO);
+                if ([d boolForKey:kSettingsLiveWPEnabled])
+                    settings_schedule_live_apply_for_key(kSettingsLiveWPEnabled);
+                [self reloadSectionOrAll:SectionLiveWP];
+            }
+            NSString *message = imported.count > 0
+                ? [NSString stringWithFormat:@"Imported %lu mood image%@.", (unsigned long)imported.count, imported.count == 1 ? @"" : @"s"]
+                : (errors.firstObject ?: @"No compatible images were imported.");
+            UIAlertController *ac = [UIAlertController alertControllerWithTitle:imported.count ? @"Mood Wallpaper Ready" : @"Import Failed"
+                                                                         message:message
+                                                                  preferredStyle:UIAlertControllerStyleAlert];
+            [ac addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
+            [self presentViewController:ac animated:YES completion:nil];
+        });
+        return;
+    }
     PHPickerResult *result = results.firstObject;
     if (!result) return;
 
@@ -13513,6 +13904,26 @@ didPickDocumentsAtURLs:(NSArray<NSURL *> *)urls
     [self reloadSectionOrAll:SectionLiveWP];
 }
 
+- (void)clearMoodWallpaperImages
+{
+    NSUserDefaults *d = NSUserDefaults.standardUserDefaults;
+    NSArray<NSString *> *relativePaths = [d arrayForKey:kSettingsLiveWPMoodImagePaths] ?: @[];
+    NSString *docs = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
+    for (NSString *relative in relativePaths) {
+        if (![relative isKindOfClass:[NSString class]] || relative.length == 0) continue;
+        NSString *path = [relative hasPrefix:@"/"] ? relative : [docs stringByAppendingPathComponent:relative];
+        [[NSFileManager defaultManager] removeItemAtPath:path error:nil];
+    }
+    [d setObject:@[] forKey:kSettingsLiveWPMoodImagePaths];
+    [d setBool:NO forKey:kSettingsLiveWPMoodMode];
+    [d synchronize];
+    settings_mark_tweak_applied(kSettingsLiveWPEnabled, NO);
+    if ([d boolForKey:kSettingsLiveWPEnabled])
+        settings_schedule_live_apply_for_key(kSettingsLiveWPEnabled);
+    log_user("[MOODWP] Cleared %lu stored image(s).\n", (unsigned long)relativePaths.count);
+    [self reloadSectionOrAll:SectionLiveWP];
+}
+
 // "Classic" alternate icon is registered in Info.plist with CFBundleIconFiles
 // pointing to infern0-Classic@{2,3}x.png at the bundle root. Modern is the
 // asset-catalog primary, selected by passing nil to setAlternateIconName:.
@@ -13940,10 +14351,17 @@ void cyanide_present_contact(UIViewController *host)
             case RootSectionActions:
                 indexPath = [NSIndexPath indexPathForRow:indexPath.row inSection:SectionActions];
                 break;
-            case RootSectionTweakBundles:
-                return [self buildBundleCellWithRow:self.tweakBundleRows[indexPath.row] tableView:tableView];
-            case RootSectionSystemBundles:
-                return [self buildBundleCellWithRow:self.systemBundleRows[indexPath.row] tableView:tableView];
+            case RootSectionHomeScreen:
+            case RootSectionLockAndNotifications:
+            case RootSectionControlCenter:
+            case RootSectionStatusBar:
+            case RootSectionMultitasking:
+            case RootSectionThemesAndVisuals:
+            case RootSectionUtilities:
+            case RootSectionSystem: {
+                NSArray<NSDictionary *> *bundles = [self bundleRowsForRootSection:(RootSection)indexPath.section];
+                return [self buildBundleCellWithRow:bundles[indexPath.row] tableView:tableView];
+            }
             case RootSectionAbout:
                 return [self buildAboutCellAtRow:indexPath.row tableView:tableView];
             case RootSectionCount:
@@ -15496,6 +15914,130 @@ void cyanide_present_contact(UIViewController *host)
                                               forKey:kSettingsPowercuffLevel];
 }
 
+- (NSString *)copypastaSnippetKeyForIndex:(NSInteger)index
+{
+    if (index == 1) return kSettingsCopypastaSnippet1;
+    if (index == 2) return kSettingsCopypastaSnippet2;
+    return kSettingsCopypastaSnippet3;
+}
+
+- (void)runCopypastaAction:(NSString *)action
+{
+    NSArray<NSString *> *parts = [action componentsSeparatedByString:@"-"];
+    if (parts.count != 3) return;
+    NSInteger index = [parts[2] integerValue];
+    NSString *key = [self copypastaSnippetKeyForIndex:index];
+    NSUserDefaults *d = NSUserDefaults.standardUserDefaults;
+    if (![d boolForKey:kSettingsCopypastaLiteEnabled]) {
+        log_user("[COPYPASTA] Action %s rejected because Copypasta Lite is disabled.\n", action.UTF8String);
+        UIAlertController *disabled = [UIAlertController alertControllerWithTitle:@"Copypasta Lite Is Off"
+                                                                           message:@"Enable Copypasta Lite before editing or using clipboard slots."
+                                                                    preferredStyle:UIAlertControllerStyleAlert];
+        [disabled addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
+        settings_present_controller(disabled, self);
+        return;
+    }
+    if ([parts[1] isEqualToString:@"copy"]) {
+        NSString *snippet = [d stringForKey:key] ?: @"";
+        if (snippet.length == 0) {
+            log_user("[COPYPASTA] Copy for snippet %ld skipped: slot is empty.\n", (long)index);
+            UIAlertController *empty = [UIAlertController alertControllerWithTitle:@"Snippet Is Empty"
+                                                                            message:@"Edit the slot or capture the current clipboard first."
+                                                                     preferredStyle:UIAlertControllerStyleAlert];
+            [empty addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
+            settings_present_controller(empty, self);
+            return;
+        }
+        UIPasteboard.generalPasteboard.string = snippet;
+        log_user("[COPYPASTA] Copied snippet %ld to UIPasteboard; characters=%lu.\n",
+                 (long)index, (unsigned long)snippet.length);
+        UIAlertController *done = [UIAlertController alertControllerWithTitle:@"Copied"
+                                                                       message:@"Switch to any app and use its normal Paste command."
+                                                                preferredStyle:UIAlertControllerStyleAlert];
+        [done addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
+        settings_present_controller(done, self);
+        return;
+    }
+
+    if ([parts[1] isEqualToString:@"capture"]) {
+        NSString *clipboard = UIPasteboard.generalPasteboard.string;
+        if (clipboard.length == 0) {
+            log_user("[COPYPASTA] Capture for snippet %ld skipped: clipboard has no text.\n", (long)index);
+            UIAlertController *empty = [UIAlertController alertControllerWithTitle:@"No Text to Save"
+                                                                            message:@"Copy some text first, then try again."
+                                                                     preferredStyle:UIAlertControllerStyleAlert];
+            [empty addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
+            settings_present_controller(empty, self);
+            return;
+        }
+        [d setObject:clipboard forKey:key];
+        [d synchronize];
+        log_user("[COPYPASTA] Captured UIPasteboard text into snippet %ld; characters=%lu.\n",
+                 (long)index, (unsigned long)clipboard.length);
+        [self.tableView reloadData];
+        return;
+    }
+
+    UIAlertController *editor = [UIAlertController alertControllerWithTitle:[NSString stringWithFormat:@"Edit Snippet %ld", (long)index]
+                                                                     message:@"Stored locally in infern0."
+                                                              preferredStyle:UIAlertControllerStyleAlert];
+    [editor addTextFieldWithConfigurationHandler:^(UITextField *field) {
+        field.text = [d stringForKey:key] ?: @"";
+        field.clearButtonMode = UITextFieldViewModeWhileEditing;
+    }];
+    [editor addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
+    __weak typeof(self) weakSelf = self;
+    [editor addAction:[UIAlertAction actionWithTitle:@"Save" style:UIAlertActionStyleDefault handler:^(UIAlertAction *_) {
+        NSString *value = editor.textFields.firstObject.text ?: @"";
+        [d setObject:value forKey:key];
+        [d synchronize];
+        log_user("[COPYPASTA] Updated snippet %ld; characters=%lu.\n", (long)index, (unsigned long)value.length);
+        [weakSelf.tableView reloadData];
+    }]];
+    settings_present_controller(editor, self);
+}
+
+- (void)runVelvetColorAction:(NSString *)action
+{
+    NSDictionary<NSString *, NSString *> *keys = @{
+        @"velvet-color-bg": kSettingsVelvetBgColor,
+        @"velvet-color-border": kSettingsVelvetBorderColor,
+        @"velvet-color-title": kSettingsVelvetTitleColor,
+        @"velvet-color-message": kSettingsVelvetMessageColor,
+        @"velvet-color-date": kSettingsVelvetDateColor,
+        @"velvet-color-edge": kSettingsVelvetEdgeGlowColor,
+    };
+    NSString *key = keys[action];
+    if (!key) return;
+    NSUserDefaults *d = NSUserDefaults.standardUserDefaults;
+    UIAlertController *editor = [UIAlertController alertControllerWithTitle:@"Enter Hex Color"
+                                                                     message:@"Use #RRGGBB or #RRGGBBAA."
+                                                              preferredStyle:UIAlertControllerStyleAlert];
+    [editor addTextFieldWithConfigurationHandler:^(UITextField *field) {
+        field.text = [d stringForKey:key] ?: @"#FFFFFF";
+        field.autocapitalizationType = UITextAutocapitalizationTypeAllCharacters;
+    }];
+    [editor addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
+    __weak typeof(self) weakSelf = self;
+    [editor addAction:[UIAlertAction actionWithTitle:@"Save" style:UIAlertActionStyleDefault handler:^(UIAlertAction *_) {
+        NSString *value = [editor.textFields.firstObject.text stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
+        BOOL lengthOK = value.length == 7 || value.length == 9;
+        NSCharacterSet *invalid = [[NSCharacterSet characterSetWithCharactersInString:@"0123456789ABCDEFabcdef"] invertedSet];
+        BOOL digitsOK = lengthOK && [value hasPrefix:@"#"] && [[value substringFromIndex:1] rangeOfCharacterFromSet:invalid].location == NSNotFound;
+        if (!digitsOK) {
+            log_user("[VELVET] Rejected invalid color value.\n");
+            return;
+        }
+        [d setObject:value.uppercaseString forKey:key];
+        [d synchronize];
+        settings_note_package_configuration_changed(key);
+        settings_schedule_live_apply_for_key(key);
+        log_user("[VELVET] Updated %s=%s.\n", key.UTF8String, value.uppercaseString.UTF8String);
+        [weakSelf.tableView reloadData];
+    }]];
+    settings_present_controller(editor, self);
+}
+
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath
 {
     [tableView deselectRowAtIndexPath:indexPath animated:YES];
@@ -15524,11 +16066,15 @@ void cyanide_present_contact(UIViewController *host)
             case RootSectionActions:
                 indexPath = [NSIndexPath indexPathForRow:indexPath.row inSection:SectionActions];
                 break;
-            case RootSectionTweakBundles:
-            case RootSectionSystemBundles: {
-                NSArray<NSDictionary *> *bundles = (RootSection)indexPath.section == RootSectionTweakBundles
-                    ? self.tweakBundleRows
-                    : self.systemBundleRows;
+            case RootSectionHomeScreen:
+            case RootSectionLockAndNotifications:
+            case RootSectionControlCenter:
+            case RootSectionStatusBar:
+            case RootSectionMultitasking:
+            case RootSectionThemesAndVisuals:
+            case RootSectionUtilities:
+            case RootSectionSystem: {
+                NSArray<NSDictionary *> *bundles = [self bundleRowsForRootSection:(RootSection)indexPath.section];
                 NSDictionary *bundle = bundles[indexPath.row];
                 NSInteger underlying = [bundle[@"section"] integerValue];
                 NSString *pushTitle = bundle[@"title"];
@@ -15564,6 +16110,22 @@ void cyanide_present_contact(UIViewController *host)
         [selectedRows[indexPath.row][@"action"] isEqualToString:@"view-log"]) {
         [self openViewLog];
         return;
+    }
+
+    if (indexPath.section == SectionCopypastaLite && indexPath.row < (NSInteger)selectedRows.count) {
+        NSString *action = selectedRows[indexPath.row][@"action"];
+        if ([action hasPrefix:@"copypasta-"]) {
+            [self runCopypastaAction:action];
+            return;
+        }
+    }
+
+    if (indexPath.section == SectionVelvet && indexPath.row < (NSInteger)selectedRows.count) {
+        NSString *action = selectedRows[indexPath.row][@"action"];
+        if ([action hasPrefix:@"velvet-color-"]) {
+            [self runVelvetColorAction:action];
+            return;
+        }
     }
 
     if (!settings_device_supported() &&
@@ -16243,6 +16805,10 @@ void cyanide_present_contact(UIViewController *host)
             [self presentLiveWPVideoPicker];
         } else if ([action isEqualToString:@"livewp-clear"]) {
             [self clearLiveWPVideo];
+        } else if ([action isEqualToString:@"moodwp-select-images"]) {
+            [self presentMoodWallpaperPhotosPicker];
+        } else if ([action isEqualToString:@"moodwp-clear"]) {
+            [self clearMoodWallpaperImages];
         }
         return;
     }

@@ -39,7 +39,7 @@ typedef struct {
     double right;
 } GL_UIEdgeInsets;
 
-static uint64_t s_gravity_ptrs[8];
+static uint64_t s_gravity_ptrs[64];
 static volatile int s_gravity_ptr_count = 0;
 static const uint64_t kGravityLiteOverlayTag = 0x47524156ULL; // "GRAV"
 static const double kGravityLiteSnapshotScale = 1.22;
@@ -732,6 +732,93 @@ static uint64_t gl_icon_list_from_folder_controller(uint64_t folderController,
     return 0;
 }
 
+static int gl_append_page_list(uint64_t candidate,
+                               uint64_t iconViewCls,
+                               uint64_t dockListView,
+                               uint64_t *out,
+                               int count,
+                               int cap,
+                               const char *source)
+{
+    if (count >= cap || !r_is_objc_ptr(candidate) || candidate == dockListView) return count;
+    if (gl_ptr_seen(candidate, out, count)) return count;
+    uint64_t usable = gl_usable_icon_list_candidate(candidate, iconViewCls);
+    if (!r_is_objc_ptr(usable)) return count;
+    out[count] = usable;
+    log_user("[GRAVITY][PAGE-DISCOVERY] page=%d list=0x%llx source=%s result=accepted.\n",
+             count + 1, usable, source ?: "unknown");
+    return count + 1;
+}
+
+// Enumerate the root folder controller's real page list instead of treating
+// arbitrary SBIconListViews currently visible in app windows as pages. The
+// returned list is stable across horizontal swipes and excludes the dock.
+static int gl_collect_home_page_list_views(uint64_t ctrl,
+                                           uint64_t mgr,
+                                           uint64_t iconViewCls,
+                                           uint64_t *out,
+                                           int cap)
+{
+    if (!out || cap <= 0) return 0;
+    int found = 0;
+    uint64_t dock = gl_dock_list_view(ctrl, mgr);
+    uint64_t rootFC = gl_root_folder_controller(ctrl, mgr);
+
+    if (r_is_objc_ptr(rootFC) &&
+        r_responds_main(rootFC, "iconListViewCount") &&
+        r_responds_main(rootFC, "iconListViewAtIndex:")) {
+        uint64_t count = gl_get_integer(rootFC, "iconListViewCount");
+        if (count > (uint64_t)cap) count = (uint64_t)cap;
+        log_user("[GRAVITY][PAGE-DISCOVERY] rootController=0x%llx reportedPageCount=%llu path=indexed.\n",
+                 rootFC, count);
+        for (uint64_t i = 0; i < count && found < cap; i++) {
+            uint64_t list = r_msg2_main(rootFC, "iconListViewAtIndex:", i, 0, 0, 0);
+            found = gl_append_page_list(list, iconViewCls, dock, out, found, cap,
+                                        "rootFolderController.iconListViewAtIndex");
+        }
+    }
+
+    const char *arraySels[] = { "iconListViews", "visibleIconListViews", NULL };
+    uint64_t owners[] = { rootFC, mgr, ctrl };
+    for (int o = 0; o < 3 && found < cap; o++) {
+        uint64_t owner = owners[o];
+        if (!r_is_objc_ptr(owner)) continue;
+        for (int s = 0; arraySels[s] && found < cap; s++) {
+            uint64_t lists = gl_safe_msg(owner, arraySels[s], 0, 0, 0, 0);
+            uint64_t count = gl_array_count(lists);
+            if (count > (uint64_t)cap) count = (uint64_t)cap;
+            for (uint64_t i = 0; i < count && found < cap; i++) {
+                found = gl_append_page_list(gl_array_object(lists, i), iconViewCls,
+                                            dock, out, found, cap, arraySels[s]);
+            }
+        }
+    }
+
+    // Last-resort paths cover iOS builds that expose only the current list or
+    // keep list views below rootFolderView without indexed accessors.
+    if (found == 0) {
+        uint64_t current = gl_current_root_list_view(ctrl, mgr);
+        found = gl_append_page_list(current, iconViewCls, dock, out, found, cap,
+                                    "currentRootIconListView-fallback");
+        uint64_t rootView = gl_safe_msg(rootFC, "rootFolderView", 0, 0, 0, 0);
+        if (r_is_objc_ptr(rootView)) {
+            uint64_t listViewCls = r_class("SBIconListView");
+            uint64_t discovered[64] = {0};
+            int count = r_is_objc_ptr(listViewCls)
+                ? sb_collect_views(rootView, listViewCls, discovered, 64) : 0;
+            for (int i = 0; i < count && found < cap; i++) {
+                found = gl_append_page_list(discovered[i], iconViewCls, dock,
+                                            out, found, cap,
+                                            "rootFolderView-descendant-fallback");
+            }
+        }
+    }
+
+    log_user("[GRAVITY][PAGE-DISCOVERY] completed pages=%d dock=0x%llx rootController=0x%llx.\n",
+             found, dock, rootFC);
+    return found;
+}
+
 static uint64_t gl_current_root_list_view(uint64_t ctrl, uint64_t mgr)
 {
     uint64_t list = 0;
@@ -749,18 +836,6 @@ static uint64_t gl_current_root_list_view(uint64_t ctrl, uint64_t mgr)
     if (!r_is_objc_ptr(list)) list = gl_safe_msg(ctrl, "currentIconListView", 0, 0, 0, 0);
     if (!r_is_objc_ptr(list)) list = gl_safe_msg(mgr, "currentRootIconListView", 0, 0, 0, 0);
     if (!r_is_objc_ptr(list)) list = gl_safe_msg(mgr, "currentIconListView", 0, 0, 0, 0);
-    return list;
-}
-
-static uint64_t gl_current_root_list_view_ios26_legacy(uint64_t ctrl)
-{
-    uint64_t list = 0;
-    if (gl_safe_msg(ctrl, "hasOpenFolder", 0, 0, 0, 0)) {
-        list = gl_safe_msg(ctrl, "currentFolderIconList", 0, 0, 0, 0);
-    }
-    if (!r_is_objc_ptr(list)) list = gl_safe_msg(ctrl, "currentRootIconList", 0, 0, 0, 0);
-    if (!r_is_objc_ptr(list)) list = gl_safe_msg(ctrl, "currentRootIconListView", 0, 0, 0, 0);
-    if (!r_is_objc_ptr(list)) list = gl_safe_msg(ctrl, "currentIconListView", 0, 0, 0, 0);
     return list;
 }
 
@@ -1047,7 +1122,7 @@ static bool gl_build_group_ios26_per_icon(uint64_t groups,
     uint32_t oldSettle = r_settle_us(0);
     for (int i = 0; i < iconCount; i++) {
         uint64_t icon = iconViews[i];
-        if (!r_is_objc_ptr(icon) || gl_view_is_hidden(icon)) continue;
+        if (!r_is_objc_ptr(icon)) continue;
 
         uint64_t parent = gl_safe_msg(icon, "superview", 0, 0, 0, 0);
         GL_CGRect originalFrame;
@@ -1066,6 +1141,10 @@ static bool gl_build_group_ios26_per_icon(uint64_t groups,
         if (!r_is_objc_ptr(frameValue)) continue;
 
         gl_reset_transform(icon);
+        // Offscreen SpringBoard pages may temporarily mark their icon views
+        // hidden. Once the icon is owned by this page's overlay it must be
+        // visible when that page scrolls onscreen.
+        gl_set_bool(icon, "setHidden:", false);
         gl_set_bool(icon, "setUserInteractionEnabled:", true);
         gl_array_add(liveItems, icon);
         gl_array_add(liveParents, parent);
@@ -1111,11 +1190,11 @@ static bool gl_build_group_ios26_per_icon(uint64_t groups,
 
     uint64_t itemBehavior = gl_alloc_init_with_items("UIDynamicItemBehavior", icons);
     if (r_is_objc_ptr(itemBehavior)) {
-        gl_set_double(itemBehavior, "setElasticity:", 0.3);
-        gl_set_double(itemBehavior, "setFriction:", 0.2);
+        gl_set_double(itemBehavior, "setElasticity:", config.bounce);
+        gl_set_double(itemBehavior, "setFriction:", config.friction);
         gl_set_double(itemBehavior, "setDensity:", 1.0);
-        gl_set_double(itemBehavior, "setResistance:", 0.0);
-        gl_set_double(itemBehavior, "setAngularResistance:", 0.0);
+        gl_set_double(itemBehavior, "setResistance:", config.resistance);
+        gl_set_double(itemBehavior, "setAngularResistance:", config.angularResistance);
         gl_set_bool(itemBehavior, "setAllowsRotation:", config.allowsRotation);
         r_msg2_main(animator, "addBehavior:", itemBehavior, 0, 0, 0);
         gl_release(itemBehavior);
@@ -1124,10 +1203,10 @@ static bool gl_build_group_ios26_per_icon(uint64_t groups,
     uint64_t gravity = gl_alloc_init_with_items("UIGravityBehavior", icons);
     if (r_is_objc_ptr(gravity)) {
         gl_set_double(gravity, "setAngle:", M_PI_2);
-        gl_set_double(gravity, "setMagnitude:", 3.0);
+        gl_set_double(gravity, "setMagnitude:", config.magnitude);
         r_msg2_main(animator, "addBehavior:", gravity, 0, 0, 0);
         int n = __atomic_load_n(&s_gravity_ptr_count, __ATOMIC_RELAXED);
-        if (n < 8) {
+        if (n < 64) {
             s_gravity_ptrs[n] = gravity;
             __atomic_store_n(&s_gravity_ptr_count, n + 1, __ATOMIC_SEQ_CST);
         }
@@ -1167,6 +1246,15 @@ static bool gl_build_group_ios26_per_icon(uint64_t groups,
            overlayFrame.w, overlayFrame.h,
            isRunning ? "running" : "starting",
            behaviorCount);
+    log_user("[GRAVITY][GROUP] type=%s list=0x%llx overlay=0x%llx iconsDiscovered=%d iconsCaptured=%d bounds=%.0fx%.0f animator=%s behaviors=%llu magnitude=%.2f bounce=%.2f friction=%.2f resistance=%.2f angularResistance=%.2f rotation=%d.\n",
+             isDock ? "dock" : "home-page",
+             listView, overlay, iconCount, added,
+             overlayFrame.w, overlayFrame.h,
+             isRunning ? "running" : "starting",
+             behaviorCount,
+             config.magnitude, config.bounce, config.friction,
+             config.resistance, config.angularResistance,
+             config.allowsRotation);
 
     gl_release(animator);
     gl_release(overlay);
@@ -1337,7 +1425,7 @@ static bool gl_build_group(uint64_t groups,
         gl_set_double(gravity, "setMagnitude:", config.magnitude);
         r_msg2_main(animator, "addBehavior:", gravity, 0, 0, 0);
         int n = __atomic_load_n(&s_gravity_ptr_count, __ATOMIC_RELAXED);
-        if (n < 8) {
+        if (n < 64) {
             s_gravity_ptrs[n] = gravity;
             __atomic_store_n(&s_gravity_ptr_count, n + 1, __ATOMIC_SEQ_CST);
         }
@@ -1421,6 +1509,7 @@ bool gravitylite_stop_in_session(void)
         uint64_t sources   = gl_dict_get(group, "sources");
         uint64_t listView  = gl_dict_get(group, "listView");
         uint64_t overlay   = gl_dict_get(group, "overlay");
+        uint64_t liveCount = gl_array_count(liveItems);
 
         if (r_is_objc_ptr(animator)) {
             r_msg2_main(animator, "removeAllBehaviors", 0, 0, 0, 0);
@@ -1447,6 +1536,9 @@ bool gravitylite_stop_in_session(void)
         if (r_is_objc_ptr(overlay)) {
             r_msg2_main(overlay, "removeFromSuperview", 0, 0, 0, 0);
         }
+        log_user("[GRAVITY][RESTORE] group=%llu/%llu list=0x%llx liveIcons=%llu resetItems=%llu animatorCleared=%d overlayRemoved=%d.\n",
+                 i + 1, count, listView, liveCount, n,
+                 r_is_objc_ptr(animator), r_is_objc_ptr(overlay));
     }
     gl_set_state(ctrl, 0);
     int orphans = gl_cleanup_gravity_overlays_in_app_windows();
@@ -1454,6 +1546,8 @@ bool gravitylite_stop_in_session(void)
         printf("[GRAVITY] Cleaned up %d orphaned overlay(s) and restored %d icons.\n", orphans, restoredIcons);
     else
         printf("[GRAVITY] Restored %d icons to the home screen.\n", restoredIcons);
+    log_user("[GRAVITY][RESTORE] completed groups=%llu restoredIcons=%d orphanOverlays=%d stateCleared=1.\n",
+             count, restoredIcons, orphans);
     return true;
 }
 
@@ -1466,6 +1560,11 @@ bool gravitylite_apply_in_session(GravityLiteConfig config)
     if (config.friction > 1.0) config.friction = 1.0;
     if (config.resistance < 0.0) config.resistance = 0.0;
     if (config.explosionForce <= 0.0) config.explosionForce = 1.0;
+
+    log_user("[GRAVITY][CONFIG] pageIsolation=1 liveIcons=1 magnitude=%.2f bounce=%.2f friction=%.2f resistance=%.2f angularResistance=%.2f rotation=%d includeDock=%d explosionForce=%.2f.\n",
+             config.magnitude, config.bounce, config.friction,
+             config.resistance, config.angularResistance,
+             config.allowsRotation, config.includeDock, config.explosionForce);
 
     uint64_t ctrl = gl_icon_controller();
     if (!r_is_objc_ptr(ctrl)) {
@@ -1515,60 +1614,40 @@ bool gravitylite_apply_in_session(GravityLiteConfig config)
         }
 
         enum { LV_CAP = 64 };
-        uint64_t processed[LV_CAP] = {0};
-        int processedCount = 0;
         uint64_t dockListView = gl_dock_list_view(ctrl, mgr);
-
-        uint64_t currentListView = gl_current_root_list_view_ios26_legacy(ctrl);
-        if (r_is_objc_ptr(currentListView) &&
-            r_msg2(currentListView, "isKindOfClass:", listViewCls, 0, 0, 0)) {
-            printf("[GRAVITY] Capturing current home screen page...\n");
-            if (gl_build_group(groups, currentListView, iconViewCls, config, false, true)) {
-                if (processedCount < LV_CAP) processed[processedCount++] = currentListView;
-                built++;
-                homeBuilt = true;
-            } else {
-                printf("[GRAVITY] Current page was not ready; checking visible pages...\n");
-            }
-        }
-
         uint64_t listViews[LV_CAP] = {0};
-        int count = sb_collect_views_in_windows(listViewCls, listViews, LV_CAP);
-        if (count <= 0) {
-            uint64_t rootFC = gl_safe_msg(mgr, "rootFolderController", 0, 0, 0, 0);
-            if (!r_is_objc_ptr(rootFC)) rootFC = gl_safe_msg(mgr, "_rootFolderController", 0, 0, 0, 0);
-            uint64_t rootView = gl_safe_msg(rootFC, "rootFolderView", 0, 0, 0, 0);
-            if (r_is_objc_ptr(rootView)) {
-                count = sb_collect_views(rootView, listViewCls, listViews, LV_CAP);
-            }
-        }
+        int count = gl_collect_home_page_list_views(ctrl, mgr, iconViewCls,
+                                                    listViews, LV_CAP);
 
         for (int i = 0; i < count; i++) {
             uint64_t listView = listViews[i];
             if (!r_is_objc_ptr(listView)) continue;
-            if (gl_ptr_seen(listView, processed, processedCount)) continue;
-
-            bool isDock = (dockListView && listView == dockListView);
-            if (isDock) continue;
-            if (processedCount < LV_CAP) processed[processedCount++] = listView;
-
-            printf("[GRAVITY] Capturing discovered home screen page %d/%d...\n",
+            printf("[GRAVITY] Capturing owned home screen page %d/%d...\n",
                    i + 1, count);
+            log_user("[GRAVITY][PAGE %d/%d] list=0x%llx capture=starting ownership=isolated.\n",
+                     i + 1, count, listView);
             if (gl_build_group(groups, listView, iconViewCls, config, false, true)) {
                 built++;
                 homeBuilt = true;
+                log_user("[GRAVITY][PAGE %d/%d] list=0x%llx overlay=page-child animator=page-local collisionBounds=page-local savedParents=1 savedFrames=1 result=active.\n",
+                         i + 1, count, listView);
+            } else {
+                log_user("[GRAVITY][PAGE %d/%d][WARN] list=0x%llx result=capture-failed; page left untouched and visible.\n",
+                         i + 1, count, listView);
             }
         }
 
-        if (r_is_objc_ptr(dockListView) && config.includeDock &&
-            !gl_ptr_seen(dockListView, processed, processedCount)) {
-            if (processedCount < LV_CAP) processed[processedCount++] = dockListView;
+        if (r_is_objc_ptr(dockListView) && config.includeDock) {
             printf("[GRAVITY] Capturing dock icons...\n");
             if (gl_build_group(groups, dockListView, iconViewCls, config, true, true)) {
                 built++;
                 dockBuilt = true;
+                log_user("[GRAVITY][DOCK] list=0x%llx ownership=isolated animator=dock-local collisionBounds=dock-local result=active.\n",
+                         dockListView);
             } else {
                 printf("[GRAVITY] Dock icons were not ready.\n");
+                log_user("[GRAVITY][DOCK][WARN] list=0x%llx result=capture-failed; dock left untouched and visible.\n",
+                         dockListView);
             }
         }
 
@@ -1585,6 +1664,9 @@ bool gravitylite_apply_in_session(GravityLiteConfig config)
         gl_set_state(ctrl, state);
         printf("[GRAVITY] Physics started — groups=%d home=%d dock=%d visiblePages=%d\n",
                built, homeBuilt, dockBuilt, count);
+        log_user("[GRAVITY][APPLY] completed discoveredPages=%d activeGroups=%d homeActive=%d dockRequested=%d dockActive=%d gravityBehaviors=%d pageIsolation=1 result=success.\n",
+                 count, built, homeBuilt, config.includeDock, dockBuilt,
+                 __atomic_load_n(&s_gravity_ptr_count, __ATOMIC_SEQ_CST));
         printf("[WARN] TO STOP GRAVITY: USE APP SWITCHER TO RETURN TO CYANIDE AND DEACTIVATE.\n");
 
         gl_release(groups);
@@ -1695,6 +1777,8 @@ bool gravitylite_explosion_in_session(double force)
 
     if (pulses > 0)
         printf("[GRAVITY] Shake pulse applied to %d group(s).\n", pulses);
+    log_user("[GRAVITY][EXPLOSION] force=%.2f activeGroups=%llu pulsesApplied=%d result=%s.\n",
+             force, count, pulses, pulses > 0 ? "success" : "no-active-groups");
     return pulses > 0;
 }
 
@@ -1710,6 +1794,8 @@ bool gravitylite_update_gravity_angle_in_session(double angle, double magnitude)
         gl_set_double(gb, "setMagnitude:", magnitude);
     }
     r_settle_us(oldSettle);
+    log_user("[GRAVITY][STEERING] angle=%.4f magnitude=%.2f pageGravityBehaviors=%d result=updated.\n",
+             angle, magnitude, count);
     return true;
 }
 

@@ -108,6 +108,38 @@ static bool ds_set_trailing_controller(uint64_t obj, uint64_t value, const char 
     return ok;
 }
 
+static bool ds_set_leading_controllers(uint64_t obj, uint64_t value, const char *tag)
+{
+    if (!r_is_objc_ptr(obj)) return false;
+    const char *setters[] = { "setLeadingCustomViewControllers:", "_setLeadingCustomViewControllers:" };
+    for (size_t i = 0; i < sizeof(setters) / sizeof(setters[0]); i++) {
+        if (!r_responds(obj, setters[i])) continue;
+        r_msg2_main(obj, setters[i], value, 0, 0, 0);
+        printf("[DST:TODAY] %s via %s\n", tag, setters[i]);
+        usleep(kDSTSettleUS);
+        return true;
+    }
+    uint64_t cls = ds_object_class(obj);
+    return ds_poke_pointer_ivar(obj, cls, "_leadingCustomViewControllers", value);
+}
+
+static bool ds_set_leading_controller(uint64_t obj, uint64_t value, const char *tag)
+{
+    if (!r_is_objc_ptr(obj)) return false;
+    const char *setters[] = { "setLeadingCustomViewController:", "_setLeadingCustomViewController:" };
+    for (size_t i = 0; i < sizeof(setters) / sizeof(setters[0]); i++) {
+        if (!r_responds(obj, setters[i])) continue;
+        r_msg2_main(obj, setters[i], value, 0, 0, 0);
+        printf("[DST:TODAY] %s via %s\n", tag, setters[i]);
+        usleep(kDSTSettleUS);
+        return true;
+    }
+    uint64_t cls = ds_object_class(obj);
+    bool ok = ds_poke_pointer_ivar(obj, cls, "_leadingCustomViewController", value);
+    if (ok) printf("[DST:TODAY] %s via _leadingCustomViewController\n", tag);
+    return ok;
+}
+
 static bool ds_clear_overlay_library_controller(uint64_t mgr)
 {
     if (!r_is_objc_ptr(mgr)) return false;
@@ -244,6 +276,51 @@ bool darksword_tweak_disable_app_library_in_session(void)
     if (ok) ds_refresh_root_folder_after_app_library_change(rootFC, rootView);
 
     printf("[DST:APPLIB] result=%d\n", ok);
+    return ok;
+}
+
+bool darksword_tweak_disable_today_view_in_session(void)
+{
+    printf("[DST:TODAY] disabling Today View leading page\n");
+    uint64_t clsIC = r_class("SBIconController");
+    uint64_t ctrl = r_is_objc_ptr(clsIC) ? r_msg2(clsIC, "sharedInstance", 0, 0, 0, 0) : 0;
+    uint64_t mgr = ds_try_msg0(ctrl, "iconManager");
+    uint64_t rootFC = ds_try_msg0(mgr, "rootFolderController");
+    uint64_t rootView = ds_try_msg0(rootFC, "rootFolderView");
+    if (!r_is_objc_ptr(rootFC)) {
+        printf("[DST:TODAY] rootFolderController nil\n");
+        return false;
+    }
+
+    bool ok = false;
+    if (ds_ios_major_version() == 17) {
+        printf("[DST:TODAY] using iOS 17 singular leading-controller path\n");
+        ok |= ds_set_leading_controller(mgr, 0, "iconManager");
+        ok |= ds_set_leading_controller(rootFC, 0, "rootFolderController");
+        uint64_t config = ds_try_msg0(rootFC, "configuration");
+        if (r_is_objc_ptr(config)) ok |= ds_set_leading_controller(config, 0, "rootFolderControllerConfiguration");
+        if (r_is_objc_ptr(rootView)) ok |= ds_set_leading_controller(rootView, 0, "rootFolderView");
+    }
+
+    if (!ok) {
+        uint64_t NSArray = r_class("NSArray");
+        uint64_t emptyArr = r_is_objc_ptr(NSArray) ? r_msg2(NSArray, "new", 0, 0, 0, 0) : 0;
+        if (!r_is_objc_ptr(emptyArr)) emptyArr = r_is_objc_ptr(NSArray) ? r_msg2(NSArray, "array", 0, 0, 0, 0) : 0;
+        if (!r_is_objc_ptr(emptyArr)) {
+            printf("[DST:TODAY] empty NSArray failed\n");
+            return false;
+        }
+        ok |= ds_set_leading_controllers(rootFC, emptyArr, "rootFolderController");
+        if (r_is_objc_ptr(rootView)) ok |= ds_set_leading_controllers(rootView, emptyArr, "rootFolderView");
+        if (!ok) {
+            printf("[DST:TODAY] plural path failed; trying singular fallback\n");
+            ok |= ds_set_leading_controller(mgr, 0, "iconManager");
+            ok |= ds_set_leading_controller(rootFC, 0, "rootFolderController");
+            if (r_is_objc_ptr(rootView)) ok |= ds_set_leading_controller(rootView, 0, "rootFolderView");
+        }
+    }
+    if (ok) ds_refresh_root_folder_after_app_library_change(rootFC, rootView);
+    printf("[DST:TODAY] result=%d restore=respring\n", ok);
     return ok;
 }
 

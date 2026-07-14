@@ -102,6 +102,8 @@ extern NSString * const kSettingsRoundedIconsEnabled;
 extern NSString * const kSettingsWatchLayoutEnabled;
 extern NSString * const kSettingsLockCustomizerEnabled;
 extern NSString * const kSettingsFreePlacementEnabled;
+extern NSString * const kSettingsCopypastaLiteEnabled;
+extern NSString * const kSettingsAppLibraryStudioEnabled;
 extern NSString * const kSettingsBlurryBadgesEnabled;
 extern NSString * const kSettingsSnapperEnabled;
 extern NSString * const kSettingsPullOverEnabled;

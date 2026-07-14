@@ -202,6 +202,11 @@ static BOOL PackageRepoScriptRequiresNativeBridge(NSString *rawScript)
         quickloader_is_driven_by_repo_tweak()) {
         return NO;
     }
+    if ([self.enabledKey isEqualToString:kSettingsCopypastaLiteEnabled]) {
+        // Copypasta Lite is an in-app UIPasteboard shelf; enabling it requires
+        // no SpringBoard/kernel apply pass.
+        return NO;
+    }
     if (self.isInstallDisabled) return NO;
     NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
     return [d boolForKey:self.enabledKey] && !settings_tweak_is_applied(self.enabledKey);

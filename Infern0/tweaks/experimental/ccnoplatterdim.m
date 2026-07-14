@@ -37,8 +37,8 @@ static void ccnoplatterdim_scan(uint64_t parent, double alpha, int depth, int *h
     if (!r_is_objc_ptr(parent) || depth > 12) return;
     char cls[160] = {0};
     ccnoplatterdim_class_name(parent, cls, sizeof(cls));
-    bool dimTarget = strstr(cls, "Platter") || strstr(cls, "Backdrop") ||
-                     strstr(cls, "Dimming") || strstr(cls, "Overlay");
+    bool dimTarget = strstr(cls, "Dimming") || strstr(cls, "PlatterOverlay") ||
+                     strstr(cls, "ExpandedPlatterTransition");
     if (dimTarget) {
         r_msg2_main_raw(parent, "setAlpha:", &alpha, sizeof(alpha), NULL, 0, NULL, 0, NULL, 0);
         if (hits) (*hits)++;
@@ -53,7 +53,7 @@ static void ccnoplatterdim_scan(uint64_t parent, double alpha, int depth, int *h
 bool ccnoplatterdim_apply_in_session(void)
 {
     printf("[CCNOPLATTERDIM] apply\n");
-    uint64_t win = sb_frontmost_window();
+    uint64_t win = sb_control_center_window();
     if (!r_is_objc_ptr(win)) return false;
     int hits = 0;
     ccnoplatterdim_scan(win, (double)gCCNoPlatterDimVisibleAlphaPercent / 100.0, 0, &hits);
@@ -64,7 +64,7 @@ bool ccnoplatterdim_apply_in_session(void)
 bool ccnoplatterdim_stop_in_session(void)
 {
     printf("[CCNOPLATTERDIM] stop\n");
-    uint64_t win = sb_frontmost_window();
+    uint64_t win = sb_control_center_window();
     int hits = 0;
     if (r_is_objc_ptr(win)) ccnoplatterdim_scan(win, 1.0, 0, &hits);
     gCCNoPlatterDimApplied = false;

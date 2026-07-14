@@ -53,28 +53,88 @@ set intentionally modifies persistent files and is clearly marked in the app.
 
 | Area | Highlights |
 | --- | --- |
-| **Home Screen** | SBCustomizer with Atria Lite controls, Gravity Lite, Cylinder Lite, Rounded Icons, Watch Layout, Free Placement Lite, Badge Studio, themes, and layout controls |
-| **Lock Screen** | Lock Screen Customizer for clock placement, scale, opacity, quick actions, and page dots |
+| **Home Screen** | SBCustomizer with an iPad-style Dock and App Library access, Gravity Lite, Cylinder Lite, Rounded Icons, Watch Layout, App Library Studio, labels, badges, and layout controls |
 | **Status Bar** | StatBar, NSBar, NiceBar Lite, Signal Readouts, carrier text, and live system information |
-| **Control Center** | Layout, spacing, appearance, status, haptics, and security experiments |
-| **Theming** | Cyanide Themer, SnowBoard Lite imports, icon styles, and LiveWP |
+| **Control Center** | Magma Evo Lite colors, BetterCCXI / Prysm Lite scale and depth, spacing, status, haptics, and security experiments |
+| **Theming** | Cyanide Themer, SnowBoard Lite imports, icon styles, LiveWP video, and Mood Wallpaper image sets |
 | **System tools** | Powercuff, OTA controls, Watch pairing overrides, location simulation, IPA tools, and carefully labeled persistent changes |
 | **Extensibility** | QuickLoader for local JavaScript tweaks and source repositories for installable community tweaks |
 
-### New Home Screen work
+### Recent tweak work
 
+- **Organized Settings** now groups packages by Home Screen, Lock Screen and
+  Notifications, Control Center, Status Bar, Multitasking, Themes, Utilities,
+  and System instead of presenting one long tweak list.
 - **Rounded Icons** applies smooth, configurable corners to every discovered
   Home Screen icon without requiring a theme.
-- **Watch Layout** creates a compact Apple Watch-style grid with circular,
-  pressable icons and reversible layout changes.
+- **Watch Layout** creates an actual Apple Watch-style beehive: circular,
+  pressable icons arranged with hex-ratio vertical spacing and alternating
+  half-slot row offsets on every Home Screen page. Dock and App Library icons
+  remain untouched, and all stock frames are restored on uninstall. It is
+  mutually exclusive with Free Placement so the two modes cannot corrupt each
+  other's saved frames.
 - **Free Placement Lite** adds configurable staggered icon offsets while keeping
   every live icon pressable and restoring saved stock frames on uninstall.
+- **App Library Studio** adds independent App Library icon size and horizontal/
+  vertical spacing controls, optional label hiding, and a Disable Today View
+  switch. It changes live icon views so apps stay pressable and removes Today
+  View at SpringBoard's leading-page controller instead of leaving a blank page.
 - **Badge Studio** combines BlurryBadges tinting with notification-count-based
   Growing Badges+ scaling.
 - **Lock Screen Customizer** moves and scales the live clock and can hide quick
-  actions or page dots, with stock-state cleanup and detailed activity logs.
-- **Gravity Lite** runs physics on live icon views across discovered pages so
-  icons remain interactive.
+  actions or page dots. Metal Lock Light adds configurable ice, violet, or gold
+  edge lighting, with stock-state cleanup and detailed activity logs.
+- **MilkyWay Lite / Dynamic Stage** hosts one or two resizable floating app
+  windows and can explicitly include Safari, Photos, and Camera in its picker.
+- **Mood Wallpaper** crossfades and gently tilts through up to eight selected
+  images on the Home Screen or Lock Screen session layer.
+- **IPA Decryptor (Beta)** probes FairPlay metadata and exports only executables
+  verified as already unencrypted. Encrypted targets stop safely until proper
+  in-memory dumping is available; the tool never labels copied encrypted bytes
+  as a successful decryption.
+- **Copypasta Lite** stores editable snippets, captures the current text
+  clipboard into any slot, and writes snippets back to the system pasteboard
+  for normal Paste in any app, without keyboard-host injection.
+- **Velvet + TinyBanners** adds banner colors, borders, corners, compact size,
+  opacity, live refresh, and geometry cleanup. **Edge / Notchification Lite**
+  adds a configurable full-screen or top-only notification glow without
+  intercepting touches.
+- **Kumquat Lite** is included in Lock Screen Customizer as compact live media
+  controls with optional artwork hiding.
+
+### Earlier port-list coverage
+
+- Atria Lite → SBCustomizer and Home Layout Extras controls.
+- Growing Badges+ → Badge Studio.
+- [Griddy](https://github.com/miki-fp/griddy) → Free Placement Lite provides
+  the safe global-offset foundation. Griddy's per-icon drag/drop and
+  orientation-specific persistence still require direct SpringBoard callbacks.
+- [Kayoko](https://github.com/camieeh/Kayoko) → Copypasta Lite now supports
+  capture, editable slots, and normal system Paste. Background clipboard
+  history and a keyboard-host panel remain deferred.
+- Dress-style Lock Screen controls → Lock Screen Customizer covers live clock
+  placement, opacity, quick actions, page dots, and cleanup. Text replacement
+  and Face ID lock controls need more verified iOS 17+ class coverage.
+- [Kumquat](https://github.com/Galactic-Dev/Kumquat) → Kumquat Lite provides
+  media-container scaling and optional artwork hiding inside Lock Screen
+  Customizer.
+- [Eneko](https://github.com/camieeh/Eneko) → LiveWP provides session-only
+  video layers for Home and Lock Screen windows. Mood Wallpaper extends the
+  same cleanup path to up to eight crossfading, tilting images.
+- WeatherGround-style custom backgrounds → LiveWP provides the safe
+  selected-video foundation; automatic weather-linked scene switching is not
+  claimed yet.
+- Nugget-style device tools → the existing System Tools packages; infern0 does
+  not duplicate Nugget's separate pairing-file workflow.
+- Radial Folders and MobileGoose remain deferred because their long-press,
+  dragging, and continuous callback behavior cannot yet be installed safely by
+  the app-driven RemoteCall session.
+- NoCameraSound region bypass is not shipped: infern0 has no verified
+  session-only camera-process audio hook, and a persistent region-property edit
+  would be misleading and unsafe without device-specific restoration support.
+- **Gravity Lite** uses live, pressable icon views on its iOS 26 per-icon path. Each Home Screen page has its own overlay, animator, collision bounds, and restore state, so icons stay on their original page while swiping instead of merging or disappearing.
+  Older fallback paths still use non-interactive snapshots and are labeled as
+  such in the package's known issues.
 - **Cylinder Lite** applies perspective depth across the Home Screen while
   preserving normal icon taps.
 - **Barmoji** now presents real pressable emoji buttons with highlight and

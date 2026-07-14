@@ -37,7 +37,7 @@ static void modulespacing_scan(uint64_t parent, double radius, int depth, int *h
     if (!r_is_objc_ptr(parent) || depth > 12) return;
     char cls[160] = {0};
     modulespacing_class_name(parent, cls, sizeof(cls));
-    if (strstr(cls, "CCUIModule") || strstr(cls, "ControlCenter")) {
+    if (strstr(cls, "CCUIModuleContainer") || strstr(cls, "CCUIContentModuleContainer")) {
         uint64_t layer = r_msg2_main(parent, "layer", 0, 0, 0, 0);
         if (r_is_objc_ptr(layer)) {
             r_msg2_main_raw(layer, "setCornerRadius:", &radius, sizeof(radius), NULL, 0, NULL, 0, NULL, 0);
@@ -57,7 +57,7 @@ static void modulespacing_scan(uint64_t parent, double radius, int depth, int *h
 bool modulespacing_apply_in_session(void)
 {
     printf("[MODULESPACING] apply\n");
-    uint64_t win = sb_frontmost_window();
+    uint64_t win = sb_control_center_window();
     if (!r_is_objc_ptr(win)) return false;
     int hits = 0;
     modulespacing_scan(win, (double)gModuleSpacingCornerRadius, 0, &hits);
@@ -68,7 +68,7 @@ bool modulespacing_apply_in_session(void)
 bool modulespacing_stop_in_session(void)
 {
     printf("[MODULESPACING] stop\n");
-    uint64_t win = sb_frontmost_window();
+    uint64_t win = sb_control_center_window();
     int hits = 0;
     if (r_is_objc_ptr(win)) modulespacing_scan(win, 18.0, 0, &hits);
     gModuleSpacingApplied = false;

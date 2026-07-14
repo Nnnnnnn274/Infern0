@@ -139,6 +139,23 @@ typedef struct {
 
 #define kStripMaxFloatSlots 2
 static StripFloatSlot gStripFloatSlots[kStripMaxFloatSlots] = {{0}};
+static int gStripConcurrentWindowLimit = 2;
+static bool gStripIncludeSystemApps = true;
+void stagestrip_invalidate_picker_cache(void);
+
+void stagestrip_configure(int concurrentWindows, bool includeSystemApps)
+{
+    if (concurrentWindows < 1) concurrentWindows = 1;
+    if (concurrentWindows > kStripMaxFloatSlots) concurrentWindows = kStripMaxFloatSlots;
+    bool systemAppModeChanged = gStripIncludeSystemApps != includeSystemApps;
+    gStripConcurrentWindowLimit = concurrentWindows;
+    gStripIncludeSystemApps = includeSystemApps;
+    if (systemAppModeChanged) stagestrip_invalidate_picker_cache();
+    printf("[STAGE][CONFIG] concurrentWindows=%d includeSystemApps=%d cacheInvalidated=%d\n",
+           gStripConcurrentWindowLimit, gStripIncludeSystemApps, systemAppModeChanged);
+    log_user("[MILKYWAY][CONFIG] concurrentWindows=%d includeSystemApps=%d cacheInvalidated=%d.\n",
+             gStripConcurrentWindowLimit, gStripIncludeSystemApps, systemAppModeChanged);
+}
 
 #define gStripFloatWindow    (gStripFloatSlots[0].window)
 #define gStripFloatHostView  (gStripFloatSlots[0].hostView)
@@ -4429,6 +4446,26 @@ static int stagestrip_collect_all_installed_apps(char bidOut[][128],
            respBundleId, respLocalizedName, respLocalizedShortName);
 
     int written = 0;
+    if (gStripIncludeSystemApps) {
+        static const char *systemBids[] = {
+            "com.apple.mobilesafari", "com.apple.mobileslideshow", "com.apple.camera"
+        };
+        static const char *systemNames[] = { "Safari", "Photos", "Camera" };
+        for (int i = 0; i < 3 && (start + written) < maxOut; i++) {
+            bool dup = false;
+            for (int k = 0; k < start + written; k++) {
+                if (strcmp(bidOut[k], systemBids[i]) == 0) { dup = true; break; }
+            }
+            if (dup) continue;
+            strncpy(bidOut[start + written], systemBids[i], 127);
+            bidOut[start + written][127] = '\0';
+            strncpy(nameOut[start + written], systemNames[i], 95);
+            nameOut[start + written][95] = '\0';
+            written++;
+            printf("[STAGE][SYSTEM] whitelisted %s (%s)\n", systemNames[i], systemBids[i]);
+            log_user("[MILKYWAY][SYSTEM] picker includes %s (%s).\n", systemNames[i], systemBids[i]);
+        }
+    }
     int taggedOut = 0;
     int prohibitedOut = 0;
     int typeFilteredOut = 0;
@@ -5743,12 +5780,15 @@ static bool stagestrip_host_stage_picks(StripScenePick *picks,
         stagestrip_dismiss_floating_host();
         return false;
     }
-    if (pickedCount > 2) pickedCount = 2;
+    if (pickedCount > gStripConcurrentWindowLimit) pickedCount = gStripConcurrentWindowLimit;
 
     for (int i = 0; i < pickedCount; i++) {
         printf("[STAGE] %s: hosting[%d] handle=0x%llx scene=0x%llx bid=%s\n",
                source ? source : "stack",
                i, picks[i].handle, picks[i].scene, picks[i].bid);
+        log_user("[MILKYWAY][HOST] source=%s slot=%d/%d bundle=%s handle=0x%llx scene=0x%llx preparation=starting.\n",
+                 source ? source : "stack", i + 1, pickedCount, picks[i].bid,
+                 picks[i].handle, picks[i].scene);
 
         // "Already prepared" early-out: if a prior apply for this scene
         // already left a valid -[keepalive timer] associated, the foreground
@@ -5837,16 +5877,21 @@ static bool stagestrip_host_stage_picks(StripScenePick *picks,
         }
     }
     if (presented == 0) {
+        log_user("[MILKYWAY][HOST][WARN] source=%s requested=%d presented=0 result=no-compatible-scene-view.\n",
+                 source ? source : "stack", pickedCount);
         stagestrip_dismiss_floating_host();
         return false;
     }
+    log_user("[MILKYWAY][HOST] source=%s requested=%d presented=%d windowLimit=%d result=active.\n",
+             source ? source : "stack", pickedCount, presented, gStripConcurrentWindowLimit);
     return true;
 }
 
 static bool stagestrip_rebuild_selected_bids(const char *topBid, const char *bottomBid)
 {
-    if (!topBid || !*topBid || !bottomBid || !*bottomBid) return false;
-    if (strcmp(topBid, bottomBid) == 0) {
+    if (!topBid || !*topBid) return false;
+    if (gStripConcurrentWindowLimit > 1 && (!bottomBid || !*bottomBid)) return false;
+    if (gStripConcurrentWindowLimit > 1 && strcmp(topBid, bottomBid) == 0) {
         printf("[STAGE] picker: ignoring duplicate selection %s\n", topBid);
         return false;
     }
@@ -5855,16 +5900,18 @@ static bool stagestrip_rebuild_selected_bids(const char *topBid, const char *bot
     memset(picks, 0, sizeof(picks));
     if (!stagestrip_get_pick_for_bid(topBid, &picks[0])) {
         printf("[STAGE] picker: top selection unavailable bid=%s\n", topBid);
+        log_user("[MILKYWAY][PICKER][WARN] top bundle=%s result=scene-unavailable.\n", topBid);
         return false;
     }
-    if (!stagestrip_get_pick_for_bid(bottomBid, &picks[1])) {
+    if (gStripConcurrentWindowLimit > 1 && !stagestrip_get_pick_for_bid(bottomBid, &picks[1])) {
         printf("[STAGE] picker: bottom selection unavailable bid=%s\n", bottomBid);
+        log_user("[MILKYWAY][PICKER][WARN] bottom bundle=%s result=scene-unavailable.\n", bottomBid);
         return false;
     }
 
     stagestrip_clear_live_rendering_state();
     StripSize stageSize = stagestrip_stage_size_for_request(4);
-    return stagestrip_host_stage_picks(picks, 2, stageSize, "picker");
+    return stagestrip_host_stage_picks(picks, gStripConcurrentWindowLimit, stageSize, "picker");
 }
 
 // Multitasking-only probe (sidebar UI disabled). Tries first to pull a
@@ -6113,8 +6160,9 @@ static bool stagestrip_read_picker_label(uint64_t label, char *out, size_t outLe
 
 static bool stagestrip_apply_picker_selection(const char *top, const char *bottom)
 {
-    if (!top || !*top || !bottom || !*bottom) return false;
-    if (strcmp(top, bottom) == 0) {
+    if (!top || !*top) return false;
+    if (gStripConcurrentWindowLimit > 1 && (!bottom || !*bottom)) return false;
+    if (gStripConcurrentWindowLimit > 1 && strcmp(top, bottom) == 0) {
         printf("[STAGE] picker: duplicate selection %s, skipping\n", top);
         return false;
     }
@@ -6130,7 +6178,7 @@ static bool stagestrip_apply_picker_selection(const char *top, const char *botto
 
     strncpy(gStripPickerTopBid, top, sizeof(gStripPickerTopBid) - 1);
     gStripPickerTopBid[sizeof(gStripPickerTopBid) - 1] = '\0';
-    strncpy(gStripPickerBottomBid, bottom, sizeof(gStripPickerBottomBid) - 1);
+    strncpy(gStripPickerBottomBid, bottom ?: "", sizeof(gStripPickerBottomBid) - 1);
     gStripPickerBottomBid[sizeof(gStripPickerBottomBid) - 1] = '\0';
 
     printf("[STAGE] picker: apply top=%s bottom=%s\n", top, bottom);
@@ -6189,8 +6237,9 @@ static int stagestrip_poll_picker_command(void)
 
     switch (cmd) {
         case kStripPickerCmdApply: {
-            if (!top[0] || !bottom[0]) {
-                printf("[STAGE] picker: apply needs both top + bottom (have top=%s bottom=%s)\n",
+            if (!top[0] || (gStripConcurrentWindowLimit > 1 && !bottom[0])) {
+                printf("[STAGE] picker: apply needs %d selection(s) (have top=%s bottom=%s)\n",
+                       gStripConcurrentWindowLimit,
                        top[0] ? top : "—", bottom[0] ? bottom : "—");
             } else {
                 stagestrip_apply_picker_selection(top, bottom);
@@ -6411,7 +6460,8 @@ static int stagestrip_poll_picker_command(void)
             char botAfter[128] = {0};
             strncpy(slot == 0 ? topAfter : botAfter, pendingBid, 127);
             strncpy(slot == 1 ? topAfter : botAfter, slot == 0 ? bottom : top, 127);
-            if (topAfter[0] && botAfter[0] && strcmp(topAfter, botAfter) != 0) {
+            if (topAfter[0] && (gStripConcurrentWindowLimit == 1 ||
+                (botAfter[0] && strcmp(topAfter, botAfter) != 0))) {
                 if (strcmp(topAfter, gStripPickerTopBid) != 0 ||
                     strcmp(botAfter, gStripPickerBottomBid) != 0) {
                     printf("[STAGE] picker: auto-apply top=%s bottom=%s\n", topAfter, botAfter);
@@ -6817,6 +6867,8 @@ bool stagestrip_stop_in_session(void)
     gStripWindow = 0;
     gStripContainer = 0;
     printf("[STAGE] stop: overlay torn down\n");
+    log_user("[MILKYWAY][STOP] controlLoopStopped=1 liveRenderingCleared=1 pickerOverlayRemoved=%d floatingWindowsDismissed=1 result=stock.\n",
+             r_is_objc_ptr(win));
     return true;
 }
 
@@ -6857,6 +6909,7 @@ void stagestrip_forget_remote_state(void)
     gHostViewHasNeedsLayout    = -1;
     gHostViewHasLayoutIfNeeded = -1;
     printf("[STAGE] forgot remote state\n");
+    log_user("[MILKYWAY][FORGET] cleared picker, scene, floating-window, gesture, and control-loop remote references.\n");
 }
 
 bool stagestrip_apply_in_session(int maxSlots)
@@ -6874,6 +6927,9 @@ bool stagestrip_apply_in_session(int maxSlots)
            ok ? 1 : 0,
            (unsigned long long)(stagestrip_now_ms() - startMS),
            oldSettleUS);
+    log_user("[MILKYWAY][APPLY] requestedSlots=%d configuredWindowLimit=%d includeSystemApps=%d result=%s elapsed=%llums.\n",
+             maxSlots, gStripConcurrentWindowLimit, gStripIncludeSystemApps,
+             ok ? "active" : "failed", (unsigned long long)(stagestrip_now_ms() - startMS));
     return ok;
 }
 

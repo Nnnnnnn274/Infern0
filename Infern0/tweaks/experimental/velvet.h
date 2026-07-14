@@ -17,6 +17,12 @@ typedef struct {
     VelvetRGBA dateColor;
     double    cornerRadius;
     bool      hasCornerRadius;
+    double    bannerScale;
+    double    bannerAlpha;
+    bool      edgeGlowEnabled;
+    bool      edgeGlowTopOnly;
+    VelvetRGBA edgeGlowColor;
+    double    edgeGlowThickness;
 } VelvetStyle;
 
 bool velvet_apply_in_session(void);

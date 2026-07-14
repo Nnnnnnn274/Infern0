@@ -39,11 +39,14 @@ static void fugap_scan(uint64_t parent, double offset, int depth, int *hits)
     if (!r_is_objc_ptr(parent) || depth > 10) return;
     char cls[160] = {0};
     fugap_class_name(parent, cls, sizeof(cls));
-    if (strstr(cls, "ControlCenter") && !strstr(cls, "Glyph") && !strstr(cls, "Button")) {
+    bool rootContainer = (strstr(cls, "ControlCenter") || strstr(cls, "CCUIModularControlCenter")) &&
+                         (strstr(cls, "Overlay") || strstr(cls, "Container") || strstr(cls, "ContentView")) &&
+                         !strstr(cls, "ModuleContainer") && !strstr(cls, "Glyph") && !strstr(cls, "Button");
+    if (rootContainer) {
         FUGapAffineTransform t = { 1, 0, 0, 1, 0, offset };
         r_msg2_main_raw(parent, "setTransform:", &t, sizeof(t), NULL, 0, NULL, 0, NULL, 0);
         if (hits) (*hits)++;
-        if (depth > 1) return;
+        return;
     }
     uint64_t subviews = r_msg2_main(parent, "subviews", 0, 0, 0, 0);
     if (!r_is_objc_ptr(subviews)) return;
@@ -57,7 +60,7 @@ static void fugap_scan(uint64_t parent, double offset, int depth, int *hits)
 bool fugap_apply_in_session(void)
 {
     printf("[FUGAP] apply\n");
-    uint64_t win = sb_frontmost_window();
+    uint64_t win = sb_control_center_window();
     if (!r_is_objc_ptr(win)) return false;
     int hits = 0;
     fugap_scan(win, (double)gFUGapYOffset, 0, &hits);
@@ -68,7 +71,7 @@ bool fugap_apply_in_session(void)
 bool fugap_stop_in_session(void)
 {
     printf("[FUGAP] stop\n");
-    uint64_t win = sb_frontmost_window();
+    uint64_t win = sb_control_center_window();
     int hits = 0;
     if (r_is_objc_ptr(win)) fugap_scan(win, 0.0, 0, &hits);
     gFUGapApplied = false;

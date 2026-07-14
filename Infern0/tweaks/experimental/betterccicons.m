@@ -37,8 +37,9 @@ static void betterccicons_scan(uint64_t parent, double radius, int depth, int *h
     if (!r_is_objc_ptr(parent) || depth > 12) return;
     char cls[160] = {0};
     betterccicons_class_name(parent, cls, sizeof(cls));
-    bool target = strstr(cls, "CCUIModule") || strstr(cls, "CCUIRound") ||
-                  strstr(cls, "ControlCenterButton") || strstr(cls, "GlyphPackage");
+    bool target = strstr(cls, "CCUIRound") || strstr(cls, "ControlCenterButton") ||
+                  strstr(cls, "GlyphPackage") || strstr(cls, "ButtonView") ||
+                  strstr(cls, "ToggleView");
     uint64_t layer = target ? r_msg2_main(parent, "layer", 0, 0, 0, 0) : 0;
     if (r_is_objc_ptr(layer)) {
         r_msg2_main_raw(layer, "setCornerRadius:", &radius, sizeof(radius), NULL, 0, NULL, 0, NULL, 0);
@@ -55,7 +56,7 @@ static void betterccicons_scan(uint64_t parent, double radius, int depth, int *h
 bool betterccicons_apply_in_session(void)
 {
     printf("[BETTERCCICONS] apply\n");
-    uint64_t win = sb_frontmost_window();
+    uint64_t win = sb_control_center_window();
     if (!r_is_objc_ptr(win)) return false;
     int hits = 0;
     betterccicons_scan(win, (double)gBetterCCIconsCornerRadius, 0, &hits);
@@ -66,7 +67,7 @@ bool betterccicons_apply_in_session(void)
 bool betterccicons_stop_in_session(void)
 {
     printf("[BETTERCCICONS] stop\n");
-    uint64_t win = sb_frontmost_window();
+    uint64_t win = sb_control_center_window();
     int hits = 0;
     if (r_is_objc_ptr(win)) betterccicons_scan(win, 12.0, 0, &hits);
     gBetterCCIconsApplied = false;

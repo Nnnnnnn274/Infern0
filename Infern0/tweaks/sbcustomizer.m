@@ -9,6 +9,10 @@
 #import <unistd.h>
 #import "../LogTextView.h"
 
+static bool gSBCIPadDockEnabled = false;
+static bool gSBCDockShowRecents = true;
+static bool gSBCDockShowAppLibrary = true;
+
 static int clamp(int v, int lo, int hi) {
     if (v < lo) return lo;
     if (v > hi) return hi;
@@ -19,6 +23,68 @@ static uint64_t try_msg0(uint64_t obj, const char *selName)
 {
     if (!r_is_objc_ptr(obj) || !r_responds(obj, selName)) return 0;
     return r_msg2(obj, selName, 0, 0, 0, 0);
+}
+
+void sbcustomizer_configure_ipad_dock(bool enabled, bool showRecents, bool showAppLibrary)
+{
+    gSBCIPadDockEnabled = enabled;
+    gSBCDockShowRecents = showRecents;
+    gSBCDockShowAppLibrary = showAppLibrary;
+    printf("[SBC][IPADDOCK] configured enabled=%d recents=%d appLibrary=%d\n",
+           enabled, showRecents, showAppLibrary);
+    log_user("[SBC][IPADDOCK] enabled=%d recents=%d appLibrary=%d; live selector scan will run on Apply.\n",
+             enabled, showRecents, showAppLibrary);
+}
+
+static int sbc_set_bool_if_supported(uint64_t obj, const char *selector, bool value)
+{
+    if (!r_is_objc_ptr(obj) || !r_responds(obj, selector)) return 0;
+    r_msg2(obj, selector, value ? 1 : 0, 0, 0, 0);
+    printf("[SBC][IPADDOCK] %s=%d object=0x%llx\n", selector, value, obj);
+    log_user("[SBC][IPADDOCK][PATH] selector=%s value=%d object=0x%llx result=sent.\n",
+             selector, value, obj);
+    return 1;
+}
+
+static void patch_ipad_dock_options(uint64_t iconCtrl, uint64_t mgr, uint64_t dock)
+{
+    int changed = 0;
+    bool showRecents = gSBCIPadDockEnabled && gSBCDockShowRecents;
+    bool showAppLibrary = gSBCIPadDockEnabled && gSBCDockShowAppLibrary;
+    uint64_t layout = try_msg0(dock, "layout");
+    uint64_t cfg = try_msg0(layout, "layoutConfiguration");
+    uint64_t floating = try_msg0(mgr, "floatingDockViewController");
+    if (!floating) floating = try_msg0(iconCtrl, "floatingDockViewController");
+    uint64_t floatingView = try_msg0(floating, "view");
+
+    uint64_t targets[] = { cfg, layout, dock, floating, floatingView };
+    for (unsigned i = 0; i < sizeof(targets) / sizeof(targets[0]); i++) {
+        uint64_t target = targets[i];
+        changed += sbc_set_bool_if_supported(target, "setShowsRecentApplications:", showRecents);
+        changed += sbc_set_bool_if_supported(target, "setShowsRecents:", showRecents);
+        changed += sbc_set_bool_if_supported(target, "setShowsAppLibrary:", showAppLibrary);
+        changed += sbc_set_bool_if_supported(target, "setShowsAppLibraryButton:", showAppLibrary);
+        changed += sbc_set_bool_if_supported(target, "setLibraryButtonVisible:", showAppLibrary);
+    }
+    if (gSBCIPadDockEnabled && r_is_objc_ptr(floatingView)) {
+        sbc_set_bool_if_supported(floatingView, "setHidden:", false);
+        sbc_set_bool_if_supported(floatingView, "setUserInteractionEnabled:", true);
+    }
+
+    uint64_t layer = try_msg0(dock, "layer");
+    if (r_is_objc_ptr(layer)) {
+        if (r_responds(layer, "setCornerRadius:")) {
+            double radius = gSBCIPadDockEnabled ? 24.0 : 0.0;
+            r_msg2_main_raw(layer, "setCornerRadius:", &radius, sizeof(radius),
+                            NULL, 0, NULL, 0, NULL, 0);
+        }
+        sbc_set_bool_if_supported(layer, "setMasksToBounds:", false);
+        changed++;
+    }
+    printf("[SBC][IPADDOCK] option paths changed=%d floatingVC=0x%llx\n", changed, floating);
+    log_user("[SBC][IPADDOCK] completed: enabled=%d supported option paths=%d floatingController=%s icons remain live/pressable.\n",
+             gSBCIPadDockEnabled, changed,
+             r_is_objc_ptr(floating) ? "found" : "not exposed on this iOS build");
 }
 
 static void disable_list_autofit(uint64_t listView, const char *tag)
@@ -103,6 +169,7 @@ static void patch_dock(uint64_t iconCtrl, int dockIcons)
         uint64_t selSetNeedsLayout = r_sel("setNeedsLayout");
         r_perform_main(dock, selSetNeedsLayout, 0, false);
     }
+    patch_ipad_dock_options(iconCtrl, mgr, dock);
 }
 
 static int patch_homescreen_list_models_v3(uint64_t mgr, int cols, int rows)
@@ -202,11 +269,12 @@ static void patch_homescreen_grid(uint64_t iconCtrl, int cols, int rows, bool hi
 
 bool sbcustomizer_apply_in_session(int dockIcons, int hsCols, int hsRows, bool hideLabels)
 {
-    dockIcons = clamp(dockIcons, 4, 7);
+    dockIcons = clamp(dockIcons, 4, gSBCIPadDockEnabled ? 12 : 7);
     hsCols    = clamp(hsCols,    3, 7);
     hsRows    = clamp(hsRows,    4, 8);
-    printf("[SBC] === entry === dock=%d hs=%dx%d hideLabels=%d\n",
-           dockIcons, hsCols, hsRows, hideLabels);
+    printf("[SBC] === entry === dock=%d hs=%dx%d hideLabels=%d ipadDock=%d recents=%d appLibrary=%d\n",
+           dockIcons, hsCols, hsRows, hideLabels, gSBCIPadDockEnabled,
+           gSBCDockShowRecents, gSBCDockShowAppLibrary);
 
     bool ok = false;
     do {

@@ -30,4 +30,10 @@ int sb_collect_windows(uint64_t *out, int cap);
 // UIApplication window.
 uint64_t sb_frontmost_window(void);
 
+// Finds SpringBoard windows that actually host Control Center. This avoids
+// applying CC tweaks to the Home Screen, notification, keyboard, or alert
+// window merely because it is frontmost.
+int sb_collect_control_center_windows(uint64_t *out, int cap);
+uint64_t sb_control_center_window(void);
+
 #endif /* sb_walk_h */

@@ -190,7 +190,7 @@ bool sugarcane_apply_in_session(void)
     }
     if (liveLabels > 0) return true;
     sugarcane_remove_labels();
-    uint64_t win = sb_frontmost_window();
+    uint64_t win = sb_control_center_window();
     if (!r_is_objc_ptr(win)) return false;
     int hits = 0;
     sugarcane_scan_sliders(win, 0, &hits);

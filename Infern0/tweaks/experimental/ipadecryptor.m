@@ -19,8 +19,6 @@
 #import <sys/stat.h>
 #import <stdlib.h>
 #import <unistd.h>
-#include <spawn.h>
-#include <sys/wait.h>
 
 static NSString * const kIPADecryptorKeyBundleID = @"bundleID";
 static NSString * const kIPADecryptorKeyName = @"name";
@@ -1550,100 +1548,19 @@ bool ipadecryptor_probe_installed_app(NSString *bundleID, NSString **messageOut)
     return true;
 }
 
-static bool ipadec_launch_and_suspend_app(NSString *bundleID, pid_t *pidOut)
-{
-    if (!pidOut) return false;
-    
-    // Try to find existing process first
-    NSString *procName = nil;
-    NSDictionary *entry = ipadec_lookup_app(bundleID);
-    if (entry) {
-        NSString *execPath = entry[kIPADecryptorKeyBundlePath];
-        procName = execPath.lastPathComponent;
-    }
-    
-    if (procName.length > 0) {
-        uint64_t proc = proc_find_by_name(procName.UTF8String);
-        if (proc) {
-            log_user("[IPADEC] Found existing process for %s\n", procName.UTF8String);
-            // Try to get pid from proc struct
-            *pidOut = 0; // Need to extract pid from proc struct
-            return true;
-        }
-    }
-    
-    // Launch app using SpringBoard
-    @try {
-        Class workspaceClass = NSClassFromString(@"LSApplicationWorkspace");
-        id workspace = ipadec_perform0(workspaceClass, @selector(defaultWorkspace));
-        if (!workspace) {
-            log_user("[IPADEC] Failed to get LSApplicationWorkspace\n");
-            return false;
-        }
-        
-        id proxy = ipadec_perform0(workspace, @selector(applicationWithBundleID:));
-        if (proxy) {
-            NSURL *url = [NSURL URLWithString:[NSString stringWithFormat:@"%@://", bundleID]];
-            [[UIApplication sharedApplication] openURL:url options:@{} completionHandler:nil];
-            log_user("[IPADEC] Attempted launch %s\n", bundleID.UTF8String);
-            usleep(500000);
-            *pidOut = 0;
-            return true;
-        }
-    } @catch (NSException *e) {
-        log_user("[IPADEC] Exception launching app: %s\n", e.reason.UTF8String);
-    }
-    
-    return false;
-}
-
-static bool ipadec_dump_encrypted_section(NSString *execPath, 
-                                          uint32_t cryptoff, 
-                                          uint32_t cryptsize, 
-                                          NSString **messageOut)
-{
-    NSFileManager *fm = NSFileManager.defaultManager;
-    if (![fm fileExistsAtPath:execPath]) {
-        if (messageOut) *messageOut = @"Executable file not found";
-        return false;
-    }
-    
-    NSData *originalData = [NSData dataWithContentsOfFile:execPath];
-    if (!originalData) {
-        if (messageOut) *messageOut = @"Failed to read executable";
-        return false;
-    }
-    
-    log_user("[IPADEC] Dumping encrypted section from file: offset=0x%x size=0x%x\n", cryptoff, cryptsize);
-    
-    // For now, just copy the encrypted section as-is
-    // In a full implementation, this would use the KRW to read decrypted memory
-    if (cryptoff + cryptsize > originalData.length) {
-        if (messageOut) *messageOut = @"Crypt section exceeds file size";
-        return false;
-    }
-    
-    NSData *encryptedSection = [originalData subdataWithRange:NSMakeRange(cryptoff, cryptsize)];
-    log_user("[IPADEC] Extracted %zu bytes from encrypted section\n", encryptedSection.length);
-    
-    // Create temp file for the decrypted section
-    NSString *tempDir = NSTemporaryDirectory();
-    NSString *decryptedPath = [tempDir stringByAppendingPathComponent:@"decrypted_section.bin"];
-    [encryptedSection writeToFile:decryptedPath atomically:YES];
-    
-    if (messageOut) *messageOut = [NSString stringWithFormat:@"Dumped encrypted section to %@", decryptedPath];
-    return true;
-}
-
 static bool ipadec_rebuild_ipa(NSString *bundlePath, 
                                NSString *decryptedSectionPath,
                                NSString **messageOut)
 {
     NSFileManager *fm = NSFileManager.defaultManager;
     NSString *outputDir = ipadecryptor_default_output_directory();
+    (void)decryptedSectionPath;
     
-    // Create basic IPA structure
-    NSString *payloadDir = [outputDir stringByAppendingPathComponent:@"Payload"];
+    // Create an isolated IPA staging tree so concurrent/failed exports cannot
+    // mix app bundles into the same Payload directory.
+    NSString *stagingDir = [NSTemporaryDirectory() stringByAppendingPathComponent:
+        [NSString stringWithFormat:@"CyanideIPAExport-%@", NSUUID.UUID.UUIDString]];
+    NSString *payloadDir = [stagingDir stringByAppendingPathComponent:@"Payload"];
     [fm createDirectoryAtPath:payloadDir withIntermediateDirectories:YES attributes:nil error:nil];
     
     // Copy the app bundle
@@ -1658,6 +1575,7 @@ static bool ipadec_rebuild_ipa(NSString *bundlePath,
     NSError *copyError = nil;
     BOOL copied = [fm copyItemAtPath:bundlePath toPath:destAppBundle error:&copyError];
     if (!copied) {
+        [fm removeItemAtPath:stagingDir error:nil];
         if (messageOut) *messageOut = [NSString stringWithFormat:@"Failed to copy app bundle: %@", copyError.localizedDescription];
         return false;
     }
@@ -1667,42 +1585,39 @@ static bool ipadec_rebuild_ipa(NSString *bundlePath,
     // 2. Update cryptid to 0 in the Mach-O header
     // 3. Rebuild the IPA with proper structure
     
-    NSString *ipaPath = [outputDir stringByAppendingPathComponent:[NSString stringWithFormat:@"%@_decrypted.ipa", appName]];
+    NSString *ipaPath = [outputDir stringByAppendingPathComponent:[NSString stringWithFormat:@"%@_export.ipa", appName]];
     
-    // Create a simple zip (IPA is just a zip file)
-    // NSTask is not available on iOS; use posix_spawn instead.
-    const char *ipaPathCStr    = ipaPath.UTF8String;
-    const char *outputDirCStr  = outputDir.UTF8String;
-
-    char original_cwd[1024];
-    original_cwd[0] = '\0';
-    getcwd(original_cwd, sizeof(original_cwd));
-    chdir(outputDirCStr);
-
-    pid_t pid;
-    const char *zipArgs[] = { "/usr/bin/zip", "-r", ipaPathCStr, "Payload", NULL };
-    int spawnErr = posix_spawn(&pid, "/usr/bin/zip", NULL, NULL,
-                               (char * const *)zipArgs, NULL);
-
-    if (original_cwd[0]) {
-        chdir(original_cwd);
-    }
-
-    if (spawnErr != 0) {
-        if (messageOut) *messageOut = [NSString stringWithFormat:@"Failed to launch zip: %s", strerror(spawnErr)];
+    // NSFileCoordinatorReadingForUploading asks iOS to prepare a directory as
+    // a temporary ZIP archive. Coordinating the staging root keeps Payload/ at
+    // the archive root, which is the required IPA structure, without assuming
+    // a jailbreak-only /usr/bin/zip binary exists.
+    [fm removeItemAtPath:ipaPath error:nil];
+    __block NSError *archiveError = nil;
+    __block BOOL archived = NO;
+    NSFileCoordinator *coordinator = [[NSFileCoordinator alloc] initWithFilePresenter:nil];
+    [coordinator coordinateReadingItemAtURL:[NSURL fileURLWithPath:stagingDir]
+                                    options:NSFileCoordinatorReadingForUploading
+                                      error:&archiveError
+                                 byAccessor:^(NSURL *preparedURL) {
+        NSError *moveError = nil;
+        archived = [fm copyItemAtURL:preparedURL
+                               toURL:[NSURL fileURLWithPath:ipaPath]
+                               error:&moveError];
+        if (!archived && moveError) archiveError = moveError;
+    }];
+    [fm removeItemAtPath:stagingDir error:nil];
+    if (!archived) {
+        if (messageOut) *messageOut = [NSString stringWithFormat:@"Failed to create IPA archive: %@",
+                                       archiveError.localizedDescription ?: @"unknown archive error"];
+        log_user("[IPADEC] Native IPA archive failed: %s\n",
+                 archiveError.localizedDescription.UTF8String ?: "unknown");
         return false;
     }
 
-    int status = 0;
-    waitpid(pid, &status, 0);
-    if (WIFEXITED(status) && WEXITSTATUS(status) == 0) {
-        log_user("[IPADEC] Created IPA at %s\n", ipaPathCStr);
-        if (messageOut) *messageOut = [NSString stringWithFormat:@"Created decrypted IPA at %@", ipaPath];
-        return true;
-    } else {
-        if (messageOut) *messageOut = @"Failed to create IPA file";
-        return false;
-    }
+    log_user("[IPADEC] Created verified unencrypted IPA export at %s using native file coordination\n",
+             ipaPath.UTF8String);
+    if (messageOut) *messageOut = [NSString stringWithFormat:@"Created IPA export at %@", ipaPath];
+    return true;
 }
 
 bool ipadecryptor_start_decrypt_installed_app(NSString *bundleID, NSString **messageOut)
@@ -1724,20 +1639,7 @@ bool ipadecryptor_start_decrypt_installed_app(NSString *bundleID, NSString **mes
     
     log_user("[IPADEC] Starting decrypt pipeline for %s\n", bundleID.UTF8String);
     
-    // Step 1: Launch/suspend target app
-    pid_t appPid = 0;
-    if (!ipadec_launch_and_suspend_app(bundleID, &appPid)) {
-        log_user("[IPADEC] Failed to launch app, will try direct file decryption\n");
-    }
-    
-    // Step 2: Get encryption info from probe
-    NSString *probeMsg = nil;
-    if (!ipadecryptor_probe_installed_app(bundleID, &probeMsg)) {
-        if (messageOut) *messageOut = @"Failed to probe encryption info";
-        return false;
-    }
-    
-    // Parse encryption info from the executable
+    // Parse encryption metadata before taking any action on the target app.
     NSData *execData = [NSData dataWithContentsOfFile:execPath];
     IPADecryptorMachOInfo info = {0};
     if (!ipadec_macho_info_at_offset(execData.bytes, execData.length, 0, &info)) {
@@ -1745,30 +1647,26 @@ bool ipadecryptor_start_decrypt_installed_app(NSString *bundleID, NSString **mes
         return false;
     }
     
-    if (!info.hasEncryptionInfo || info.cryptid == 0) {
-        if (messageOut) *messageOut = @"App is not encrypted";
+    if (info.hasEncryptionInfo && info.cryptid != 0) {
+        log_user("[IPADEC][BLOCKED] encrypted executable cryptid=%u off=0x%x size=0x%x; refusing fake file copy\n",
+                 info.cryptid, info.cryptoff, info.cryptsize);
+        if (messageOut) {
+            *messageOut = @"This app is encrypted. The beta cannot safely read its decrypted in-memory executable yet, so no misleading IPA was created.";
+        }
         return false;
     }
-    
-    log_user("[IPADEC] Found encryption: cryptid=%u cryptoff=0x%x cryptsize=0x%x\n", 
-             info.cryptid, info.cryptoff, info.cryptsize);
-    
-    // Step 3: Dump encrypted section
-    NSString *dumpMessage = nil;
-    if (!ipadec_dump_encrypted_section(execPath, info.cryptoff, info.cryptsize, &dumpMessage)) {
-        if (messageOut) *messageOut = dumpMessage ?: @"Failed to dump encrypted section";
-        return false;
-    }
-    
-    // Step 4: Rebuild IPA
+
+    log_user("[IPADEC] executable is already unencrypted; exporting bundle without claiming decryption\n");
+
+    // Export only an executable whose Mach-O encryption command is absent or cryptid=0.
     NSString *ipaMessage = nil;
     if (!ipadec_rebuild_ipa(bundlePath, nil, &ipaMessage)) {
         if (messageOut) *messageOut = ipaMessage ?: @"Failed to rebuild IPA";
         return false;
     }
     
-    log_user("[IPADEC] Decrypt pipeline completed\n");
-    if (messageOut) *messageOut = @"Decryption completed. Note: This is a basic implementation that extracts the encrypted section. Full decryption requires KRW memory dumping.";
+    log_user("[IPADEC] honest export pipeline completed\n");
+    if (messageOut) *messageOut = ipaMessage ?: @"IPA export completed.";
     
     return true;
 }

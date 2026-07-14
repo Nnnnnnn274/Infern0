@@ -42,12 +42,17 @@ static void cleancc_class_name(uint64_t obj, char *out, size_t outLen)
     r_free(buf);
 }
 
-static void cleancc_scan(uint64_t parent, uint64_t color, double alpha, int depth, int *hits)
+static void cleancc_scan(uint64_t parent, uint64_t color, double alpha,
+                         bool ccContext, int depth, int *hits)
 {
     if (!r_is_objc_ptr(parent) || depth > 12) return;
     char cls[160] = {0};
     cleancc_class_name(parent, cls, sizeof(cls));
-    if (strstr(cls, "CCUI") || strstr(cls, "ControlCenter")) {
+    ccContext = ccContext || strstr(cls, "CCUI") || strstr(cls, "ControlCenter");
+    bool ccMaterial = ccContext &&
+                      (strstr(cls, "Material") || strstr(cls, "Backdrop") ||
+                       strstr(cls, "Background") || strstr(cls, "VisualEffect"));
+    if (ccMaterial) {
         if (r_is_objc_ptr(color) && r_responds_main(parent, "setBackgroundColor:")) {
             r_msg2_main(parent, "setBackgroundColor:", color, 0, 0, 0);
         }
@@ -61,14 +66,15 @@ static void cleancc_scan(uint64_t parent, uint64_t color, double alpha, int dept
     uint64_t count = r_msg2_main(subviews, "count", 0, 0, 0, 0);
     if (count > 160) count = 160;
     for (uint64_t i = 0; i < count; i++) {
-        cleancc_scan(r_msg2_main(subviews, "objectAtIndex:", i, 0, 0, 0), color, alpha, depth + 1, hits);
+        cleancc_scan(r_msg2_main(subviews, "objectAtIndex:", i, 0, 0, 0),
+                     color, alpha, ccContext, depth + 1, hits);
     }
 }
 
 bool cleancc_apply_in_session(void)
 {
     printf("[CLEANCC] apply\n");
-    uint64_t win = sb_frontmost_window();
+    uint64_t win = sb_control_center_window();
     if (!r_is_objc_ptr(win)) return false;
     double tintAlpha = (double)gCleanCCGlassTintPercent / 100.0;
     double materialAlpha = (double)gCleanCCMaterialAlphaPercent / 100.0;
@@ -76,7 +82,7 @@ bool cleancc_apply_in_session(void)
     if (materialAlpha > 1.0) materialAlpha = 1.0;
     gCleanCCTint = cleancc_color(1, 1, 1, tintAlpha);
     int hits = 0;
-    cleancc_scan(win, gCleanCCTint, materialAlpha, 0, &hits);
+    cleancc_scan(win, gCleanCCTint, materialAlpha, false, 0, &hits);
     printf("[CLEANCC] adjusted %d CC views\n", hits);
     return hits > 0;
 }
@@ -84,10 +90,10 @@ bool cleancc_apply_in_session(void)
 bool cleancc_stop_in_session(void)
 {
     printf("[CLEANCC] stop\n");
-    uint64_t win = sb_frontmost_window();
+    uint64_t win = sb_control_center_window();
     uint64_t clear = cleancc_color(0, 0, 0, 0);
     int hits = 0;
-    if (r_is_objc_ptr(win)) cleancc_scan(win, clear, 1.0, 0, &hits);
+    if (r_is_objc_ptr(win)) cleancc_scan(win, clear, 1.0, false, 0, &hits);
     gCleanCCTint = 0;
     return true;
 }

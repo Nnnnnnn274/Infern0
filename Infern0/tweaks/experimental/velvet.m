@@ -23,6 +23,14 @@ typedef struct {
 static VelvetStyledEntry gVelvetStyled[kVelvetMaxStyledViews];
 static int gVelvetStyledCount = 0;
 static uint64_t gVelvetTick = 0;
+static uint64_t gVelvetBannerView = 0;
+static uint64_t gVelvetEdgeOverlay = 0;
+static uint64_t gVelvetEdgeBanner = 0;
+static uint64_t gVelvetEdgeWindow = 0;
+
+typedef struct {
+    double x, y, width, height;
+} VelvetRect;
 
 #pragma mark - Config update (called from SettingsViewController local context)
 
@@ -54,6 +62,27 @@ static uint64_t vl_clear_color(void)
     uint64_t UIColor = r_class("UIColor");
     if (!r_is_objc_ptr(UIColor)) return 0;
     return r_msg2_main(UIColor, "clearColor", 0, 0, 0, 0);
+}
+
+static bool vl_get_rect(uint64_t obj, const char *selector, VelvetRect *out)
+{
+    if (!r_is_objc_ptr(obj) || !selector || !out) return false;
+    memset(out, 0, sizeof(*out));
+    if (!r_msg2_main_struct_ret(obj, selector, out, sizeof(*out),
+                                NULL, 0, NULL, 0, NULL, 0, NULL, 0)) return false;
+    return out->width > 0.0 && out->height > 0.0;
+}
+
+static void vl_set_rect(uint64_t obj, const char *selector, VelvetRect rect)
+{
+    if (!r_is_objc_ptr(obj)) return;
+    r_msg2_main_raw(obj, selector, &rect, sizeof(rect), NULL, 0, NULL, 0, NULL, 0);
+}
+
+static void vl_set_alpha(uint64_t view, double alpha)
+{
+    if (!r_is_objc_ptr(view)) return;
+    r_msg2_main_raw(view, "setAlpha:", &alpha, sizeof(alpha), NULL, 0, NULL, 0, NULL, 0);
 }
 
 #pragma mark - Style application on a remote UIView
@@ -116,6 +145,19 @@ static bool vl_apply_style_to_view(uint64_t view, const VelvetStyle *style)
     return applied;
 }
 
+static void vl_apply_banner_geometry(uint64_t view, const VelvetStyle *style)
+{
+    if (!r_is_objc_ptr(view) || !style) return;
+    gVelvetBannerView = view;
+    double scale = style->bannerScale > 0.0 ? style->bannerScale : 1.0;
+    double alpha = style->bannerAlpha > 0.0 ? style->bannerAlpha : 1.0;
+    struct { double a, b, c, d, tx, ty; } transform = { scale, 0, 0, scale, 0, 0 };
+    if (r_responds_main(view, "setTransform:"))
+        r_msg2_main_raw(view, "setTransform:", &transform, sizeof(transform), NULL, 0, NULL, 0, NULL, 0);
+    if (r_responds_main(view, "setAlpha:"))
+        r_msg2_main_raw(view, "setAlpha:", &alpha, sizeof(alpha), NULL, 0, NULL, 0, NULL, 0);
+}
+
 static bool vl_apply_style_to_label(uint64_t label, const VelvetRGBA *color)
 {
     if (!r_is_objc_ptr(label) || !color || !color->hasValue) return false;
@@ -176,7 +218,7 @@ static bool vl_str_contains(const char *str, const char *needle)
     return strstr(str, needle) != NULL;
 }
 
-static void vl_scan_subviews(uint64_t parent, const VelvetStyle *style, int depth)
+static void vl_scan_subviews(uint64_t parent, const VelvetStyle *style, int depth, bool reapply)
 {
     if (!r_is_objc_ptr(parent) || depth > kVelvetMaxDepth) return;
 
@@ -188,9 +230,10 @@ static void vl_scan_subviews(uint64_t parent, const VelvetStyle *style, int dept
 
     for (uint64_t i = 0; i < count; i++) {
         uint64_t sv = r_msg2_main(subviews, "objectAtIndex:", i, 0, 0, 0);
-        if (!r_is_objc_ptr(sv) || vl_is_styled(sv)) continue;
+        if (!r_is_objc_ptr(sv)) continue;
+        bool alreadyStyled = vl_is_styled(sv);
 
-        if (vl_is_uilabel(sv)) {
+        if ((!alreadyStyled || reapply) && vl_is_uilabel(sv)) {
             char cls[128] = {0};
             vl_read_class_name(sv, cls, sizeof(cls));
 
@@ -208,12 +251,14 @@ static void vl_scan_subviews(uint64_t parent, const VelvetStyle *style, int dept
                 vl_apply_style_to_label(sv, &style->messageColor);
                 vl_mark_styled(sv);
             }
-        } else if (vl_is_uiview(sv)) {
+        } else if ((!alreadyStyled || reapply) && vl_is_uiview(sv)) {
             bool applied = vl_apply_style_to_view(sv, style);
             if (applied) vl_mark_styled(sv);
         }
 
-        vl_scan_subviews(sv, style, depth + 1);
+        // Always descend. A styled container can receive newly-created labels,
+        // and a live settings update must reach descendants styled earlier.
+        vl_scan_subviews(sv, style, depth + 1, reapply);
     }
 }
 
@@ -224,6 +269,19 @@ static uint64_t vl_springboard_application(void)
     uint64_t UIApplication = r_class("UIApplication");
     if (!r_is_objc_ptr(UIApplication)) return 0;
     return r_msg2_main(UIApplication, "sharedApplication", 0, 0, 0, 0);
+}
+
+static uint64_t vl_key_window(uint64_t app)
+{
+    if (!r_is_objc_ptr(app)) return 0;
+    uint64_t windows = r_msg2_main(app, "windows", 0, 0, 0, 0);
+    uint64_t count = r_is_objc_ptr(windows) ? r_msg2_main(windows, "count", 0, 0, 0, 0) : 0;
+    if (count > 64) count = 64;
+    for (uint64_t i = 0; i < count; i++) {
+        uint64_t win = r_msg2_main(windows, "objectAtIndex:", i, 0, 0, 0);
+        if (r_is_objc_ptr(win) && (r_msg2_main(win, "isKeyWindow", 0, 0, 0, 0) & 0xff)) return win;
+    }
+    return r_msg2_main(app, "keyWindow", 0, 0, 0, 0);
 }
 
 static uint64_t vl_try_msg0_main(uint64_t obj, const char *selName)
@@ -261,6 +319,88 @@ static uint64_t vl_active_banner_view(uint64_t bannerDest)
         if (r_is_objc_ptr(vc)) view = vl_try_msg0_main(vc, "view");
     }
     return view;
+}
+
+static void vl_remove_edge_overlay(void)
+{
+    if (r_is_objc_ptr(gVelvetEdgeOverlay)) {
+        r_msg2_main(gVelvetEdgeOverlay, "removeFromSuperview", 0, 0, 0, 0);
+        r_msg2_main(gVelvetEdgeOverlay, "release", 0, 0, 0, 0);
+    }
+    gVelvetEdgeOverlay = 0;
+    gVelvetEdgeBanner = 0;
+    gVelvetEdgeWindow = 0;
+}
+
+static bool vl_configure_edge_overlay(uint64_t app, const VelvetStyle *style)
+{
+    if (!style || !style->edgeGlowEnabled) {
+        vl_remove_edge_overlay();
+        return true;
+    }
+
+    uint64_t win = vl_key_window(app);
+    VelvetRect bounds = {0};
+    if (!r_is_objc_ptr(win) || !vl_get_rect(win, "bounds", &bounds)) return false;
+    if (r_is_objc_ptr(gVelvetEdgeOverlay) && gVelvetEdgeWindow != win) {
+        vl_remove_edge_overlay();
+    }
+
+    VelvetRect frame = style->edgeGlowTopOnly
+        ? (VelvetRect){12.0, 4.0, bounds.width - 24.0, 54.0}
+        : (VelvetRect){2.0, 2.0, bounds.width - 4.0, bounds.height - 4.0};
+    if (frame.width <= 0.0 || frame.height <= 0.0) return false;
+
+    if (!r_is_objc_ptr(gVelvetEdgeOverlay)) {
+        uint64_t UIView = r_class("UIView");
+        uint64_t overlay = r_is_objc_ptr(UIView) ? r_msg2_main(UIView, "alloc", 0, 0, 0, 0) : 0;
+        if (r_is_objc_ptr(overlay))
+            overlay = r_msg2_main_raw(overlay, "initWithFrame:", &frame, sizeof(frame), NULL, 0, NULL, 0, NULL, 0);
+        if (!r_is_objc_ptr(overlay)) return false;
+        gVelvetEdgeOverlay = overlay;
+        gVelvetEdgeWindow = win;
+        r_msg2_main(overlay, "setUserInteractionEnabled:", 0, 0, 0, 0);
+        uint64_t clear = vl_clear_color();
+        if (r_is_objc_ptr(clear)) r_msg2_main(overlay, "setBackgroundColor:", clear, 0, 0, 0);
+        r_msg2_main(win, "addSubview:", overlay, 0, 0, 0);
+    } else {
+        vl_set_rect(gVelvetEdgeOverlay, "setFrame:", frame);
+        if (r_responds_main(win, "bringSubviewToFront:"))
+            r_msg2_main(win, "bringSubviewToFront:", gVelvetEdgeOverlay, 0, 0, 0);
+    }
+
+    uint64_t layer = r_msg2_main(gVelvetEdgeOverlay, "layer", 0, 0, 0, 0);
+    uint64_t color = vl_remote_color(&style->edgeGlowColor);
+    if (r_is_objc_ptr(layer) && r_is_objc_ptr(color)) {
+        uint64_t cgColor = r_msg2_main(color, "CGColor", 0, 0, 0, 0);
+        if (r_is_objc_ptr(cgColor)) r_msg2_main(layer, "setBorderColor:", cgColor, 0, 0, 0);
+        double width = style->edgeGlowThickness;
+        double radius = style->edgeGlowTopOnly ? 27.0 : style->cornerRadius;
+        r_msg2_main_raw(layer, "setBorderWidth:", &width, sizeof(width), NULL, 0, NULL, 0, NULL, 0);
+        r_msg2_main_raw(layer, "setCornerRadius:", &radius, sizeof(radius), NULL, 0, NULL, 0, NULL, 0);
+    }
+    return true;
+}
+
+static bool vl_update_edge_glow(uint64_t app, const VelvetStyle *style)
+{
+    if (!vl_configure_edge_overlay(app, style)) return false;
+    if (!style->edgeGlowEnabled || !r_is_objc_ptr(gVelvetEdgeOverlay)) return true;
+
+    uint64_t dest = vl_banner_destination(app);
+    uint64_t banner = r_is_objc_ptr(dest) ? vl_active_banner_view(dest) : 0;
+    bool visible = r_is_objc_ptr(banner);
+    // Alpha is already encoded in the configured UIColor; keep the overlay at
+    // full opacity so translucent colors are not attenuated twice.
+    vl_set_alpha(gVelvetEdgeOverlay, visible ? 1.0 : 0.0);
+    if (visible && banner != gVelvetEdgeBanner) {
+        gVelvetEdgeBanner = banner;
+        printf("[EDGEGLOW] notification glow shown banner=0x%llx mode=%s thickness=%.1f\n",
+               banner, style->edgeGlowTopOnly ? "notch" : "edge", style->edgeGlowThickness);
+    } else if (!visible) {
+        gVelvetEdgeBanner = 0;
+    }
+    return true;
 }
 
 #pragma mark - List view scanning (Notification Center / Lock Screen)
@@ -314,7 +454,7 @@ static uint64_t vl_find_list_controller(void)
     return 0;
 }
 
-static void vl_scan_list_cells(uint64_t listView, const VelvetStyle *style)
+static void vl_scan_list_cells(uint64_t listView, const VelvetStyle *style, bool reapply)
 {
     if (!r_is_objc_ptr(listView)) return;
 
@@ -326,7 +466,8 @@ static void vl_scan_list_cells(uint64_t listView, const VelvetStyle *style)
 
     for (uint64_t i = 0; i < count; i++) {
         uint64_t sv = r_msg2_main(subviews, "objectAtIndex:", i, 0, 0, 0);
-        if (!r_is_objc_ptr(sv) || vl_is_styled(sv)) continue;
+        if (!r_is_objc_ptr(sv)) continue;
+        bool alreadyStyled = vl_is_styled(sv);
 
         char cls[128] = {0};
         uint64_t rCls = r_dlsym_call(R_TIMEOUT, "object_getClass", sv, 0, 0, 0, 0, 0, 0, 0);
@@ -343,9 +484,11 @@ static void vl_scan_list_cells(uint64_t listView, const VelvetStyle *style)
 
         if (strstr(cls, "NCNotificationListCell") || strstr(cls, "NCNotificationRequest") ||
             strstr(cls, "Cell") || strstr(cls, "cell")) {
-            bool applied = vl_apply_style_to_view(sv, style);
-            if (applied) vl_mark_styled(sv);
-            vl_scan_subviews(sv, style, 0);
+            if (!alreadyStyled || reapply) {
+                bool applied = vl_apply_style_to_view(sv, style);
+                if (applied) vl_mark_styled(sv);
+            }
+            vl_scan_subviews(sv, style, 0, reapply);
         }
     }
 }
@@ -365,19 +508,21 @@ bool velvet_apply_in_session(void)
         uint64_t bannerDest = vl_banner_destination(app);
         if (r_is_objc_ptr(bannerDest)) {
             uint64_t bannerView = vl_active_banner_view(bannerDest);
-            if (r_is_objc_ptr(bannerView) && !vl_is_styled(bannerView)) {
+            if (r_is_objc_ptr(bannerView)) {
                 bool applied = vl_apply_style_to_view(bannerView, style);
-                if (applied) vl_mark_styled(bannerView);
-                vl_scan_subviews(bannerView, style, 0);
+                vl_apply_banner_geometry(bannerView, style);
+                if (applied && !vl_is_styled(bannerView)) vl_mark_styled(bannerView);
+                vl_scan_subviews(bannerView, style, 0, true);
                 printf("[VELVET] styled active banner view=0x%llx\n", bannerView);
             }
         }
 
         uint64_t listView = vl_find_list_controller();
         if (r_is_objc_ptr(listView)) {
-            vl_scan_list_cells(listView, style);
+            vl_scan_list_cells(listView, style, true);
             printf("[VELVET] scanned list cells listView=0x%llx\n", listView);
         }
+        vl_update_edge_glow(app, style);
     }
 
     gVelvetGlobalDirty = false;
@@ -398,20 +543,23 @@ bool velvet_tick_in_session(void)
     uint64_t app = vl_springboard_application();
     if (!r_is_objc_ptr(app)) return false;
 
+    vl_update_edge_glow(app, style);
+
     uint64_t bannerDest = vl_banner_destination(app);
     if (r_is_objc_ptr(bannerDest)) {
         uint64_t bannerView = vl_active_banner_view(bannerDest);
         if (r_is_objc_ptr(bannerView) && !vl_is_styled(bannerView)) {
             bool applied = vl_apply_style_to_view(bannerView, style);
+            vl_apply_banner_geometry(bannerView, style);
             if (applied) vl_mark_styled(bannerView);
-            vl_scan_subviews(bannerView, style, 0);
+            vl_scan_subviews(bannerView, style, 0, false);
             printf("[VELVET] tick: styled new banner view=0x%llx\n", bannerView);
         }
     }
 
     uint64_t listView = vl_find_list_controller();
     if (r_is_objc_ptr(listView)) {
-        vl_scan_list_cells(listView, style);
+        vl_scan_list_cells(listView, style, false);
     }
 
     if (gVelvetTick % 300 == 0) {
@@ -425,6 +573,25 @@ bool velvet_tick_in_session(void)
 bool velvet_stop_in_session(void)
 {
     printf("[VELVET] stop\n");
+    for (int i = 0; i < gVelvetStyledCount; i++) {
+        uint64_t view = gVelvetStyled[i].view;
+        if (!r_is_objc_ptr(view)) continue;
+        uint64_t layer = r_msg2_main(view, "layer", 0, 0, 0, 0);
+        if (r_is_objc_ptr(layer)) {
+            double zero = 0.0;
+            r_msg2_main_raw(layer, "setBorderWidth:", &zero, sizeof(zero), NULL, 0, NULL, 0, NULL, 0);
+        }
+    }
+    if (r_is_objc_ptr(gVelvetBannerView)) {
+        double alpha = 1.0;
+        struct { double a, b, c, d, tx, ty; } identity = { 1, 0, 0, 1, 0, 0 };
+        if (r_responds_main(gVelvetBannerView, "setAlpha:"))
+            r_msg2_main_raw(gVelvetBannerView, "setAlpha:", &alpha, sizeof(alpha), NULL, 0, NULL, 0, NULL, 0);
+        if (r_responds_main(gVelvetBannerView, "setTransform:"))
+            r_msg2_main_raw(gVelvetBannerView, "setTransform:", &identity, sizeof(identity), NULL, 0, NULL, 0, NULL, 0);
+    }
+    gVelvetBannerView = 0;
+    vl_remove_edge_overlay();
     gVelvetStyledCount = 0;
     return true;
 }
@@ -433,6 +600,10 @@ void velvet_forget_remote_state(void)
 {
     gVelvetStyledCount = 0;
     gVelvetTick = 0;
+    gVelvetBannerView = 0;
+    gVelvetEdgeOverlay = 0;
+    gVelvetEdgeBanner = 0;
+    gVelvetEdgeWindow = 0;
     gVelvetGlobalDirty = true;
 }
 

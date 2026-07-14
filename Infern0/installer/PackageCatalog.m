@@ -162,6 +162,8 @@ static const NSInteger kSecRoundedIcons     = 57;
 static const NSInteger kSecWatchLayout      = 58;
 static const NSInteger kSecLockCustomizer   = 59;
 static const NSInteger kSecFreePlacement    = 60;
+static const NSInteger kSecCopypastaLite    = 61;
+static const NSInteger kSecAppLibraryStudio = 62;
 static const NSInteger kSecDarkSwordTweaks  = 13;
 
 + (NSArray<Package *> *)allPackages
@@ -245,8 +247,8 @@ static const NSInteger kSecDarkSwordTweaks  = 13;
 
         Package *sbc = [[Package alloc] initWithIdentifier:@"com.darksword.sbcustomizer"
                                            name:@"SBCustomizer"
-                               shortDescription:@"Custom dock count and home screen grid"
-                                longDescription:@"Customizes the dock icon count and the home screen icon grid (columns and rows). Optionally hides icon labels.\n\nAdjust the per-axis counts and the label-hide switch in the Settings tab."
+                               shortDescription:@"iPad-style Dock, App Library access, and home grid"
+                                longDescription:@"Customizes the dock icon count and Home Screen grid, optionally hides labels, and adds an iPad-style floating Dock mode. Supported iOS builds can expose recent apps and App Library access directly from the Dock. Live icon views remain pressable, and every selector path is recorded in the activity log."
                                         version:version
                                          author:@"Nnnnnnn274"
                                        category:@"Home Screen"
@@ -313,9 +315,9 @@ static const NSInteger kSecDarkSwordTweaks  = 13;
         notificationIsland.unstableWarning = @"⚠️ Beta: Polls SpringBoard notification state over RemoteCall and may occasionally miss banners or duplicate activity updates.";
 
         Package *ipaDecryptor = [[Package alloc] initWithIdentifier:@"com.darksword.ipadecryptor"
-                                           name:@"IPA Decryptor"
-                               shortDescription:@"Decrypt installed App Store app payloads"
-                                 longDescription:@"Local IPA decryptor. Select an installed user app or paste an App Store link, resolve it to a bundle ID, sign in for an App Store download token, fetch the encrypted IPA to Documents, probe FairPlay encryption metadata, then run the decrypt pipeline.\n\nCurrent build includes app discovery, App Store link resolution, sign-in, encrypted IPA fetching, encryption probing, and basic IPA rebuilding. Full memory decryption requires KRW integration."
+                                           name:@"IPA Decryptor (Beta)"
+                               shortDescription:@"Probe encryption and export verified unencrypted apps"
+                                 longDescription:@"Select an installed app or resolve an App Store link, download an encrypted IPA, and inspect the main Mach-O FairPlay encryption command. The current beta exports an IPA only when the installed executable is already unencrypted. If cryptid is nonzero it stops with a clear diagnostic instead of copying encrypted bytes into a falsely labeled decrypted archive. In-memory executable dumping remains under development."
                                         version:version
                                          author:@"londek / zeroxjf"
                                        category:@"System"
@@ -324,17 +326,17 @@ static const NSInteger kSecDarkSwordTweaks  = 13;
                                      enabledKey:nil
                                           isNew:NO];
         ipaDecryptor.settingsSection = kSecIPADecryptor;
-        ipaDecryptor.unstableWarning = @"⚠️ Beta: Basic decryption implemented. Full memory dumping requires KRW integration and may not work on all iOS versions.";
+        ipaDecryptor.unstableWarning = @"Beta: encrypted App Store executables are detected but not decrypted yet. No output IPA is created unless the executable is verified unencrypted.";
 
         Package *stageStrip = [[Package alloc] initWithIdentifier:@"com.darksword.stagestrip"
-                                           name:@"Dynamic Stage Lite"
-                               shortDescription:@"Two floating app windows, iPad-style"
+                                           name:@"MilkyWay Lite / Dynamic Stage"
+                               shortDescription:@"One or two floating app windows, including system apps"
                                 longDescription:
-            @"Run two apps as floating, resizable windows on top of SpringBoard.\n\n"
+            @"Run one or two apps as floating, resizable windows on top of SpringBoard. Settings controls the concurrent-window limit and whether Safari, Photos, and Camera are explicitly included in the picker.\n\n"
             @"Based on Dynamic Stage by tomt000 — the original Stage Manager-for-iPhone tweak. Dynamic Stage Lite is an independent, RemoteCall-only re-implementation of the split-view + scene-hosting design; no original tweak code or assets are reused. Go check out tomt000's full version on Havoc.\n\n"
             @"How to use:\n"
             @"• Tap the dot in the bottom-right corner of the screen to open the picker.\n"
-            @"• Tap two apps to launch them side-by-side.\n"
+            @"• Tap one or two apps, according to the configured window limit.\n"
             @"• Drag the top bar to move; drag any corner to resize.\n"
             @"• X in the top-left of a window closes it.\n"
             @"• Gear in the picker tray jumps back to infern0 settings.\n\n"
@@ -385,8 +387,8 @@ static const NSInteger kSecDarkSwordTweaks  = 13;
 
         Package *liveWP = [[Package alloc] initWithIdentifier:@"com.darksword.livewp"
                                            name:@"LiveWP"
-                               shortDescription:@"Video wallpaper for Home and Lock Screen"
-                                longDescription:@"Plays a selected MP4/MOV/M4V video behind SpringBoard's home and lock screen windows while infern0 keeps the RemoteCall session alive.\n\nPorted from d1y/cyanide-ios."
+                               shortDescription:@"Video or eight-image Mood Wallpaper"
+                                longDescription:@"Plays a selected MP4/MOV/M4V video behind SpringBoard's Home and Lock Screen windows, or crossfades and tilts through up to eight selected Mood Wallpaper images. Both modes are session-only and are removed during cleanup.\n\nVideo mode is ported from d1y/cyanide-ios; Mood Wallpaper uses the same reversible live-layer engine."
                                         version:version
                                          author:@"d1y"
                                        category:@"Theming"
@@ -418,7 +420,7 @@ static const NSInteger kSecDarkSwordTweaks  = 13;
         Package *gravityLite = [[Package alloc] initWithIdentifier:@"com.darksword.gravitylite"
                                            name:@"Gravity Lite"
                                shortDescription:@"Make home-screen icons fall with physics"
-                                longDescription:@"Core RemoteCall-only port of Julio Verne's classic Gravity tweak for iOS 26. Applies UIDynamicAnimator gravity, collision bounds, bounce, friction, resistance, optional dock physics, accelerometer steering, shake pulses, restore, and an explosion pulse to the currently visible SpringBoard icon views.\n\nThis is not a full Substrate-style port. Activator/Home-button hooks, drag gestures, and preference-daemon notifications are intentionally left out. Use Settings to tune the core physics and the Restore button to reset the layout."
+                                longDescription:@"Core RemoteCall-only port of Julio Verne's classic Gravity tweak for iOS 26. Every Home Screen page now owns a separate overlay, animator, collision boundary, and saved icon layout, so icons remain attached to their original page instead of merging or disappearing during page swipes. The dock uses its own optional simulation. Live icons remain pressable while gravity, bounce, friction, resistance, accelerometer steering, shake pulses, restore, and explosion pulses are active.\n\nThis is not a full Substrate-style port. Activator/Home-button hooks, drag gestures, and preference-daemon notifications are intentionally left out. Use Settings to tune the core physics and the Restore button to reset every page to its saved layout."
                                         version:version
                                          author:@"Julio Verne / zeroxjf"
                                        category:@"Home Screen"
@@ -427,12 +429,12 @@ static const NSInteger kSecDarkSwordTweaks  = 13;
                                      enabledKey:kSettingsGravityLiteEnabled
                                           isNew:NO];
         gravityLite.settingsSection = kSecGravityLite;
-        gravityLite.unstableWarning = @"Beta: RemoteCall-only physics can be reset by SpringBoard relayouts such as page swipes, rotations, folder transitions, or resprings. Use Restore Icon Layout if icons stay displaced.";
+        gravityLite.unstableWarning = @"Beta: each page is isolated during normal page swipes, but larger SpringBoard relayouts such as rotation, folder transitions, or resprings can still reset live RemoteCall physics. Use Restore Icon Layout if icons stay displaced.";
         gravityLite.knownIssues = @[
             @"To disable, use the App Switcher to return to infern0 and deactivate Gravity Lite. There is no other way to stop it right now.",
-            @"Touch input does not register on displaced icons yet. Forwarding taps in this environment is a major WIP.",
+            @"The iOS 26 per-icon path reparents live icon views and keeps them interactive. Older fallback paths still animate snapshots, so displaced snapshot icons cannot receive taps.",
             @"Install is slow as hell. WIP. infern0 has to capture every visible icon and widget before physics start.",
-            @"Page swipes, folder opens, or SpringBoard relayouts may stop the effect. Run Gravity again.",
+            @"Rotation, folder transitions, or a SpringBoard relayout may stop the effect. Normal Home Screen page swipes keep each page in its own simulation.",
         ];
 
         Package *appSwitcherGrid = [[Package alloc] initWithIdentifier:@"com.darksword.appswitchergrid"
@@ -463,6 +465,19 @@ static const NSInteger kSecDarkSwordTweaks  = 13;
         quickLoader.settingsSection = kSecQuickLoader;
         quickLoader.unstableWarning = @"Runs user-selected JavaScript with access to infern0's RemoteCall helpers. Only use scripts you trust; bad scripts can crash SpringBoard.";
 
+        Package *copypastaLite = [[Package alloc] initWithIdentifier:@"com.darksword.copypastalite"
+                                           name:@"Copypasta Lite"
+                               shortDescription:@"Editable system clipboard shelf"
+                                longDescription:@"Stores three editable text snippets inside infern0. One tap writes the selected snippet to UIPasteboard, and a capture action can save the current text clipboard back into any slot. Every app can then accept the text through its normal Paste command. This safe build intentionally uses the infern0 settings panel because RemoteCall cannot attach a new snippet-specific callback inside third-party keyboard hosts."
+                                        version:version
+                                         author:@"Nnnnnnn274"
+                                       category:@"Productivity"
+                                     symbolName:@"doc.on.clipboard"
+                                           kind:PackageInstallKindToggle
+                                     enabledKey:kSettingsCopypastaLiteEnabled
+                                          isNew:YES];
+        copypastaLite.settingsSection = kSecCopypastaLite;
+
 #if CYANIDE_EXPERIMENTAL_TWEAKS_AVAILABLE
         Package *fastLockXLite = [[Package alloc] initWithIdentifier:@"com.darksword.fastlockx-lite"
                                            name:@"FastLockX Lite"
@@ -479,9 +494,9 @@ static const NSInteger kSecDarkSwordTweaks  = 13;
         fastLockXLite.unstableWarning = @"Beta / unstable: sends private SpringBoard lock-screen and biometric-resource messages. Always On runs SpringBoard timers while the device is locked, so disable it or respring if Face ID feels noisy or unstable.";
 
         Package *velvet = [[Package alloc] initWithIdentifier:@"com.darksword.velvet"
-                                           name:@"Velvet"
-                               shortDescription:@"Custom compact notification banners"
-                                longDescription:@"Velvet/TinyBanners-style notification styling. Applies custom banner and Notification Center cell backgrounds, borders, corner radius, and text colors through SpringBoard's RemoteCall session.\n\nConfigure the colors and shape in Settings. The live scanner reapplies styles while infern0 is active."
+                                           name:@"Velvet + Edge Glow"
+                               shortDescription:@"Compact banners and notification edge lighting"
+                                longDescription:@"Combines Velvet/TinyBanners styling with the community-requested Edge and Notchification visual. It applies custom banner and Notification Center colors, borders, corner radius, compact scale, and opacity. An optional non-interactive outline appears only while an incoming SpringBoard banner is active, with full-screen edge and compact top-only modes. The live scanner reapplies settings while infern0 is active and cleanup removes the glow overlay and restores banner geometry."
                                         version:version
                                          author:@"Nnnnnnn274"
                                        category:@"SpringBoard"
@@ -610,9 +625,9 @@ static const NSInteger kSecDarkSwordTweaks  = 13;
         sugarCane.settingsSection = kSecSugarCane;
 
         Package *betterCCXI = [[Package alloc] initWithIdentifier:@"com.darksword.betterccxi"
-                                           name:@"BetterCCXI"
+                                           name:@"BetterCCXI / Prysm Lite"
                                shortDescription:@"Larger Control Center module emphasis"
-                                longDescription:@"First-pass BetterCCXI/MissionControl-style port. Applies a visible layout emphasis pass for Control Center modules while infern0 is active."
+                                longDescription:@"Applies a cohesive, configurable scale and depth treatment to Control Center module, media, and Now Playing containers while infern0 is active. It does not rewrite persistent Control Center layout preferences."
                                         version:version
                                          author:@"Nnnnnnn274"
                                        category:@"Control Center"
@@ -623,9 +638,9 @@ static const NSInteger kSecDarkSwordTweaks  = 13;
         betterCCXI.settingsSection = kSecBetterCCXI;
 
         Package *magma = [[Package alloc] initWithIdentifier:@"com.darksword.magma"
-                                           name:@"Magma"
+                                           name:@"Magma Evo Lite"
                                shortDescription:@"Tint Control Center glyphs"
-                                longDescription:@"First-pass Magma/Rainbow-style port. Tints visible Control Center glyphs and labels with a warm active color."
+                                longDescription:@"Granular live-session Control Center color customization. Toggle glyphs, brightness and volume sliders, media controls, and module backgrounds can be enabled independently, with configurable RGBA tint and detailed logs."
                                         version:version
                                          author:@"Nnnnnnn274"
                                        category:@"Control Center"
@@ -781,8 +796,8 @@ static const NSInteger kSecDarkSwordTweaks  = 13;
 
         Package *watchLayout = [[Package alloc] initWithIdentifier:@"com.darksword.watchlayout"
                                            name:@"Watch Layout"
-                               shortDescription:@"Circular Apple Watch-style icon grid"
-                                longDescription:@"Compacts every discovered Home Screen page into a circular Apple Watch-style grid with circular icons and configurable spacing and scale. It transforms live icon views, so icons remain pressable, and saves stock frames for clean restoration."
+                               shortDescription:@"Staggered Apple Watch-style beehive icon grid"
+                                longDescription:@"Reflows each discovered Home Screen page into a true Apple Watch-style honeycomb: circular live icons, hex-ratio vertical spacing, and alternating half-slot row offsets. Compactness and icon scale are configurable. Dock and App Library icons are excluded, taps remain live, stock frames are saved for restoration, and detailed logs report each page's geometry and cleanup. Watch Layout is mutually exclusive with Free Placement Lite because both own the same icon frames."
                                         version:version
                                          author:@"zeroxjf"
                                        category:@"Home Screen"
@@ -795,7 +810,7 @@ static const NSInteger kSecDarkSwordTweaks  = 13;
         Package *lockCustomizer = [[Package alloc] initWithIdentifier:@"com.darksword.lockcustomizer"
                                            name:@"Lock Screen Customizer"
                                shortDescription:@"Move, resize, and clean up the Lock Screen"
-                                longDescription:@"A configurable Lock Screen customizer that resizes and repositions the live clock, adjusts its opacity, and can hide camera, flashlight, and page-dot views. Every matched change is logged and uninstall restores stock transforms and visibility."
+                                longDescription:@"A configurable Lock Screen customizer that resizes and repositions the live clock, adjusts opacity, hides camera, flashlight, or page-dot views, and includes Kumquat Lite scaling for live MediaControls. Metal Lock Light adds an adjustable ice, violet, or gold edge glow without intercepting touch input. Every matched change is logged and uninstall restores stock transforms and visibility."
                                         version:version
                                          author:@"Nnnnnnn274"
                                        category:@"Lock Screen"
@@ -817,6 +832,20 @@ static const NSInteger kSecDarkSwordTweaks  = 13;
                                      enabledKey:kSettingsFreePlacementEnabled
                                           isNew:YES];
         freePlacement.settingsSection = kSecFreePlacement;
+
+        Package *appLibraryStudio = [[Package alloc] initWithIdentifier:@"com.darksword.applibrarystudio"
+                                           name:@"App Library Studio"
+                               shortDescription:@"Custom App Library layout and no Today View"
+                                longDescription:@"Adds separate size, horizontal-spacing, vertical-spacing, and label controls for live App Library icons and category pods while keeping them pressable. Its Disable Today View option removes SpringBoard's leading page controller so left swipes do not land on a hidden blank page. App Library geometry restores during cleanup; rebuilding Today View after disabling it requires a respring. Every apply, restore, match count, and selected value is written to the detailed activity log."
+                                        version:version
+                                         author:@"Nnnnnnn274"
+                                       category:@"Home Screen"
+                                     symbolName:@"square.grid.3x3.square"
+                                           kind:PackageInstallKindToggle
+                                     enabledKey:kSettingsAppLibraryStudioEnabled
+                                          isNew:YES];
+        appLibraryStudio.settingsSection = kSecAppLibraryStudio;
+        appLibraryStudio.unstableWarning = @"Beta: App Library class names and page-controller internals can change between iOS builds. Icon layout is session-only; disabling Today View is restored by respring.";
 
         Package *blurryBadges = [[Package alloc] initWithIdentifier:@"com.darksword.blurrybadges"
                                            name:@"Badge Studio"
@@ -1072,6 +1101,7 @@ static const NSInteger kSecDarkSwordTweaks  = 13;
             watchLayout,
             lockCustomizer,
             freePlacement,
+            appLibraryStudio,
             blurryBadges,
             snapper,
             pullOver,
@@ -1083,6 +1113,7 @@ static const NSInteger kSecDarkSwordTweaks  = 13;
             liveWP,
             appSwitcherGrid,
             quickLoader,
+            copypastaLite,
         ];
         NSSet<NSString *> *darkSwordIDs = [NSSet setWithArray:@[
             @"com.darksword.disable-app-library",

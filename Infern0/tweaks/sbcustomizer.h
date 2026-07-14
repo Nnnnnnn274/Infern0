@@ -10,5 +10,6 @@
 
 bool sbcustomizer_apply(int dockIcons, int hsCols, int hsRows, bool hideLabels);
 bool sbcustomizer_apply_in_session(int dockIcons, int hsCols, int hsRows, bool hideLabels);
+void sbcustomizer_configure_ipad_dock(bool enabled, bool showRecents, bool showAppLibrary);
 
 #endif

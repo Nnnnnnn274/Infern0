@@ -8,6 +8,7 @@
 #import <stdbool.h>
 
 bool darksword_tweak_disable_app_library_in_session(void);
+bool darksword_tweak_disable_today_view_in_session(void);
 bool darksword_tweak_disable_icon_fly_in_in_session(void);
 bool darksword_tweak_zero_wake_animation_in_session(void);
 bool darksword_tweak_zero_backlight_fade_in_session(void);

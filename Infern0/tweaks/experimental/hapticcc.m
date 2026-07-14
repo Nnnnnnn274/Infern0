@@ -72,7 +72,7 @@ static void hapticcc_scan(uint64_t view, int depth, int *hits, bool *fired)
 
 bool hapticcc_apply_in_session(void)
 {
-    uint64_t win = sb_frontmost_window();
+    uint64_t win = sb_control_center_window();
     if (!r_is_objc_ptr(win)) return false;
     int hits = 0;
     bool fired = false;

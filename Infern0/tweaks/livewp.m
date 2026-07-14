@@ -14,6 +14,7 @@
 
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
+#import <QuartzCore/QuartzCore.h>
 #import <stdio.h>
 #import <time.h>
 #import <unistd.h>
@@ -31,6 +32,7 @@ static uint64_t g_livewp_home_window = 0;
 static uint64_t g_livewp_lock_window = 0;
 static bool g_livewp_configured = false;
 static bool g_livewp_paused = false;
+static bool g_livewp_mood_mode = false;
 
 // Manually flip to true when collecting detailed LiveWP timing logs.
 static const bool kLiveWPDebugLogging = false;
@@ -80,6 +82,7 @@ NSString * const kLiveWPVideoPath = @"LiveWPVideoPath";
 // ============================================================================
 
 static bool livewp_create_player(NSString *videoPath);
+static bool livewp_create_mood_layers(NSArray<NSString *> *imagePaths, double duration, double tiltDegrees);
 static bool livewp_attach_and_play(void);
 static void livewp_cleanup(void);
 
@@ -96,6 +99,21 @@ NSString *livewp_absolute_path(void) {
     return [docs stringByAppendingPathComponent:rel];
 }
 
+NSArray<NSString *> *livewp_mood_absolute_paths(void)
+{
+    NSArray *saved = [[NSUserDefaults standardUserDefaults] arrayForKey:@"LiveWPMoodImagePaths"];
+    if (![saved isKindOfClass:[NSArray class]]) return @[];
+    NSString *docs = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
+    NSMutableArray<NSString *> *paths = [NSMutableArray array];
+    for (id value in saved) {
+        if (![value isKindOfClass:[NSString class]] || [(NSString *)value length] == 0) continue;
+        NSString *path = [(NSString *)value hasPrefix:@"/"] ? value : [docs stringByAppendingPathComponent:value];
+        if ([[NSFileManager defaultManager] fileExistsAtPath:path]) [paths addObject:path];
+        if (paths.count == 8) break;
+    }
+    return paths;
+}
+
 bool livewp_apply_in_session(void)
 {
     uint32_t oldSettleUS = r_settle_us(0);
@@ -103,6 +121,28 @@ bool livewp_apply_in_session(void)
     LIVEWP_DEBUG_LOG("[LIVEWP][DEBUG][apply] start configured=%d paused=%d\n",
                      g_livewp_configured ? 1 : 0, g_livewp_paused ? 1 : 0);
     bool ok = false;
+
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    g_livewp_mood_mode = [defaults boolForKey:@"LiveWPMoodMode"];
+    if (g_livewp_mood_mode) {
+        NSArray<NSString *> *images = livewp_mood_absolute_paths();
+        double duration = [defaults doubleForKey:@"LiveWPMoodDuration"];
+        double tilt = [defaults doubleForKey:@"LiveWPMoodTiltDegrees"];
+        if (duration < 2.0) duration = 7.0;
+        if (tilt < 0.5) tilt = 2.5;
+        if (g_livewp_configured) livewp_stop_in_session();
+        if (!livewp_create_mood_layers(images, duration, tilt) || !livewp_attach_and_play()) {
+            log_user("[MOODWP] Failed to create or attach mood layers; images=%lu.\n", (unsigned long)images.count);
+            livewp_cleanup();
+            goto out;
+        }
+        g_livewp_configured = true;
+        g_livewp_paused = false;
+        log_user("[MOODWP] OK: images=%lu duration=%.1fs tilt=%.1fdeg homeLayer=0x%llx lockLayer=0x%llx.\n",
+                 (unsigned long)images.count, duration, tilt, g_livewp_home_layer, g_livewp_lock_layer);
+        ok = true;
+        goto out;
+    }
 
     NSString *videoPath = livewp_absolute_path();
     if (!videoPath || videoPath.length == 0) {
@@ -177,7 +217,11 @@ bool livewp_stop_in_session(void)
         return true;
     }
 
-    if (r_is_objc_ptr(g_livewp_player))
+    bool wasMood = g_livewp_mood_mode;
+    bool hadPlayer = r_is_objc_ptr(g_livewp_player);
+    bool hadHomeLayer = r_is_objc_ptr(g_livewp_home_layer);
+    bool hadLockLayer = r_is_objc_ptr(g_livewp_lock_layer);
+    if (hadPlayer)
         r_msg2_main(g_livewp_player, "pause", 0, 0, 0, 0);
 
     if (r_is_objc_ptr(g_livewp_home_layer))
@@ -188,7 +232,10 @@ bool livewp_stop_in_session(void)
     livewp_cleanup();
     g_livewp_configured = false;
     g_livewp_paused = false;
-    log_user("[LIVEWP] stopped.\n");
+    g_livewp_mood_mode = false;
+    log_user("[%s][STOP] playerPaused=%d homeLayerRemoved=%d lockLayerRemoved=%d remoteReferencesCleared=1 elapsed=%llums.\n",
+             wasMood ? "MOODWP" : "LIVEWP", hadPlayer, hadHomeLayer, hadLockLayer,
+             livewp_elapsed_ms_since(startUs));
     LIVEWP_DEBUG_LOG("[LIVEWP][DEBUG][stop] end ok=1 total=%llums\n",
                      livewp_elapsed_ms_since(startUs));
     r_settle_us(oldSettleUS);
@@ -353,6 +400,7 @@ void livewp_forget_remote_state(void)
     g_livewp_lock_window = 0;
     g_livewp_configured = false;
     g_livewp_paused = false;
+    g_livewp_mood_mode = false;
 }
 
 // ============================================================================
@@ -377,6 +425,108 @@ static uint64_t livewp_make_layer(uint64_t player)
     LIVEWP_DEBUG_LOG("[LIVEWP][DEBUG][make-layer] end ok=1 layer=0x%llx gravityOK=%d total=%llums\n",
                      layer, r_is_objc_ptr(gravity) ? 1 : 0, livewp_elapsed_ms_since(startUs));
     return layer;
+}
+
+static uint64_t livewp_number(double value)
+{
+    uint64_t cls = r_class("NSNumber");
+    return r_is_objc_ptr(cls)
+        ? r_msg2_main_raw(cls, "numberWithDouble:", &value, sizeof(value), NULL, 0, NULL, 0, NULL, 0)
+        : 0;
+}
+
+static void livewp_set_layer_opacity(uint64_t layer, float opacity)
+{
+    if (r_is_objc_ptr(layer))
+        r_msg2_main_raw(layer, "setOpacity:", &opacity, sizeof(opacity), NULL, 0, NULL, 0, NULL, 0);
+}
+
+static void livewp_add_mood_animation(uint64_t layer, const char *keyPath,
+                                      double from, double to, double duration,
+                                      double beginTime, const char *key)
+{
+    uint64_t keyPathString = r_nsstr_retained(keyPath);
+    uint64_t animationClass = r_class("CABasicAnimation");
+    uint64_t animation = r_is_objc_ptr(animationClass) && r_is_objc_ptr(keyPathString)
+        ? r_msg2_main(animationClass, "animationWithKeyPath:", keyPathString, 0, 0, 0) : 0;
+    if (r_is_objc_ptr(keyPathString)) r_msg2_main(keyPathString, "release", 0, 0, 0, 0);
+    if (!r_is_objc_ptr(animation)) return;
+    uint64_t fromNumber = livewp_number(from), toNumber = livewp_number(to);
+    if (r_is_objc_ptr(fromNumber)) r_msg2_main(animation, "setFromValue:", fromNumber, 0, 0, 0);
+    if (r_is_objc_ptr(toNumber)) r_msg2_main(animation, "setToValue:", toNumber, 0, 0, 0);
+    r_msg2_main_raw(animation, "setDuration:", &duration, sizeof(duration), NULL, 0, NULL, 0, NULL, 0);
+    r_msg2_main_raw(animation, "setBeginTime:", &beginTime, sizeof(beginTime), NULL, 0, NULL, 0, NULL, 0);
+    float repeats = 1000000.0f;
+    r_msg2_main_raw(animation, "setRepeatCount:", &repeats, sizeof(repeats), NULL, 0, NULL, 0, NULL, 0);
+    r_msg2_main(animation, "setAutoreverses:", 1, 0, 0, 0);
+    r_msg2_main(animation, "setRemovedOnCompletion:", 0, 0, 0, 0);
+    uint64_t keyString = r_nsstr_retained(key);
+    r_msg2_main(layer, "addAnimation:forKey:", animation, keyString, 0, 0);
+    if (r_is_objc_ptr(keyString)) r_msg2_main(keyString, "release", 0, 0, 0, 0);
+}
+
+static uint64_t livewp_make_mood_parent(NSArray<NSString *> *imagePaths,
+                                        double duration, double tiltDegrees,
+                                        const char *target)
+{
+    uint64_t parent = r_msg2_main(r_class("CALayer"), "layer", 0, 0, 0, 0);
+    if (!r_is_objc_ptr(parent)) return 0;
+    double baseTime = CACurrentMediaTime();
+    NSUInteger count = MIN((NSUInteger)8, imagePaths.count);
+    for (NSUInteger i = 0; i < count; i++) {
+        uint64_t path = r_nsstr_retained(imagePaths[i].UTF8String);
+        uint64_t image = r_is_objc_ptr(path)
+            ? r_msg2_main(r_class("UIImage"), "imageWithContentsOfFile:", path, 0, 0, 0) : 0;
+        if (r_is_objc_ptr(path)) r_msg2_main(path, "release", 0, 0, 0, 0);
+        uint64_t cgImage = r_is_objc_ptr(image) ? r_msg2_main(image, "CGImage", 0, 0, 0, 0) : 0;
+        if (!cgImage) {
+            log_user("[MOODWP][IMAGE] target=%s index=%lu path=%s result=decode-failed.\n",
+                     target ?: "unknown", (unsigned long)i, imagePaths[i].UTF8String);
+            continue;
+        }
+        uint64_t layer = r_msg2_main(r_class("CALayer"), "layer", 0, 0, 0, 0);
+        if (!r_is_objc_ptr(layer)) {
+            log_user("[MOODWP][IMAGE] target=%s index=%lu path=%s result=layer-allocation-failed.\n",
+                     target ?: "unknown", (unsigned long)i, imagePaths[i].UTF8String);
+            continue;
+        }
+        CGRect screen = UIScreen.mainScreen.bounds;
+        LiveWPRect imageFrame = { 0.0, 0.0, screen.size.width, screen.size.height };
+        r_msg2_main_raw(layer, "setFrame:", &imageFrame, sizeof(imageFrame), NULL, 0, NULL, 0, NULL, 0);
+        r_msg2_main(layer, "setContents:", cgImage, 0, 0, 0);
+        uint64_t gravity = r_nsstr_retained("resizeAspectFill");
+        if (r_is_objc_ptr(gravity)) {
+            r_msg2_main(layer, "setContentsGravity:", gravity, 0, 0, 0);
+            r_msg2_main(gravity, "release", 0, 0, 0, 0);
+        }
+        livewp_set_layer_opacity(layer, i == 0 ? 1.0f : 0.0f);
+        double phase = baseTime + (double)i * ((duration * 2.0) / (double)MAX((NSUInteger)1, count));
+        livewp_add_mood_animation(layer, "opacity", 0.0, 1.0, duration, phase, "cyanideMoodOpacity");
+        livewp_add_mood_animation(layer, "transform.scale", 1.02, 1.10, duration * 1.7, phase, "cyanideMoodScale");
+        livewp_add_mood_animation(layer, "transform.rotation.z",
+                                  -tiltDegrees * M_PI / 180.0,
+                                   tiltDegrees * M_PI / 180.0,
+                                  duration * 1.35, phase, "cyanideMoodTilt");
+        r_msg2_main(parent, "addSublayer:", layer, 0, 0, 0);
+        log_user("[MOODWP][IMAGE] target=%s index=%lu path=%s phase=%.2fs duration=%.1fs tilt=%.1fdeg result=loaded.\n",
+                 target ?: "unknown", (unsigned long)i, imagePaths[i].UTF8String,
+                 phase - baseTime, duration, tiltDegrees);
+    }
+    return parent;
+}
+
+static bool livewp_create_mood_layers(NSArray<NSString *> *imagePaths, double duration, double tiltDegrees)
+{
+    if (imagePaths.count == 0) {
+        log_user("[MOODWP] No images configured. Choose 1-8 images first.\n");
+        return false;
+    }
+    g_livewp_home_layer = livewp_make_mood_parent(imagePaths, duration, tiltDegrees, "home");
+    g_livewp_lock_layer = livewp_make_mood_parent(imagePaths, duration, tiltDegrees, "lock");
+    g_livewp_player = 0;
+    g_livewp_player_item = 0;
+    g_livewp_looper = 0;
+    return r_is_objc_ptr(g_livewp_home_layer) && r_is_objc_ptr(g_livewp_lock_layer);
 }
 
 static bool livewp_create_player(NSString *videoPath)
@@ -566,7 +716,8 @@ static bool livewp_attach_and_play(void)
                      lockMoved ? 1 : 0, livewp_elapsed_ms_since(cachedStartUs));
     if (homeOK || lockOK) {
         uint64_t playStartUs = livewp_now_us();
-        r_msg2_main(g_livewp_player, "play", 0, 0, 0, 0);
+        if (r_is_objc_ptr(g_livewp_player))
+            r_msg2_main(g_livewp_player, "play", 0, 0, 0, 0);
         LIVEWP_DEBUG_LOG("[LIVEWP][DEBUG][attach] play cached elapsed=%llums\n",
                          livewp_elapsed_ms_since(playStartUs));
         if (homeMoved || lockMoved) {
@@ -654,13 +805,19 @@ static bool livewp_attach_and_play(void)
     }
 
     uint64_t playStartUs = livewp_now_us();
-    r_msg2_main(g_livewp_player, "play", 0, 0, 0, 0);
+    if (r_is_objc_ptr(g_livewp_player))
+        r_msg2_main(g_livewp_player, "play", 0, 0, 0, 0);
     LIVEWP_DEBUG_LOG("[LIVEWP][DEBUG][attach] play scanned elapsed=%llums\n",
                      livewp_elapsed_ms_since(playStartUs));
 
     LIVEWP_DEBUG_LOG("[LIVEWP][DEBUG][attach] end ok=%d home=0x%llx(%d) lock=0x%llx(%d) wCount=%llu total=%llums\n",
                      (homeOK || lockOK) ? 1 : 0, homeWin, homeMoved,
                      lockWin, lockMoved, wCount, livewp_elapsed_ms_since(startUs));
+    log_user("[%s][ATTACH] scannedWindows=%llu homeWindow=%s homeAttached=%d lockWindow=%s lockAttached=%d homeLayerMoved=%d lockLayerMoved=%d result=%s.\n",
+             g_livewp_mood_mode ? "MOODWP" : "LIVEWP", wCount,
+             r_is_objc_ptr(homeWin) ? "found" : "missing", homeOK,
+             r_is_objc_ptr(lockWin) ? "found" : "missing", lockOK,
+             homeMoved, lockMoved, (homeOK || lockOK) ? "active" : "no compatible window");
     return homeOK || lockOK;
 }
 

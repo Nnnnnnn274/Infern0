@@ -9,6 +9,8 @@
 static bool gBetterCCXIApplied = false;
 static int gBetterCCXIZLift = 4;
 static int gBetterCCXIDepthLimit = 12;
+static int gBetterCCXIModuleScalePercent = 96;
+typedef struct { double a, b, c, d, tx, ty; } BetterCCXIAffine;
 
 static uint64_t betterccxi_key_window(void)
 {
@@ -40,11 +42,17 @@ static void betterccxi_scan(uint64_t parent, double scale, int depth, int *hits)
     betterccxi_class_name(parent, cls, sizeof(cls));
     bool target = strstr(cls, "CCUIModule") || strstr(cls, "MediaControls") ||
                   strstr(cls, "NowPlaying") || strstr(cls, "ControlCenter");
+    bool scaleTarget = strstr(cls, "CCUIModuleContainer") || strstr(cls, "MediaControlsPanelView") ||
+                       strstr(cls, "NowPlayingContainer");
     uint64_t layer = target ? r_msg2_main(parent, "layer", 0, 0, 0, 0) : 0;
     if (r_is_objc_ptr(layer)) {
         double z = (double)gBetterCCXIZLift;
         r_msg2_main_raw(layer, "setZPosition:", &z, sizeof(z), NULL, 0, NULL, 0, NULL, 0);
         if (hits) (*hits)++;
+    }
+    if (scaleTarget && r_responds_main(parent, "setTransform:")) {
+        BetterCCXIAffine transform = { scale, 0, 0, scale, 0, 0 };
+        r_msg2_main_raw(parent, "setTransform:", &transform, sizeof(transform), NULL, 0, NULL, 0, NULL, 0);
     }
     uint64_t subviews = r_msg2_main(parent, "subviews", 0, 0, 0, 0);
     if (!r_is_objc_ptr(subviews)) return;
@@ -58,10 +66,11 @@ static void betterccxi_scan(uint64_t parent, double scale, int depth, int *hits)
 bool betterccxi_apply_in_session(void)
 {
     printf("[BETTERCCXI] apply\n");
-    uint64_t win = sb_frontmost_window();
+    uint64_t win = sb_control_center_window();
     if (!r_is_objc_ptr(win)) return false;
     int hits = 0;
-    betterccxi_scan(win, 1.0, 0, &hits);
+    betterccxi_scan(win, (double)gBetterCCXIModuleScalePercent / 100.0, 0, &hits);
+    printf("[BETTERCCXI] lift=%d scale=%d%% depth=%d hits=%d\n", gBetterCCXIZLift, gBetterCCXIModuleScalePercent, gBetterCCXIDepthLimit, hits);
     gBetterCCXIApplied = hits > 0;
     return gBetterCCXIApplied;
 }
@@ -69,7 +78,7 @@ bool betterccxi_apply_in_session(void)
 bool betterccxi_stop_in_session(void)
 {
     printf("[BETTERCCXI] stop\n");
-    uint64_t win = sb_frontmost_window();
+    uint64_t win = sb_control_center_window();
     int hits = 0;
     int old = gBetterCCXIZLift;
     gBetterCCXIZLift = 0;
@@ -79,14 +88,17 @@ bool betterccxi_stop_in_session(void)
     return true;
 }
 
-void betterccxi_configure(int zLift, int depthLimit)
+void betterccxi_configure(int zLift, int depthLimit, int moduleScalePercent)
 {
     if (zLift < 0) zLift = 0;
     if (zLift > 20) zLift = 20;
     if (depthLimit < 4) depthLimit = 4;
     if (depthLimit > 16) depthLimit = 16;
+    if (moduleScalePercent < 75) moduleScalePercent = 75;
+    if (moduleScalePercent > 115) moduleScalePercent = 115;
     gBetterCCXIZLift = zLift;
     gBetterCCXIDepthLimit = depthLimit;
+    gBetterCCXIModuleScalePercent = moduleScalePercent;
 }
 
 void betterccxi_forget_remote_state(void) { gBetterCCXIApplied = false; }

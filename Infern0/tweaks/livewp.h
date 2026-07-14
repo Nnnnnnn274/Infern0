@@ -20,5 +20,6 @@ bool livewp_stop_in_session(void);
 void livewp_forget_remote_state(void);
 bool livewp_swap_video_in_session(NSString *videoPath);
 NSString *livewp_absolute_path(void);
+NSArray<NSString *> *livewp_mood_absolute_paths(void);
 
 #endif

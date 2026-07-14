@@ -14,6 +14,7 @@
 #import <sys/un.h>
 #import <unistd.h>
 #import <errno.h>
+#import <string.h>
 
 static uint64_t sw_safe_msg(uint64_t obj, const char *selname,
                             uint64_t a, uint64_t b, uint64_t c, uint64_t d)
@@ -268,6 +269,78 @@ uint64_t sb_frontmost_window(void)
     for (int i = 0; i < count; i++) {
         uint64_t isKey = sw_safe_msg(windows[i], "isKeyWindow", 0, 0, 0, 0);
         if (isKey & 0xff) return windows[i];
+    }
+    return count > 0 ? windows[count - 1] : 0;
+}
+
+static bool sbw_object_name_contains_cc(uint64_t obj)
+{
+    if (!r_is_objc_ptr(obj)) return false;
+    uint64_t cls = r_dlsym_call(R_TIMEOUT, "object_getClass", obj, 0, 0, 0, 0, 0, 0, 0);
+    uint64_t name = r_is_objc_ptr(cls)
+        ? r_dlsym_call(R_TIMEOUT, "class_getName", cls, 0, 0, 0, 0, 0, 0, 0) : 0;
+    if (!name) return false;
+    char buffer[192] = {0};
+    remote_read(name, buffer, sizeof(buffer) - 1);
+    return strstr(buffer, "ControlCenter") != NULL || strstr(buffer, "CCUI") != NULL;
+}
+
+static bool sbw_window_hosts_control_center(uint64_t window)
+{
+    if (!r_is_objc_ptr(window)) return false;
+    if (sbw_object_name_contains_cc(window)) return true;
+
+    uint64_t controller = sw_safe_msg(window, "rootViewController", 0, 0, 0, 0);
+    if (sbw_object_name_contains_cc(controller)) return true;
+    uint64_t rootView = sw_safe_msg(controller, "view", 0, 0, 0, 0);
+    if (sbw_object_name_contains_cc(rootView)) return true;
+
+    const char *rootClasses[] = {
+        "CCUIModularControlCenterOverlayView",
+        "CCUIModularControlCenterView",
+        "CCUIControlCenterView",
+        "CCUIModuleContainerView",
+        "CCUIContentModuleContainerView",
+        NULL,
+    };
+    uint64_t sample[1] = {0};
+    for (int i = 0; rootClasses[i]; i++) {
+        uint64_t cls = r_class(rootClasses[i]);
+        if (r_is_objc_ptr(cls) && sb_collect_views(window, cls, sample, 1) > 0) return true;
+    }
+    return false;
+}
+
+int sb_collect_control_center_windows(uint64_t *out, int cap)
+{
+    if (!out || cap <= 0) return 0;
+    uint64_t windows[64] = {0};
+    int windowCount = sb_collect_windows(windows, 64);
+    int found = 0;
+    for (int i = 0; i < windowCount && found < cap; i++) {
+        if (sbw_window_hosts_control_center(windows[i])) out[found++] = windows[i];
+    }
+    static int lastFound = -1;
+    if (lastFound != found) {
+        printf("[SB_WALK][CC] scannedWindows=%d matchedControlCenterWindows=%d state=changed\n",
+               windowCount, found);
+        lastFound = found;
+    }
+    return found;
+}
+
+uint64_t sb_control_center_window(void)
+{
+    uint64_t windows[16] = {0};
+    int count = sb_collect_control_center_windows(windows, 16);
+    for (int i = count - 1; i >= 0; i--) {
+        uint64_t hidden = sw_safe_msg(windows[i], "isHidden", 0, 0, 0, 0);
+        double alpha = 1.0;
+        if (r_responds_main(windows[i], "alpha")) {
+            r_msg2_main_struct_ret(windows[i], "alpha", &alpha, sizeof(alpha),
+                                   NULL, 0, NULL, 0, NULL, 0, NULL, 0);
+        }
+        if (!(hidden & 0xff) && alpha > 0.01) return windows[i];
     }
     return count > 0 ? windows[count - 1] : 0;
 }

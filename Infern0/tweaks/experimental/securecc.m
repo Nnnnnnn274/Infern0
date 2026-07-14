@@ -79,7 +79,7 @@ bool securecc_apply_in_session(void)
 {
     bool locked = false;
     if (!securecc_is_locked(&locked)) return false;
-    uint64_t win = sb_frontmost_window();
+    uint64_t win = sb_control_center_window();
     int controls = 0;
     if (r_is_objc_ptr(win)) securecc_set_controls_enabled(win, !locked, 0, &controls);
     if (!locked || !gSecureCCShowIndicator) {
@@ -132,7 +132,7 @@ bool securecc_stop_in_session(void)
 {
     printf("[SECURECC] stop\n");
     if (r_is_objc_ptr(gSecureCCBanner)) r_msg2_main(gSecureCCBanner, "removeFromSuperview", 0, 0, 0, 0);
-    uint64_t win = sb_frontmost_window();
+    uint64_t win = sb_control_center_window();
     if (r_is_objc_ptr(win)) securecc_set_controls_enabled(win, true, 0, NULL);
     gSecureCCBanner = 0;
     return true;
