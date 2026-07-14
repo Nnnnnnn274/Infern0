@@ -121,6 +121,7 @@ bool livewp_apply_in_session(void)
     LIVEWP_DEBUG_LOG("[LIVEWP][DEBUG][apply] start configured=%d paused=%d\n",
                      g_livewp_configured ? 1 : 0, g_livewp_paused ? 1 : 0);
     bool ok = false;
+    NSString *videoPath = nil;
 
     NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
     g_livewp_mood_mode = [defaults boolForKey:@"LiveWPMoodMode"];
@@ -144,7 +145,7 @@ bool livewp_apply_in_session(void)
         goto out;
     }
 
-    NSString *videoPath = livewp_absolute_path();
+    videoPath = livewp_absolute_path();
     if (!videoPath || videoPath.length == 0) {
         log_user("[LIVEWP] No video path configured.\n");
         LIVEWP_DEBUG_LOG("[LIVEWP][DEBUG][apply] end ok=0 reason=no-path total=%llums\n",
