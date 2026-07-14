@@ -75,7 +75,7 @@ static UILabel *packages_stat_label(void)
 
 @interface PackagesViewController () <UISearchResultsUpdating>
 @property (nonatomic, copy) NSArray<Package *> *allPackagesSorted;
-@property (nonatomic, copy) NSArray<Package *> *newPackages;
+@property (nonatomic, copy) NSArray<Package *> *recentPackages;
 @property (nonatomic, copy) NSArray<NSArray<Package *> *> *displayedSections;
 @property (nonatomic, copy) NSArray<NSString *> *displayedSectionTitles;
 @property (nonatomic, copy) NSArray<Package *> *searchResults;
@@ -248,7 +248,7 @@ static UILabel *packages_stat_label(void)
         [NSString stringWithFormat:@"%ld\nTotal", (long)self.allPackagesSorted.count],
         [NSString stringWithFormat:@"%ld\nActive", (long)active],
         [NSString stringWithFormat:@"%ld\nUpdates", (long)updates],
-        [NSString stringWithFormat:@"%ld\nNew", (long)self.newPackages.count],
+        [NSString stringWithFormat:@"%ld\nNew", (long)self.recentPackages.count],
     ];
     NSArray<UIColor *> *colors = @[UIColor.labelColor, UIColor.systemGreenColor,
                                    UIColor.systemRedColor, UIColor.systemOrangeColor];
@@ -276,16 +276,16 @@ static UILabel *packages_stat_label(void)
             return [a.name localizedCaseInsensitiveCompare:b.name];
         }];
 
-    NSMutableArray<Package *> *newPackages = [NSMutableArray array];
+    NSMutableArray<Package *> *recentPackages = [NSMutableArray array];
     for (Package *pkg in self.allPackagesSorted) {
-        if (package_is_recent(pkg)) [newPackages addObject:pkg];
+        if (package_is_recent(pkg)) [recentPackages addObject:pkg];
     }
-    [newPackages sortUsingComparator:^NSComparisonResult(Package *a, Package *b) {
+    [recentPackages sortUsingComparator:^NSComparisonResult(Package *a, Package *b) {
         NSTimeInterval ta = package_seen_timestamp(a), tb = package_seen_timestamp(b);
         if (ta != tb) return ta > tb ? NSOrderedAscending : NSOrderedDescending;
         return [a.name localizedCaseInsensitiveCompare:b.name];
     }];
-    self.newPackages = newPackages;
+    self.recentPackages = recentPackages;
 
     [self rebuildDisplayedSections];
     [self rebuildSearchResults];
@@ -338,7 +338,7 @@ static UILabel *packages_stat_label(void)
             return [self.allPackagesSorted filteredArrayUsingPredicate:p];
         }
         case PackagesScopeNew:
-            return self.newPackages;
+            return self.recentPackages;
         case PackagesScopeAll:
         default:
             return self.allPackagesSorted;
