@@ -320,7 +320,7 @@ static Package *catalog_community_port(NSString *identifier, NSString *name,
                                      enabledKey:kSettingsTypeBannerEnabled
                                           isNew:NO];
         typeBanner.settingsSection = kSecTypeBanner;
-        typeBanner.unstableWarning = @"⚠️ Beta: Keeps an original-thread imagent RemoteCall session for live polling and may occasionally miss indicators.";
+        typeBanner.unstableWarning = @"Beta: Uses a short-lived imagent probe every five seconds and restores the daemon thread after every poll. Disable it and report the [TYPEBANNER] log if a probe or restore fails.";
 
         Package *notificationIsland = [[Package alloc] initWithIdentifier:@"com.darksword.notificationisland"
                                            name:@"Notification Island"

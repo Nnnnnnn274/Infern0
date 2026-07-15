@@ -238,6 +238,20 @@ static void gl_set_double(uint64_t obj, const char *selName, double value)
                     NULL, 0, NULL, 0, NULL, 0);
 }
 
+// The motion callback runs many times per second, so a behavior invalidated by
+// a SpringBoard page rebuild must not remain in its raw-address cache.  Unlike
+// the general setter above, this reports the RemoteCall result so the caller
+// can evict a dead behavior after the first failed access.
+static bool gl_set_double_checked(uint64_t obj, const char *selName, double value)
+{
+    if (!r_is_objc_ptr(obj) || !selName) return false;
+    if (!r_responds_main(obj, selName) || !remote_call_current_success()) return false;
+    r_msg2_main_raw(obj, selName,
+                    &value, sizeof(value),
+                    NULL, 0, NULL, 0, NULL, 0);
+    return remote_call_current_success();
+}
+
 static void gl_set_bool(uint64_t obj, const char *selName, bool value)
 {
     if (!r_is_objc_ptr(obj) || !r_responds_main(obj, selName)) return;
@@ -1490,17 +1504,12 @@ static bool gl_build_group_ios26_per_icon(uint64_t groups,
         gl_set_double(gravity, "setAngle:", M_PI_2);
         gl_set_double(gravity, "setMagnitude:", config.magnitude);
         r_msg2_main(animator, "addBehavior:", gravity, 0, 0, 0);
-        int n = __atomic_load_n(&s_gravity_ptr_count, __ATOMIC_RELAXED);
-        if (n < 64) {
-            s_gravity_ptrs[n] = gravity;
-            __atomic_store_n(&s_gravity_ptr_count, n + 1, __ATOMIC_SEQ_CST);
-        }
-        gl_release(gravity);
     }
 
     uint64_t group = gl_new_remote("NSMutableDictionary");
     if (r_is_objc_ptr(group)) {
         gl_dict_set(group, "animator", animator);
+        if (r_is_objc_ptr(gravity)) gl_dict_set(group, "gravity", gravity);
         gl_dict_set(group, "icons", icons);
         gl_dict_set(group, "snapshots", icons);
         gl_dict_set(group, "liveItems", liveItems);
@@ -1511,9 +1520,18 @@ static bool gl_build_group_ios26_per_icon(uint64_t groups,
         gl_dict_set(group, "overlay", overlay);
         gl_array_add(groups, group);
         gl_release(group);
+        if (r_is_objc_ptr(gravity)) {
+            int n = __atomic_load_n(&s_gravity_ptr_count, __ATOMIC_RELAXED);
+            if (n < 64) {
+                s_gravity_ptrs[n] = gravity;
+                __atomic_store_n(&s_gravity_ptr_count, n + 1, __ATOMIC_SEQ_CST);
+            }
+            gl_release(gravity);
+        }
     } else {
         gl_restore_live_items(liveItems, liveParents, liveFrames);
         r_msg2_main(overlay, "removeFromSuperview", 0, 0, 0, 0);
+        if (r_is_objc_ptr(gravity)) gl_release(gravity);
         gl_release(animator);
         gl_release(overlay);
         gl_release(icons);
@@ -1716,17 +1734,12 @@ static bool gl_build_group(uint64_t groups,
         gl_set_double(gravity, "setAngle:", M_PI_2);
         gl_set_double(gravity, "setMagnitude:", config.magnitude);
         r_msg2_main(animator, "addBehavior:", gravity, 0, 0, 0);
-        int n = __atomic_load_n(&s_gravity_ptr_count, __ATOMIC_RELAXED);
-        if (n < 64) {
-            s_gravity_ptrs[n] = gravity;
-            __atomic_store_n(&s_gravity_ptr_count, n + 1, __ATOMIC_SEQ_CST);
-        }
-        gl_release(gravity);
     }
 
     uint64_t group = gl_new_remote("NSMutableDictionary");
     if (r_is_objc_ptr(group)) {
         gl_dict_set(group, "animator", animator);
+        if (r_is_objc_ptr(gravity)) gl_dict_set(group, "gravity", gravity);
         gl_dict_set(group, "snapshots", snapshots);
         gl_dict_set(group, "liveItems", liveItems);
         gl_dict_set(group, "liveParents", liveParents);
@@ -1735,11 +1748,20 @@ static bool gl_build_group(uint64_t groups,
         gl_dict_set(group, "overlay", overlay);
         gl_array_add(groups, group);
         gl_release(group);
+        if (r_is_objc_ptr(gravity)) {
+            int n = __atomic_load_n(&s_gravity_ptr_count, __ATOMIC_RELAXED);
+            if (n < 64) {
+                s_gravity_ptrs[n] = gravity;
+                __atomic_store_n(&s_gravity_ptr_count, n + 1, __ATOMIC_SEQ_CST);
+            }
+            gl_release(gravity);
+        }
     } else {
         gl_restore_live_items(liveItems, liveParents, liveFrames);
         gl_set_double(listView, "setAlpha:", 1.0);
         gl_layout_list_view(listView);
         r_msg2_main(overlay, "removeFromSuperview", 0, 0, 0, 0);
+        if (r_is_objc_ptr(gravity)) gl_release(gravity);
         gl_release(animator);
         gl_release(overlay);
         gl_release(snapshots);
@@ -2158,17 +2180,29 @@ bool gravitylite_update_gravity_angle_in_session(double angle, double magnitude)
     int count = __atomic_load_n(&s_gravity_ptr_count, __ATOMIC_SEQ_CST);
     if (count <= 0) return false;
     uint32_t oldSettle = r_settle_us(0);
+    int kept = 0;
+    int evicted = 0;
     for (int i = 0; i < count; i++) {
         uint64_t gb = s_gravity_ptrs[i];
-        if (!r_is_objc_ptr(gb)) continue;
-        gl_set_double(gb, "setAngle:", angle);
-        gl_set_double(gb, "setMagnitude:", magnitude);
+        if (!r_is_objc_ptr(gb) ||
+            !gl_set_double_checked(gb, "setAngle:", angle) ||
+            !gl_set_double_checked(gb, "setMagnitude:", magnitude)) {
+            evicted++;
+            continue;
+        }
+        s_gravity_ptrs[kept++] = gb;
     }
+    for (int i = kept; i < count; i++) s_gravity_ptrs[i] = 0;
+    __atomic_store_n(&s_gravity_ptr_count, kept, __ATOMIC_SEQ_CST);
     r_settle_us(oldSettle);
+    if (evicted > 0) {
+        log_user("[GRAVITY][STEERING-RECOVERY] evictedStaleBehaviors=%d remainingGroups=%d action=stopped-retrying-invalid-vm-object.\n",
+                 evicted, kept);
+    }
     if ((refreshTick % 100U) == 0U)
         log_user("[GRAVITY][STEERING] angle=%.4f magnitude=%.2f groups=%d discoveryTick=%u result=updated.\n",
-                 angle, magnitude, count, refreshTick);
-    return true;
+                 angle, magnitude, kept, refreshTick);
+    return kept > 0;
 }
 
 void gravitylite_forget_remote_state(void)

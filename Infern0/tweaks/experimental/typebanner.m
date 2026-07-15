@@ -26,7 +26,9 @@ static const double kTypeBannerIconLabelGap = 8.0;
 static const uint64_t kTypeBannerRBSLegacyPreventSuspendFlag = 1;
 static const uint64_t kTypeBannerRBSLegacyBackgroundUIReason = 7;
 static const uint64_t kTypeBannerMobileBootstrapCooldownUS = 3000000;
-static const uint64_t kTypeBannerImagentProbeCooldownUS = 1000000;
+// A failed original-thread daemon probe is not retried immediately. Repeated
+// bootstrap attempts against an unhealthy imagent can stall system messaging.
+static const uint64_t kTypeBannerImagentProbeCooldownUS = 10000000;
 static const bool kTypeBannerDaemonOnlyDetection = true;
 static const bool kTypeBannerResolveMobileSMSNames = false;
 // Crash logs from iOS 26.0.1 show SpringBoard-hosted RBSAssertion acquisition
@@ -597,9 +599,11 @@ bool typebanner_mobile_was_unreachable_last_tick(void)
 
 #pragma mark - Detection helpers (MobileSMS side)
 
-// Cap on chats per poll. IMChatRegistry.allExistingChats is typically <300
-// on a busy device; cap so a bogus return doesn't melt us.
-static const uint64_t kTbMaxChatsPerPoll = 512;
+// Cap every poll so a bogus or unexpectedly large collection cannot keep a
+// system daemon's original thread occupied for an unbounded scan.
+// Keep original-thread occupancy short. The previous 512-chat walk could hold
+// imagent for far too long on accounts with a large message history.
+static const uint64_t kTbMaxChatsPerPoll = 64;
 
 static NSString *tb_remote_nsstring_to_utf8(uint64_t nsStringObj, uint64_t selUTF8)
 {
@@ -1670,25 +1674,51 @@ static void tb_defer_imagent_probe(const char *reason)
     }
 }
 
+static bool tb_restore_imagent_original_thread(RemoteCallSession *session,
+                                               const char *context)
+{
+    if (!session) return true;
+    @try {
+        // Bound the restore wait too. The default ten-second stable timeout is
+        // inappropriate while borrowing a core daemon's original thread.
+        remote_call_with_session(session, ^{
+            remote_call_set_stable_timeout_floor_ms(1500);
+        });
+        [session destroyRemoteCall];
+        printf("[TYPEBANNER] imagent safe probe: original thread restored (%s)\n",
+               context ?: "probe");
+        return true;
+    } @catch (NSException *e) {
+        [session abandonRemoteCall];
+        printf("[TYPEBANNER] imagent original-thread restore exception (%s): %s\n",
+               context ?: "probe", e.reason.UTF8String);
+        return false;
+    }
+}
+
 static NSString *tb_try_imagent_original_thread_only_poll(RemoteCallSession **sessionRef)
 {
     gTypeBannerImagentReachableLastTick = false;
     if (tb_imagent_probe_deferred()) return nil;
 
-    RemoteCallSession *session = sessionRef ? *sessionRef : nil;
-    bool ownsSession = false;
-    if (!session) {
-        printf("[TYPEBANNER] imagent safe probe: original-thread-only bootstrap\n");
-        session = [[RemoteCallSession alloc] initWithProcess:@"imagent"
-                                           useMigFilterBypass:NO
-                                      firstExceptionTimeoutMS:TYPEBANNER_RC_MOBILESMS_FIRST_EXCEPTION_TIMEOUT_MS
-                                           originalThreadOnly:YES];
-        if (sessionRef) {
-            *sessionRef = session;
-        } else {
-            ownsSession = true;
+    // Never keep an original-thread-only session between ticks. Such a session
+    // owns imagent's original thread until destroyRemoteCall restores it; the
+    // old cached design could therefore wedge messaging (and the device) for
+    // the entire lifetime of the live loop.
+    if (sessionRef && *sessionRef) {
+        RemoteCallSession *staleSession = *sessionRef;
+        *sessionRef = nil;
+        if (!tb_restore_imagent_original_thread(staleSession, "legacy-cache")) {
+            tb_defer_imagent_probe("legacy session teardown failed");
+            return nil;
         }
     }
+
+    printf("[TYPEBANNER] imagent safe probe: begin one-shot original-thread session\n");
+    RemoteCallSession *session = [[RemoteCallSession alloc] initWithProcess:@"imagent"
+                                                        useMigFilterBypass:NO
+                                                   firstExceptionTimeoutMS:TYPEBANNER_RC_MOBILESMS_FIRST_EXCEPTION_TIMEOUT_MS
+                                                        originalThreadOnly:YES];
     if (!session) {
         RemoteCallInitFailure failure = remote_call_last_init_failure();
         uint32_t pid = remote_call_last_init_failure_pid();
@@ -1716,28 +1746,17 @@ static NSString *tb_try_imagent_original_thread_only_poll(RemoteCallSession **se
     }
 
     if (!gTypeBannerImagentPollRemoteHealthy) {
-        if (sessionRef && *sessionRef == session) {
-            [session abandonRemoteCall];
-            *sessionRef = nil;
-        } else if (ownsSession) {
-            @try {
-                [session destroyRemoteCall];
-            } @catch (NSException *e) {
-                printf("[TYPEBANNER] imagent original-thread-only destroy exception: %s\n",
-                       e.reason.UTF8String);
-            }
-        }
+        // Still attempt one bounded restore before dropping local resources.
+        // This gives imagent its original execution state back whenever the
+        // final poll reply was merely late rather than a daemon death.
+        (void)tb_restore_imagent_original_thread(session, "unhealthy-poll");
         tb_defer_imagent_probe("poll stopped replying");
         return nil;
     }
 
-    if (ownsSession) {
-        @try {
-            [session destroyRemoteCall];
-        } @catch (NSException *e) {
-            printf("[TYPEBANNER] imagent original-thread-only destroy exception: %s\n",
-                   e.reason.UTF8String);
-        }
+    if (!tb_restore_imagent_original_thread(session, "poll-complete")) {
+        tb_defer_imagent_probe("original thread restore failed");
+        return nil;
     }
 
     gTypeBannerLastImagentInitFailure = RemoteCallInitFailureNone;

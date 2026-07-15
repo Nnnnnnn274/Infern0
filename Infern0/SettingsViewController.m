@@ -1215,6 +1215,7 @@ static BOOL settings_cleanup_in_progress(void);
 static BOOL settings_screen_awake_cached(void);
 static BOOL settings_screen_locked_cached(void);
 static void settings_restart_gravity_motion_if_active(const char *reason);
+static void settings_stop_gravity_motion(void);
 
 extern int  escape_sbx_demo2(void);
 extern int  escape_sbx_demo2_in_session(void);
@@ -1301,7 +1302,15 @@ static void settings_start_gravity_motion(double magnitude, double explosionForc
 
             @synchronized (settings_rc_lock()) {
                 if (!settings_gravity_motion_can_remote_call(generation, mm)) return;
-                gravitylite_update_gravity_angle_in_session(angle, effectiveMagnitude);
+                if (!gravitylite_update_gravity_angle_in_session(angle, effectiveMagnitude) &&
+                    __sync_bool_compare_and_swap(&g_gravity_motion_stop_requested, 0, 1)) {
+                    log_user("[GRAVITY][STEERING-RECOVERY] no live physics behaviors remain; stopping the motion feed. Reapply Gravity Lite to rebuild its page state.\n");
+                    dispatch_async(dispatch_get_main_queue(), ^{
+                        if (generation == g_gravity_motion_generation &&
+                            mm == g_gravity_motion_manager)
+                            settings_stop_gravity_motion();
+                    });
+                }
             }
         }];
     } else {
@@ -1315,7 +1324,15 @@ static void settings_start_gravity_motion(double magnitude, double explosionForc
                                                      : (0.90 + fmin(tilt, 1.2) * 0.50));
             @synchronized (settings_rc_lock()) {
                 if (!settings_gravity_motion_can_remote_call(generation, mm)) return;
-                gravitylite_update_gravity_angle_in_session(angle, effectiveMagnitude);
+                if (!gravitylite_update_gravity_angle_in_session(angle, effectiveMagnitude) &&
+                    __sync_bool_compare_and_swap(&g_gravity_motion_stop_requested, 0, 1)) {
+                    log_user("[GRAVITY][STEERING-RECOVERY] no live physics behaviors remain; stopping the motion feed. Reapply Gravity Lite to rebuild its page state.\n");
+                    dispatch_async(dispatch_get_main_queue(), ^{
+                        if (generation == g_gravity_motion_generation &&
+                            mm == g_gravity_motion_manager)
+                            settings_stop_gravity_motion();
+                    });
+                }
             }
         }];
     }
@@ -1923,8 +1940,11 @@ static const NSUInteger kAxonLiteLiveMaxTicks = 43200;
 static const int kSettingsSpringBoardRCFirstExceptionTimeoutMS = 3000;
 // TypeBanner polls imagent for typing indicators with original-thread-only
 // RemoteCall probes and opens SpringBoard only when the banner state changes.
-static const useconds_t kTypeBannerLiveIntervalUS = 1000000;
-static const useconds_t kTypeBannerLiveBackgroundIntervalUS = 1000000;
+// TypeBanner temporarily borrows imagent's original thread. Keep probes sparse
+// enough to avoid hammering a core system daemon while remaining responsive to
+// normal multi-second typing indicators.
+static const useconds_t kTypeBannerLiveIntervalUS = 5000000;
+static const useconds_t kTypeBannerLiveBackgroundIntervalUS = 5000000;
 static const useconds_t kTypeBannerInitialDaemonSettleUS = 250000;
 static const NSUInteger kTypeBannerLiveMaxTicks = 28800;
 static const useconds_t kNotificationIslandLiveIntervalUS = 750000;
@@ -5590,7 +5610,6 @@ static void settings_start_typebanner_live_loop(void)
         BOOL deferredLogged = NO;
         BOOL pausedForMessages = NO;
         RemoteCallSession *mobileSession = nil;
-        RemoteCallSession *daemonSession = nil;
 
         printf("[SETTINGS] TypeBanner live loop started interval=%uus background=%uus max=%lu\n",
                kTypeBannerLiveIntervalUS,
@@ -5632,12 +5651,6 @@ static void settings_start_typebanner_live_loop(void)
                             mobileSession = nil;
                         }
                     }
-                    if (daemonSession) {
-                        @synchronized (settings_rc_lock()) {
-                            [daemonSession abandonRemoteCall];
-                            daemonSession = nil;
-                        }
-                    }
                     settings_live_loop_sleep_interruptible(0,
                                                            intervalUS,
                                                            &g_typebanner_live_stop_requested);
@@ -5658,7 +5671,7 @@ static void settings_start_typebanner_live_loop(void)
                             g_kexploit_done &&
                             settings_typebanner_can_poll_messages()) {
                             ok = typebanner_run_once_with_cached_sessions(&mobileSession,
-                                                                          &daemonSession,
+                                                                          NULL,
                                                                           g_springboard_rc_ready != 0);
                         } else {
                             ok = true;
@@ -5701,12 +5714,6 @@ static void settings_start_typebanner_live_loop(void)
                 @synchronized (settings_rc_lock()) {
                     [mobileSession destroyRemoteCall];
                     mobileSession = nil;
-                }
-            }
-            if (daemonSession) {
-                @synchronized (settings_rc_lock()) {
-                    [daemonSession destroyRemoteCall];
-                    daemonSession = nil;
                 }
             }
 
@@ -11597,8 +11604,8 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
 {
     return @[
         @{ @"kind": @"button",
-           @"title": @"Test: Poll Daemon & Show Banner",
-           @"subtitle": @"Runs the live imagent detection path once. Banner shows the result; the [TYPEBANNER] log lines explain what was/wasn't found.",
+           @"title": @"Test Banner Rendering",
+           @"subtitle": @"Shows and hides a demo banner using short SpringBoard sessions. It does not probe the Messages daemon.",
            @"action": @"typebanner-test" },
     ];
 }
@@ -17292,48 +17299,8 @@ void cyanide_present_contact(UIViewController *host)
                         }
                     }
 
-                    log_user("[TYPEBANNER] Test: polling imagent for typing indicators…\n");
-                    NSString *detected = nil;
-                    @synchronized (settings_rc_lock()) {
-                        RemoteCallSession *daemonSession = [[RemoteCallSession alloc] initWithProcess:@"imagent"
-                                                                                   useMigFilterBypass:NO
-                                                                              firstExceptionTimeoutMS:TYPEBANNER_RC_MOBILESMS_FIRST_EXCEPTION_TIMEOUT_MS
-                                                                                    originalThreadOnly:YES];
-                        if (!daemonSession) {
-                            RemoteCallInitFailure failure = remote_call_last_init_failure();
-                            uint32_t pid = remote_call_last_init_failure_pid();
-                            if (failure == RemoteCallInitFailureProcessMissing) {
-                                log_user("[TYPEBANNER] imagent is not running.\n");
-                            } else if (failure == RemoteCallInitFailureFirstExceptionTimeout && pid != 0) {
-                                log_user("[TYPEBANNER] imagent pid=%u did not answer the original-thread bootstrap this tick.\n",
-                                         pid);
-                            } else if (pid != 0) {
-                                log_user("[TYPEBANNER] imagent RemoteCall init failed: %s (pid=%u)\n",
-                                         remote_call_init_failure_description(failure), pid);
-                            } else {
-                                log_user("[TYPEBANNER] imagent RemoteCall init failed: %s\n",
-                                         remote_call_init_failure_description(failure));
-                            }
-                        } else {
-                            @try {
-                                detected = typebanner_poll_in_imagent_remote_session(daemonSession);
-                            } @catch (NSException *e) {
-                                log_user("[TYPEBANNER] imagent poll threw: %s\n", e.reason.UTF8String);
-                            }
-                            if (detected.length == 0) {
-                                log_user("[TYPEBANNER] No daemon typing indicator detected on this poll.\n");
-                            }
-                            [daemonSession destroyRemoteCall];
-                        }
-                    }
-
-                    if (detected.length > 0) {
-                        log_user("[TYPEBANNER] Detected typing: %s. Showing banner.\n",
-                                 detected.UTF8String);
-                    } else {
-                        log_user("[TYPEBANNER] Showing a one-shot demo banner so you can confirm the SpringBoard render path.\n");
-                    }
-
+                    log_user("[TYPEBANNER] Render test: showing a demo without probing imagent.\n");
+                    BOOL shown = NO;
                     @synchronized (settings_rc_lock()) {
                         RemoteCallSession *springboardSession = [[RemoteCallSession alloc] initWithProcess:@"SpringBoard"
                                                                                          useMigFilterBypass:NO
@@ -17343,15 +17310,36 @@ void cyanide_present_contact(UIViewController *host)
                         } else {
                             bool ok = false;
                             @try {
-                                NSString *label = detected.length > 0 ? detected : @"TypeBanner demo";
-                                ok = typebanner_show_in_springboard_remote_session(springboardSession, label);
+                                ok = typebanner_show_in_springboard_remote_session(springboardSession,
+                                                                                   @"TypeBanner demo");
                             } @catch (NSException *e) {
                                 log_user("[TYPEBANNER] SpringBoard show threw: %s\n", e.reason.UTF8String);
                             }
-                            log_user("[TYPEBANNER] show=%d. Banner auto-hides in 5s.\n", ok);
-                            sleep(5);
-                            @try { typebanner_hide_in_springboard_remote_session(springboardSession); } @catch (NSException *e) {}
+                            shown = ok;
                             [springboardSession destroyRemoteCall];
+                        }
+                    }
+                    log_user("[TYPEBANNER] render show=%d. Banner auto-hides in 5s.\n", shown);
+
+                    // Do not hold the global RemoteCall lock or a live session
+                    // while the demo is visible.
+                    if (shown) sleep(5);
+
+                    @synchronized (settings_rc_lock()) {
+                        RemoteCallSession *springboardSession = [[RemoteCallSession alloc] initWithProcess:@"SpringBoard"
+                                                                                         useMigFilterBypass:NO
+                                                                                    firstExceptionTimeoutMS:TYPEBANNER_RC_FIRST_EXCEPTION_TIMEOUT_MS];
+                        if (springboardSession) {
+                            bool hidden = false;
+                            @try {
+                                hidden = typebanner_hide_in_springboard_remote_session(springboardSession);
+                            } @catch (NSException *e) {
+                                log_user("[TYPEBANNER] SpringBoard hide threw: %s\n", e.reason.UTF8String);
+                            }
+                            [springboardSession destroyRemoteCall];
+                            log_user("[TYPEBANNER] render hide=%d.\n", hidden);
+                        } else {
+                            log_user("[TYPEBANNER] SpringBoard not reachable for demo cleanup; cleanup or respring will remove the overlay.\n");
                         }
                     }
 
