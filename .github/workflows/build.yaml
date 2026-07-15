@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - testing
   workflow_dispatch:
 
 jobs:
@@ -58,6 +59,21 @@ jobs:
             Infern0.xcodeproj/project.pbxproj | head -1)
           echo "value=$v" >> "$GITHUB_OUTPUT"
 
+      - name: Select release channel
+        id: channel
+        shell: bash
+        run: |
+          version="${{ steps.version.outputs.value }}"
+          if [ "$GITHUB_REF_NAME" = "testing" ]; then
+            echo "tag=${version}-testing" >> "$GITHUB_OUTPUT"
+            echo "name=Infern0 ${version} Testing" >> "$GITHUB_OUTPUT"
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${version}" >> "$GITHUB_OUTPUT"
+            echo "name=Infern0 ${version}" >> "$GITHUB_OUTPUT"
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Generate changelog
         id: changelog
         shell: bash
@@ -82,7 +98,9 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.version.outputs.value }}
+          tag_name: ${{ steps.channel.outputs.tag }}
+          name: ${{ steps.channel.outputs.name }}
+          prerelease: ${{ steps.channel.outputs.prerelease }}
           body: ${{ steps.changelog.outputs.body }}
           files: release-assets/Infern0-*.ipa
           fail_on_unmatched_files: true
