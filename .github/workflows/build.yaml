@@ -89,6 +89,14 @@ jobs:
           echo "$log" >> "$GITHUB_OUTPUT"
           echo "$delimiter" >> "$GITHUB_OUTPUT"
 
+      - name: Point testing tag at this build
+        if: github.ref_name == 'testing'
+        shell: bash
+        run: |
+          tag="${{ steps.channel.outputs.tag }}"
+          git tag --force "$tag" "$GITHUB_SHA"
+          git push origin "refs/tags/$tag" --force
+
       - name: Download IPA
         uses: actions/download-artifact@v4
         with:
@@ -101,11 +109,12 @@ jobs:
           tag_name: ${{ steps.channel.outputs.tag }}
           name: ${{ steps.channel.outputs.name }}
           prerelease: ${{ steps.channel.outputs.prerelease }}
+          target_commitish: ${{ github.sha }}
           body: ${{ steps.changelog.outputs.body }}
           files: release-assets/Infern0-*.ipa
           fail_on_unmatched_files: true
           generate_release_notes: true
-          update: true
+          overwrite_files: true
 
   notify:
     name: Notify Discord
