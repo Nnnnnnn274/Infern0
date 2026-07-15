@@ -2,6 +2,7 @@
 #import "../remote_objc.h"
 #import "../sb_walk.h"
 #import "../../TaskRop/RemoteCall.h"
+#import "../../LogTextView.h"
 
 #import <Foundation/Foundation.h>
 #import <string.h>
