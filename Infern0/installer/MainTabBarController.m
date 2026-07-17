@@ -8,6 +8,7 @@
 #import "QueueReviewViewController.h"
 #import "PackageQueue.h"
 #import "HomeViewController.h"
+#import "CYIconBadge.h"
 #import "../SettingsViewController.h"
 
 static const CGFloat kPopupHeight  = 56.0;

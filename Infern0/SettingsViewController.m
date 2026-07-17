@@ -7601,21 +7601,6 @@ static void settings_schedule_live_apply_for_key(NSString *key)
         });
         return;
     }
-    if (settings_key_is_community_port(key)) {
-        if (!g_springboard_rc_ready) {
-            if (settings_key_affects_package_state(key)) settings_mark_tweak_applied(key, NO);
-            settings_notify_package_queue_changed_async();
-            return;
-        }
-        dispatch_async(dispatch_get_global_queue(0, 0), ^{
-            @synchronized (settings_rc_lock()) {
-                if (!settings_cleanup_in_progress() && g_springboard_rc_ready)
-                    (void)settings_apply_community_ports(d);
-            }
-            settings_notify_package_queue_changed_async();
-        });
-        return;
-    }
     if (settings_key_is_location_sim(key)) {
         BOOL locsimStarted = [d boolForKey:kSettingsLocationSimStarted];
         if ([key isEqualToString:kSettingsLocationSimEnabled]) {
