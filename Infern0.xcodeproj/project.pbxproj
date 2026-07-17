@@ -58,10 +58,6 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
-				tweaks/experimental/NotificationIslandActivityAttributes.swift,
-				tweaks/experimental/NotificationIslandLiveActivityBridge.swift,
-				tweaks/experimental/NotificationIslandWidget/Info.plist,
-				tweaks/experimental/NotificationIslandWidget/NotificationIslandWidgetBundle.swift,
 				XPF/.gitignore,
 				XPF/.gitmodules,
 				XPF/.vscode/settings.json,

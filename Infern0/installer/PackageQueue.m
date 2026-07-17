@@ -6,8 +6,7 @@
 #import "PackageQueue.h"
 #import "PackageCatalog.h"
 #import "../SettingsViewController.h"
-#import "../tweaks/QuickLoader.h"
-#import "../tweaks/RepoTweaks.h"
+#import "../tweaks/retired_tweak_compat.h"
 
 NSString * const PackageQueueDidChangeNotification = @"PackageQueueDidChangeNotification";
 

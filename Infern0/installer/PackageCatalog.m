@@ -5,7 +5,7 @@
 
 #import "PackageCatalog.h"
 #import "../SettingsViewController.h"
-#import "../tweaks/RepoTweaks.h"
+#import "../tweaks/retired_tweak_compat.h"
 #import "../tweaks/experimental_tweaks.h"
 
 @interface Package ()
@@ -119,6 +119,7 @@ static const NSInteger kSecPowercuff        = 12;
 static const NSInteger kSecDragCoefficient  = 14;
 static const NSInteger kSecLayoutExtras     = 15;
 static const NSInteger kSecNanoRegistry     = 16;
+static const NSInteger kSecThemer           = 17;
 static const NSInteger kSecSnowBoardLite    = 18;
 static const NSInteger kSecLiveWP           = 19;
 static const NSInteger kSecLocationSim      = 20;
@@ -164,29 +165,7 @@ static const NSInteger kSecLockCustomizer   = 59;
 static const NSInteger kSecFreePlacement    = 60;
 static const NSInteger kSecCopypastaLite    = 61;
 static const NSInteger kSecAppLibraryStudio = 62;
-static const NSInteger kSecCommunityPorts   = 63;
 static const NSInteger kSecDarkSwordTweaks  = 13;
-
-static Package *catalog_community_port(NSString *identifier, NSString *name,
-                                       NSString *summary, NSString *details,
-                                       NSString *symbol, NSString *key,
-                                       NSString *category, NSString *version)
-{
-    Package *package = [[Package alloc] initWithIdentifier:identifier
-                                                      name:name
-                                          shortDescription:summary
-                                           longDescription:details
-                                                   version:version
-                                                    author:@"Nnnnnnn274"
-                                                  category:category
-                                                symbolName:symbol
-                                                      kind:PackageInstallKindToggle
-                                                enabledKey:key
-                                                     isNew:YES];
-    package.settingsSection = kSecCommunityPorts;
-    package.unstableWarning = @"Live-session port: cleanup, respring, reboot, or closing infern0 removes the active runtime changes.";
-    return package;
-}
 
 + (NSArray<Package *> *)allPackages
 {
@@ -419,6 +398,20 @@ static Package *catalog_community_port(NSString *identifier, NSString *name,
                                      enabledKey:kSettingsLiveWPEnabled
                                           isNew:NO];
         liveWP.settingsSection = kSecLiveWP;
+
+        Package *themer = [[Package alloc] initWithIdentifier:@"com.darksword.themer"
+                                             name:@"Infern0 Themer"
+                                 shortDescription:@"Per-bundle icon theme engine"
+                                  longDescription:@"Replaces stock app icons with a selected local icon theme. Choose a theme in Settings before applying. Changes are session-based and may need re-applying after SpringBoard restarts."
+                                          version:version
+                                           author:@"zeroxjf"
+                                         category:@"Beta"
+                                       symbolName:@"paintpalette.fill"
+                                             kind:PackageInstallKindToggle
+                                       enabledKey:kSettingsThemerEnabled
+                                            isNew:NO];
+        themer.experimental = NO;
+        themer.settingsSection = kSecThemer;
 
         Package *layoutExtras = [[Package alloc] initWithIdentifier:@"com.darksword.layoutextras"
                                            name:@"Home Layout Extras"
@@ -819,9 +812,9 @@ static Package *catalog_community_port(NSString *identifier, NSString *name,
         Package *watchLayout = [[Package alloc] initWithIdentifier:@"com.darksword.watchlayout"
                                            name:@"Watch Layout"
                                shortDescription:@"Staggered Apple Watch-style beehive icon grid"
-                                longDescription:@"Reflows each discovered Home Screen page into a true Apple Watch-style honeycomb: circular live icons, hex-ratio vertical spacing, and alternating half-slot row offsets. Compactness and icon scale are configurable. Dock and App Library icons are excluded, taps remain live, stock frames are saved for restoration, and detailed logs report each page's geometry and cleanup. Watch Layout is mutually exclusive with Free Placement Lite because both own the same icon frames."
+                                longDescription:@"Replaces the page grid for the current SpringBoard session with a vertically scrolling Apple Watch-style honeycomb. It builds alternating five- and four-icon rows from native SBIconViews, keeps every tile pressable, includes system apps, and leaves the Dock untouched. Compactness and icon size are configurable. The stock page views are hidden rather than rewritten, then restored when the tweak stops. App discovery is bounded, repeated failures back off for 30 seconds, and detailed logs report catalog, geometry, interaction, fallback, and cleanup results."
                                         version:version
-                                         author:@"zeroxjf"
+                                         author:@"hxhlb + infern0"
                                        category:@"Home Screen"
                                      symbolName:@"circle.grid.3x3.fill"
                                            kind:PackageInstallKindToggle
@@ -936,15 +929,6 @@ static Package *catalog_community_port(NSString *identifier, NSString *name,
                                           isNew:NO];
         tweakLoader.settingsSection = kSecTweakLoader;
 
-        Package *scrollingDock = catalog_community_port(@"com.darksword.scrollingdock", @"Scrolling Dock Lite", @"Scrollable pressable dock icons", @"Moves live dock icon views into a horizontal UIScrollView, preserves taps, exposes three to eight visible slots, and restores every icon to its original parent and frame during cleanup.", @"dock.rectangle", kSettingsScrollingDockEnabled, @"Home Screen", version);
-        Package *niuBiBar = catalog_community_port(@"com.darksword.niubibarlite", @"NiuBiBar Lite", @"Pressable home-bar actions", @"Adds a compact home-indicator palette with native Lock and Spotlight actions when their SpringBoard selectors are available. Unsupported actions are logged instead of silently failing.", @"line.3.horizontal", kSettingsNiuBiBarEnabled, @"SpringBoard", version);
-        Package *volSkip = catalog_community_port(@"com.darksword.volskiplite", @"VolSkip Lite", @"Floating media skip palette", @"Provides pressable previous, play, and next controls backed by the system music player. Hardware-volume interception is intentionally not claimed because that requires process injection.", @"forward.end.fill", kSettingsVolSkipEnabled, @"Utilities", version);
-        Package *flowLite = catalog_community_port(@"com.darksword.flowlite", @"Flow Lite", @"Lock-screen music canvas", @"Finds live Now Playing, MediaControls, and artwork views, then applies a larger rounded music-canvas treatment with reversible geometry and detailed match logs.", @"music.note.list", kSettingsFlowLiteEnabled, @"Lock Screen", version);
-        Package *appProfiles = catalog_community_port(@"com.darksword.appprofileslite", @"App Profiles Lite", @"Foreground-aware brightness profiles", @"Reads SpringBoard's frontmost application and applies category profiles: full brightness for Camera, a navigation profile for Maps, and a configurable default for other apps.", @"slider.horizontal.3", kSettingsAppProfilesEnabled, @"Utilities", version);
-        Package *chargeFX = catalog_community_port(@"com.darksword.chargefxlite", @"ChargeFX Lite", @"Charging edge animation surface", @"Shows a touch-through green edge treatment while UIDevice reports charging or full state. Thickness is configurable and every battery-state decision is logged.", @"bolt.circle.fill", kSettingsChargeFXEnabled, @"Lock Screen", version);
-        Package *rotatePro = catalog_community_port(@"com.darksword.rotateprolite", @"RotatePro Lite", @"Floating orientation control", @"Adds a floating Rotate button that requests landscape orientation through UIDevice's live orientation selector when the running iOS build exposes it.", @"rotate.right.fill", kSettingsRotateProEnabled, @"Utilities", version);
-        Package *keepEye = catalog_community_port(@"com.darksword.keepeyelite", @"KeepEye HUD", @"CPU and battery-state HUD", @"Displays active CPU count, charging state, and RemoteCall session state in a compact touch-through HUD refreshed by infern0's visual loop.", @"gauge.with.dots.needle.67percent", kSettingsKeepEyeEnabled, @"Status Bar", version);
-        Package *lastLook = catalog_community_port(@"com.darksword.lastlooklite", @"LastLook Lite", @"OLED notification preview styling", @"Styles visible Notification, ShortLook, and platter views with compact scaling, rounded borders, and configurable opacity, then restores identity geometry during cleanup.", @"bell.and.waves.left.and.right", kSettingsLastLookEnabled, @"Lock Screen", version);
 #endif
 
         Package *nanoRegistry = [[Package alloc] initWithIdentifier:@"com.darksword.nanoregistry"
@@ -1024,6 +1008,7 @@ static Package *catalog_community_port(NSString *identifier, NSString *name,
             layoutExtras,
             gravityLite,
             powercuff,
+            themer,
 
             disableAppLibrary,
 
@@ -1139,15 +1124,6 @@ static Package *catalog_community_port(NSString *identifier, NSString *name,
             pullOver,
             alkaline,
             tweakLoader,
-            scrollingDock,
-            niuBiBar,
-            volSkip,
-            flowLite,
-            appProfiles,
-            chargeFX,
-            rotatePro,
-            keepEye,
-            lastLook,
 #endif
             locationSim,
             snowboardLite,
@@ -1156,6 +1132,33 @@ static Package *catalog_community_port(NSString *identifier, NSString *name,
             quickLoader,
             copypastaLite,
         ];
+        NSSet<NSString *> *retainedPackageIDs = [NSSet setWithArray:@[
+            @"com.darksword.statbar",
+            @"com.darksword.rssidisplay",
+            @"com.darksword.sbcustomizer",
+            @"com.darksword.powercuff",
+            @"com.darksword.axonlite",
+            @"com.darksword.typebanner",
+            @"com.darksword.stagestrip",
+            @"com.darksword.themer",
+            @"com.darksword.layoutextras",
+            @"com.darksword.gravitylite",
+            @"com.darksword.nanoregistry",
+            @"com.darksword.ota-block",
+            @"com.darksword.disable-app-library",
+            @"com.darksword.disable-icon-flyin",
+            @"com.darksword.zero-wake-animation",
+            @"com.darksword.zero-backlight-fade",
+            @"com.darksword.double-tap-to-lock",
+            @"com.darksword.cylinderlite",
+            @"com.darksword.barmoji",
+            @"com.darksword.watchlayout",
+            @"com.darksword.lockcustomizer",
+        ]];
+        list = [list filteredArrayUsingPredicate:[NSPredicate predicateWithBlock:^BOOL(Package *package, NSDictionary *bindings) {
+            (void)bindings;
+            return [retainedPackageIDs containsObject:package.identifier];
+        }]];
         NSSet<NSString *> *darkSwordIDs = [NSSet setWithArray:@[
             @"com.darksword.disable-app-library",
             @"com.darksword.disable-icon-flyin",
@@ -1169,9 +1172,7 @@ static Package *catalog_community_port(NSString *identifier, NSString *name,
             }
         }
     });
-    NSArray<Package *> *repoPackages = [self repoPackages];
-    if (repoPackages.count == 0) return list;
-    return [list arrayByAddingObjectsFromArray:repoPackages];
+    return list;
 }
 
 + (NSArray<NSString *> *)categoriesInOrder

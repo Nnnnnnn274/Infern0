@@ -10,7 +10,7 @@
 #import "PackageDetailViewController.h"
 #import "PackageQueue.h"
 #import "../SettingsViewController.h"
-#import "../tweaks/RepoTweaks.h"
+#import "../tweaks/retired_tweak_compat.h"
 #import "MainTabBarController.h"
 #import <math.h>
 

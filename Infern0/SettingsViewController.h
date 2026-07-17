@@ -109,15 +109,6 @@ extern NSString * const kSettingsSnapperEnabled;
 extern NSString * const kSettingsPullOverEnabled;
 extern NSString * const kSettingsAlkalineEnabled;
 extern NSString * const kSettingsTweakLoaderEnabled;
-extern NSString * const kSettingsScrollingDockEnabled;
-extern NSString * const kSettingsNiuBiBarEnabled;
-extern NSString * const kSettingsVolSkipEnabled;
-extern NSString * const kSettingsFlowLiteEnabled;
-extern NSString * const kSettingsAppProfilesEnabled;
-extern NSString * const kSettingsChargeFXEnabled;
-extern NSString * const kSettingsRotateProEnabled;
-extern NSString * const kSettingsKeepEyeEnabled;
-extern NSString * const kSettingsLastLookEnabled;
 
 extern NSString * const kSettingsGravityLiteEnabled;
 extern NSString * const kSettingsGravityLiteDockEnabled;

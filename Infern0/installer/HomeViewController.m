@@ -4,7 +4,6 @@
 //
 
 #import "HomeViewController.h"
-#import "SourcesViewController.h"
 #import "Package.h"
 #import "PackageCatalog.h"
 #import "PackageQueue.h"
@@ -12,7 +11,6 @@
 #import "../SettingsViewController.h"
 #import <unistd.h>
 #import <fcntl.h>
-#import "../tweaks/RepoTweaks.h"
 #import "../kexploit/kexploit_opa334.h"
 #import "../tweaks/kpac_bypass.h"
 #import "../tweaks/coretrust_bypass.h"
@@ -319,12 +317,10 @@ static const CGFloat kMargin = 20.0;
     UILabel *header = [self sectionHeader:@"What's New"];
     [s addArrangedSubview:header];
 
-    [s addArrangedSubview:[self compactRow:@"JavaScript tweak support by @MinePlayer16"
-                                     icon:@"bolt.fill" color:UIColor.systemOrangeColor]];
-    [s addArrangedSubview:[self compactRow:@"Source repos with browsable tweak catalogs"
-                                     icon:@"tray.and.arrow.down.fill" color:UIColor.systemGreenColor]];
-    [s addArrangedSubview:[self compactRow:@"SnowBoard Lite and SpringBoard stability fixes"
-                                     icon:@"wrench.and.screwdriver.fill" color:UIColor.systemRedColor]];
+    [s addArrangedSubview:[self compactRow:@"Focused catalog of retained, testable tweaks"
+                                     icon:@"checkmark.shield.fill" color:UIColor.systemGreenColor]];
+    [s addArrangedSubview:[self compactRow:@"Session cleanup and detailed activity logs"
+                                     icon:@"waveform.path.ecg" color:UIColor.systemOrangeColor]];
 
     return card;
 }
@@ -338,16 +334,11 @@ static const CGFloat kMargin = 20.0;
 
     [s addArrangedSubview:[self sectionHeader:@"Get Started"]];
 
-    [s addArrangedSubview:[self bigActionButton:@"Open QuickLoader"
-                                          sub:@"Run several local .js tweaks together"
-                                         icon:@"bolt.fill"
+    [s addArrangedSubview:[self bigActionButton:@"Browse Packages"
+                                          sub:@"Choose from the cleaned retained catalog"
+                                         icon:@"shippingbox.fill"
                                         color:UIColor.systemOrangeColor
-                                          sel:@selector(openQuickLoader)]];
-    [s addArrangedSubview:[self bigActionButton:@"Add a Source"
-                                          sub:@"Browse and install JS tweaks from repos"
-                                         icon:@"plus.circle.fill"
-                                        color:UIColor.systemGreenColor
-                                          sel:@selector(openSourcesTab)]];
+                                          sel:@selector(openPackagesTab)]];
     return card;
 }
 
@@ -791,36 +782,6 @@ static BOOL g_running_flag = NO;
     if (!tab) return;
     for (NSUInteger i = 0; i < tab.viewControllers.count; i++) {
         if ([tab.viewControllers[i].tabBarItem.title isEqualToString:@"Packages"]) {
-            tab.selectedIndex = i;
-            return;
-        }
-    }
-}
-
-- (void)openQuickLoader
-{
-    UITabBarController *tab = self.tabBarController;
-    if (!tab) return;
-    for (NSUInteger i = 0; i < tab.viewControllers.count; i++) {
-        UIViewController *vc = tab.viewControllers[i];
-        if ([vc.tabBarItem.title isEqualToString:@"Settings"]) {
-            UINavigationController *nav = [vc isKindOfClass:UINavigationController.class] ? (UINavigationController *)vc : nil;
-            if (!nav) return;
-            [nav popToRootViewControllerAnimated:NO];
-            SettingsViewController *ql = [SettingsViewController quickLoaderSettingsController];
-            [nav pushViewController:ql animated:NO];
-            tab.selectedIndex = i;
-            return;
-        }
-    }
-}
-
-- (void)openSourcesTab
-{
-    UITabBarController *tab = self.tabBarController;
-    if (!tab) return;
-    for (NSUInteger i = 0; i < tab.viewControllers.count; i++) {
-        if ([tab.viewControllers[i].tabBarItem.title isEqualToString:@"Sources"]) {
             tab.selectedIndex = i;
             return;
         }

@@ -8,8 +8,7 @@
 #import "PackageQueue.h"
 #import "../LogTextView.h"
 #import "../SettingsViewController.h"
-#import "../tweaks/QuickLoader.h"
-#import "../tweaks/RepoTweaks.h"
+#import "../tweaks/retired_tweak_compat.h"
 #import <math.h>
 
 
