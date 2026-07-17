@@ -255,12 +255,6 @@ static int wl_installed_apps(WLAppEntry *out, int cap)
     for (uint64_t i = 0; i < count; i++) {
         uint64_t app = wl_safe_msg(applications, "objectAtIndex:", i, 0, 0, 0);
         if (!r_is_objc_ptr(app)) continue;
-        if (r_responds_main(app, "isHidden") &&
-            wl_safe_msg(app, "isHidden", 0, 0, 0, 0)) {
-            skippedHidden++;
-            continue;
-        }
-
         uint64_t bundle = wl_safe_msg(app, "bundleIdentifier", 0, 0, 0, 0);
         if (!r_is_objc_ptr(bundle))
             bundle = wl_safe_msg(app, "displayIdentifier", 0, 0, 0, 0);
@@ -281,7 +275,7 @@ static int wl_installed_apps(WLAppEntry *out, int cap)
         out[accepted++].bundleID = bundle;
     }
     r_settle_us(oldSettle);
-    log_user("[WATCHLAYOUT][CATALOG] scanned=%llu accepted=%d hiddenOrPrivateApple=%d invalid=%d remoteStringReads=bounded-fail-open.\n",
+    log_user("[WATCHLAYOUT][CATALOG] scanned=%llu accepted=%d filteredPrivateApple=%d invalid=%d remoteStringReads=bounded-fail-open.\n",
              (unsigned long long)count, accepted, skippedHidden,
              invalidIdentifiers);
     return accepted;
@@ -297,22 +291,24 @@ static bool wl_class_has_instance_method(uint64_t cls, const char *selector)
 
 static bool wl_apple_bundle_is_user_facing(const char *identifier)
 {
-    if (!identifier || !identifier[0]) return true;
-    static const char *const allowed[] = {
-        "com.apple.Preferences", "com.apple.Settings", "com.apple.settings",
-        "com.apple.mobilesafari", "com.apple.mobileslideshow",
-        "com.apple.camera", "com.apple.Maps", "com.apple.mobilecal",
-        "com.apple.mobilephone", "com.apple.MobileSMS", "com.apple.mobilemail",
-        "com.apple.mobilenotes", "com.apple.mobiletimer", "com.apple.MobileAddressBook",
-        "com.apple.weather", "com.apple.news", "com.apple.stocks",
-        "com.apple.Home", "com.apple.shortcuts", "com.apple.reminders",
-        "com.apple.DocumentsApp", "com.apple.iBooks", "com.apple.tv",
-        "com.apple.podcasts", "com.apple.findmy", "com.apple.Health",
-        "com.apple.Passbook", NULL
+    if (!identifier || strncmp(identifier, "com.apple.", 10) != 0) return false;
+    // Keep the default permissive: Apple ships many legitimate user apps and
+    // their identifiers vary by OS release. Only known internal hosts are
+    // suppressed from the Watch Layout catalog.
+    static const char *const privateBundles[] = {
+        "com.apple.springboard", "com.apple.SpringBoard",
+        "com.apple.setupassistant", "com.apple.SetupAssistant",
+        "com.apple.WebSheet", "com.apple.websheet",
+        "com.apple.Siri", "com.apple.siri",
+        "com.apple.Diagnostics", "com.apple.DiagnosticsService",
+        "com.apple.InCallService", "com.apple.datadetectors",
+        "com.apple.PreferencesUIService", "com.apple.AppSSOAgent",
+        "com.apple.CoreAuthUI", "com.apple.PasscodeSettings",
+        NULL
     };
-    for (int i = 0; allowed[i]; i++)
-        if (strcmp(identifier, allowed[i]) == 0) return true;
-    return false;
+    for (int i = 0; privateBundles[i]; i++)
+        if (strcmp(identifier, privateBundles[i]) == 0) return false;
+    return true;
 }
 
 static bool wl_bundle_should_be_visible(uint64_t bundle)
