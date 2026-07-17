@@ -444,10 +444,14 @@ static uint64_t wl_make_open_invocation(uint64_t workspace, uint64_t bundleID)
     return invocation;
 }
 
-static uint64_t wl_make_async_open_invocation(uint64_t openInvocation)
+static uint64_t wl_make_background_open_invocation(uint64_t openInvocation)
 {
     if (!r_is_objc_ptr(openInvocation)) return 0;
-    uint64_t selector = r_sel("performSelectorOnMainThread:withObject:waitUntilDone:");
+    // Gesture recognizers already invoke their targets on SpringBoard's main
+    // thread. Running LSApplicationWorkspace there causes a short UI stall
+    // before the launch animation. Dispatch the retained invocation to an
+    // NSObject background selector so the gesture callback returns at once.
+    uint64_t selector = r_sel("performSelectorInBackground:withObject:");
     uint64_t signature = selector
         ? r_msg2_main(openInvocation, "methodSignatureForSelector:", selector, 0, 0, 0)
         : 0;
@@ -462,23 +466,18 @@ static uint64_t wl_make_async_open_invocation(uint64_t openInvocation)
     uint64_t invokeSelector = r_sel("invoke");
     uint64_t argSelector = r_dlsym_call(R_TIMEOUT, "malloc", sizeof(invokeSelector), 0, 0, 0, 0, 0, 0, 0);
     uint64_t argObject = r_dlsym_call(R_TIMEOUT, "malloc", sizeof(uint64_t), 0, 0, 0, 0, 0, 0, 0);
-    uint64_t argWait = r_dlsym_call(R_TIMEOUT, "malloc", sizeof(uint64_t), 0, 0, 0, 0, 0, 0, 0);
     uint64_t zero = 0;
-    if (!argSelector || !argObject || !argWait ||
+    if (!argSelector || !argObject ||
         !remote_write(argSelector, &invokeSelector, sizeof(invokeSelector)) ||
-        !remote_write(argObject, &zero, sizeof(zero)) ||
-        !remote_write(argWait, &zero, sizeof(zero))) {
+        !remote_write(argObject, &zero, sizeof(zero))) {
         if (argSelector) r_free(argSelector);
         if (argObject) r_free(argObject);
-        if (argWait) r_free(argWait);
         return 0;
     }
     r_msg2_main(outer, "setArgument:atIndex:", argSelector, 2, 0, 0);
     r_msg2_main(outer, "setArgument:atIndex:", argObject, 3, 0, 0);
-    r_msg2_main(outer, "setArgument:atIndex:", argWait, 4, 0, 0);
     r_free(argSelector);
     r_free(argObject);
-    r_free(argWait);
     r_msg2_main(outer, "retainArguments", 0, 0, 0, 0);
     return outer;
 }
@@ -490,7 +489,7 @@ static bool wl_bind_open_action(uint64_t view,
     if (!r_is_objc_ptr(view) || !r_is_objc_ptr(bundleID)) return false;
     uint64_t openInvocation = wl_make_open_invocation(workspace, bundleID);
     if (!r_is_objc_ptr(openInvocation)) return false;
-    uint64_t asyncInvocation = wl_make_async_open_invocation(openInvocation);
+    uint64_t asyncInvocation = wl_make_background_open_invocation(openInvocation);
     if (r_is_objc_ptr(asyncInvocation)) openInvocation = asyncInvocation;
 
     uint64_t invokeSelector = r_sel("invoke");
@@ -1001,7 +1000,7 @@ bool watchlayout_apply_in_session(void)
         return false;
     }
 
-    printf("[WATCHLAYOUT] implementation=overlay-v7 scaleOwner=SBIconView nativeContextMenus=1 asyncLaunch=1 boundedReads=1\n");
+    printf("[WATCHLAYOUT] implementation=overlay-v8 scaleOwner=SBIconView nativeContextMenus=1 launchThread=background boundedReads=1\n");
 
     log_user("[WATCHLAYOUT][1/3] Reading the SpringBoard app catalog without remote string copies...\n");
     WLAppEntry apps[WL_MAX_APPS] = {0};
@@ -1254,7 +1253,7 @@ bool watchlayout_apply_in_session(void)
            longPressGuardFailures,
            overlayHeight, contentSize.height,
            s_compact_percent, s_icon_scale_percent);
-    log_user("[WATCHLAYOUT][APPLY] implementation=overlay-v7 overlay=scrolling-honeycomb layout=5/4 source=SBApplicationController lists=%d apps=%d privateAppleAppsFiltered=1 nativeMenus=%d scaleFailures=%d editingGestureGuards=%d editingModeGuards=%d imageFailures=%d actionFailures=%d longPressGuardFailures=%d viewportHeight=%.1f compact=%d%% scale=%d%% asyncLaunch=1 boundedReads=1 iconModelWrites=0.\n",
+    log_user("[WATCHLAYOUT][APPLY] implementation=overlay-v8 overlay=scrolling-honeycomb layout=5/4 source=SBApplicationController lists=%d apps=%d privateAppleAppsFiltered=1 nativeMenus=%d scaleFailures=%d editingGestureGuards=%d editingModeGuards=%d imageFailures=%d actionFailures=%d longPressGuardFailures=%d viewportHeight=%.1f compact=%d%% scale=%d%% launchThread=background boundedReads=1 iconModelWrites=0.\n",
              s_list_count, installed, nativeMenuIcons,
              scaleFailures, editingGestureGuards, editingModeGuards,
              imageFailures, actionFailures,
