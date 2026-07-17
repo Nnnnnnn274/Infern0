@@ -50,6 +50,8 @@ typedef struct {
     uint64_t bundleID;
 } WLAppEntry;
 
+static bool wl_bundle_should_be_visible(uint64_t bundle);
+
 enum {
     // Keep the first render bounded so SpringBoard input remains responsive.
     WL_MAX_APPS = 256,
