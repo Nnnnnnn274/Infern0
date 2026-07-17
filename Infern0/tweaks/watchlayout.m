@@ -43,6 +43,13 @@ typedef struct {
     bool generateIconImage;
 } WLIconSource;
 
+typedef struct {
+    // Borrowed NSString owned by SBApplication. Keeping this as a remote
+    // object avoids copying every bundle identifier through remote_read(),
+    // which can stall the first Watch Layout pass on some devices.
+    uint64_t bundleID;
+} WLAppEntry;
+
 enum {
     WL_MAX_APPS = 1024,
     WL_MAX_LISTS = 64,
@@ -207,11 +214,10 @@ static int wl_restore_ancestor_editing_gestures(void)
     return restored;
 }
 
-static NSArray<NSDictionary<NSString *, NSString *> *> *wl_installed_apps(void)
+static int wl_installed_apps(WLAppEntry *out, int cap)
 {
-    NSMutableArray<NSDictionary<NSString *, NSString *> *> *result =
-        [NSMutableArray arrayWithCapacity:128];
-    NSMutableSet<NSString *> *seen = [NSMutableSet set];
+    if (!out || cap <= 0) return 0;
+    memset(out, 0, sizeof(*out) * (size_t)cap);
 
     uint64_t controllerClass = r_class("SBApplicationController");
     uint64_t controller = r_is_objc_ptr(controllerClass)
@@ -232,16 +238,17 @@ static NSArray<NSDictionary<NSString *, NSString *> *> *wl_installed_apps(void)
         applications = wl_safe_msg(applications, "allValues", 0, 0, 0, 0);
     if (!r_is_objc_ptr(applications)) {
         log_user("[WATCHLAYOUT][CATALOG] SBApplicationController did not expose an application array.\n");
-        return result;
+        return 0;
     }
     if (!r_responds_main(applications, "objectAtIndex:")) {
         log_user("[WATCHLAYOUT][CATALOG] Application collection is not indexable; stopped before scanning.\n");
-        return result;
+        return 0;
     }
 
     uint64_t count = wl_safe_msg(applications, "count", 0, 0, 0, 0);
-    if (count > WL_MAX_APPS) count = WL_MAX_APPS;
-    int readFailures = 0, skippedHidden = 0;
+    if (count > (uint64_t)cap) count = (uint64_t)cap;
+    int accepted = 0, skippedHidden = 0, invalidIdentifiers = 0;
+    uint32_t oldSettle = r_settle_us(0);
     for (uint64_t i = 0; i < count; i++) {
         uint64_t app = wl_safe_msg(applications, "objectAtIndex:", i, 0, 0, 0);
         if (!r_is_objc_ptr(app)) continue;
@@ -254,25 +261,23 @@ static NSArray<NSDictionary<NSString *, NSString *> *> *wl_installed_apps(void)
         uint64_t bundle = wl_safe_msg(app, "bundleIdentifier", 0, 0, 0, 0);
         if (!r_is_objc_ptr(bundle))
             bundle = wl_safe_msg(app, "displayIdentifier", 0, 0, 0, 0);
-        char bundleID[512] = {0};
-        if (!r_read_nsstring(bundle, bundleID, sizeof(bundleID))) {
-            readFailures++;
-            // A broken RemoteCall read path must stop quickly instead of
-            // printing failures for every installed application forever.
-            if (readFailures >= 8) break;
+        if (!r_is_objc_ptr(bundle)) {
+            invalidIdentifiers++;
             continue;
         }
-        NSString *bundleString = [NSString stringWithUTF8String:bundleID];
-        if (bundleString.length == 0 || [seen containsObject:bundleString]) continue;
 
-        [result addObject:@{ @"bundleID": bundleString,
-                             @"name": bundleString }];
-        [seen addObject:bundleString];
+        bool duplicate = false;
+        for (int j = 0; j < accepted; j++) {
+            if (out[j].bundleID == bundle) { duplicate = true; break; }
+        }
+        if (duplicate) continue;
+        out[accepted++].bundleID = bundle;
     }
-    log_user("[WATCHLAYOUT][CATALOG] scanned=%llu accepted=%lu hidden=%d readFailures=%d failureBudget=8.\n",
-             (unsigned long long)count, (unsigned long)result.count,
-             skippedHidden, readFailures);
-    return result;
+    r_settle_us(oldSettle);
+    log_user("[WATCHLAYOUT][CATALOG] scanned=%llu accepted=%d hidden=%d invalid=%d remoteStringReads=0.\n",
+             (unsigned long long)count, accepted, skippedHidden,
+             invalidIdentifiers);
+    return accepted;
 }
 
 static bool wl_class_has_instance_method(uint64_t cls, const char *selector)
@@ -283,32 +288,27 @@ static bool wl_class_has_instance_method(uint64_t cls, const char *selector)
                      cls, sel, 0, 0, 0, 0, 0, 0) != 0;
 }
 
-static uint64_t wl_fetch_icon_model(const char *bundleID,
+static uint64_t wl_fetch_icon_model(uint64_t bundleID,
                                     const WLIconSource *source)
 {
-    if (!bundleID || !*bundleID || !source ||
+    if (!r_is_objc_ptr(bundleID) || !source ||
         !r_is_objc_ptr(source->iconModel)) return 0;
-
-    uint64_t bid = r_cfstr(bundleID);
-    if (!r_is_objc_ptr(bid)) return 0;
 
     uint64_t icon = source->applicationIconForBundle
         ? r_msg2_main(source->iconModel, "applicationIconForBundleIdentifier:",
-                      bid, 0, 0, 0)
+                      bundleID, 0, 0, 0)
         : 0;
     if (!r_is_objc_ptr(icon) && source->expectedIconForDisplay)
         icon = r_msg2_main(source->iconModel,
                            "expectedIconForDisplayIdentifier:",
-                           bid, 0, 0, 0);
+                           bundleID, 0, 0, 0);
     return icon;
 }
 
-static uint64_t wl_fetch_icon_image(const char *bundleID,
+static uint64_t wl_fetch_icon_image(uint64_t bundleID,
                                     const WLIconSource *source)
 {
-    if (!bundleID || !*bundleID || !source) return 0;
-    uint64_t bid = r_cfstr(bundleID);
-    if (!r_is_objc_ptr(bid)) return 0;
+    if (!r_is_objc_ptr(bundleID) || !source) return 0;
 
     uint64_t image = 0;
     if (r_is_objc_ptr(source->imageClass) && source->privateImageAPI) {
@@ -316,7 +316,7 @@ static uint64_t wl_fetch_icon_image(const char *bundleID,
         double scale = 2.0;
         image = r_msg2_main_raw(source->imageClass,
             "_applicationIconImageForBundleIdentifier:format:scale:",
-            &bid, sizeof(bid),
+            &bundleID, sizeof(bundleID),
             &format, sizeof(format),
             &scale, sizeof(scale),
             NULL, 0);
@@ -365,13 +365,10 @@ static uint64_t wl_make_open_invocation(uint64_t workspace, uint64_t bundleID)
 
 static bool wl_bind_open_action(uint64_t view,
                                 uint64_t workspace,
-                                const char *bundleID)
+                                uint64_t bundleID)
 {
-    if (!r_is_objc_ptr(view) || !bundleID || !*bundleID) return false;
-    uint64_t bid = r_nsstr_retained(bundleID);
-    if (!r_is_objc_ptr(bid)) return false;
-    uint64_t openInvocation = wl_make_open_invocation(workspace, bid);
-    r_msg2_main(bid, "release", 0, 0, 0, 0);
+    if (!r_is_objc_ptr(view) || !r_is_objc_ptr(bundleID)) return false;
+    uint64_t openInvocation = wl_make_open_invocation(workspace, bundleID);
     if (!r_is_objc_ptr(openInvocation)) return false;
 
     uint64_t invokeSelector = r_sel("invoke");
@@ -675,7 +672,7 @@ static bool wl_scale_native_icon_view(uint64_t view,
     return true;
 }
 
-static uint64_t wl_new_native_icon_view(const char *bundleID,
+static uint64_t wl_new_native_icon_view(uint64_t bundleID,
                                         uint64_t manager,
                                         const WLIconSource *source)
 {
@@ -876,14 +873,17 @@ bool watchlayout_apply_in_session(void)
 
     printf("[WATCHLAYOUT] implementation=overlay-v6 scaleOwner=SBIconView editingGuard=forbid boundedReads=1\n");
 
-    NSArray<NSDictionary<NSString *, NSString *> *> *apps = wl_installed_apps();
-    if (apps.count == 0) {
+    log_user("[WATCHLAYOUT][1/3] Reading the SpringBoard app catalog without remote string copies...\n");
+    WLAppEntry apps[WL_MAX_APPS] = {0};
+    int appCount = wl_installed_apps(apps, WL_MAX_APPS);
+    if (appCount == 0) {
         printf("[WATCHLAYOUT] installed app catalog is empty\n");
         return wl_apply_failed("application-catalog");
     }
-    printf("[WATCHLAYOUT] installed app catalog=%lu source=SBApplicationController boundedReads=1\n",
-           (unsigned long)apps.count);
+    printf("[WATCHLAYOUT] installed app catalog=%d source=SBApplicationController remoteStringReads=0\n",
+           appCount);
 
+    log_user("[WATCHLAYOUT][2/3] Locating the Home Screen host and creating the honeycomb canvas...\n");
     printf("[WATCHLAYOUT] resolving SpringBoard Home Screen host\n");
     uint64_t controller = wl_icon_controller();
     uint64_t manager = wl_safe_msg(controller, "iconManager", 0, 0, 0, 0);
@@ -1025,11 +1025,11 @@ bool watchlayout_apply_in_session(void)
     int scaleFailures = 0;
     int editingGestureGuards = 0;
     int editingModeGuards = 0;
-    for (NSDictionary<NSString *, NSString *> *entry in apps) {
-        NSString *bundleID = entry[@"bundleID"];
-        NSString *name = [entry[@"name"] isKindOfClass:NSString.class]
-            ? entry[@"name"] : bundleID;
-        if (bundleID.length == 0) continue;
+    log_user("[WATCHLAYOUT][3/3] Building %d lightweight pressable icons...\n",
+             appCount);
+    for (int appIndex = 0; appIndex < appCount; appIndex++) {
+        uint64_t bundleID = apps[appIndex].bundleID;
+        if (!r_is_objc_ptr(bundleID)) continue;
 
         WLPoint center = {0};
         wl_layout_position(installed, rootBounds.width, iconSize,
@@ -1044,61 +1044,43 @@ bool watchlayout_apply_in_session(void)
         if (!r_is_objc_ptr(tile)) continue;
         wl_configure_round_wrapper(tile, iconSize);
 
-        uint64_t nativeIcon = wl_new_native_icon_view(
-            bundleID.UTF8String, manager, &iconSource);
-        if (r_is_objc_ptr(nativeIcon)) {
-            r_msg2_main(tile, "addSubview:", nativeIcon, 0, 0, 0);
-            nativeMenuIcons++;
-        } else {
-            uint64_t image = wl_fetch_icon_image(bundleID.UTF8String, &iconSource);
-            if (r_is_objc_ptr(image)) {
-                uint64_t imageView = wl_new_image_view(
-                    (WLRect){0.0, 0.0, iconSize, iconSize}, image);
-                if (r_is_objc_ptr(imageView)) {
-                    r_msg2_main(tile, "addSubview:", imageView, 0, 0, 0);
-                    r_msg2_main(imageView, "release", 0, 0, 0, 0);
-                } else {
-                    imageFailures++;
-                }
+        // A native SBIconView costs dozens of cross-process calls per app and
+        // was the source of the apparently frozen first pass. UIImageView plus
+        // an invocation-backed tap gesture remains fully pressable while being
+        // much cheaper and avoiding editing-mode side effects.
+        uint64_t image = wl_fetch_icon_image(bundleID, &iconSource);
+        if (r_is_objc_ptr(image)) {
+            uint64_t imageView = wl_new_image_view(
+                (WLRect){0.0, 0.0, iconSize, iconSize}, image);
+            if (r_is_objc_ptr(imageView)) {
+                r_msg2_main(tile, "addSubview:", imageView, 0, 0, 0);
+                r_msg2_main(imageView, "release", 0, 0, 0, 0);
             } else {
                 imageFailures++;
-                NSString *initial = name.length > 0
-                    ? [name substringToIndex:1].uppercaseString : @"?";
-                uint64_t label = wl_new_initial_label(
-                    (WLRect){0.0, 0.0, iconSize, iconSize}, initial.UTF8String);
-                if (r_is_objc_ptr(label)) {
-                    r_msg2_main(tile, "addSubview:", label, 0, 0, 0);
-                    r_msg2_main(label, "release", 0, 0, 0, 0);
-                }
+            }
+        } else {
+            imageFailures++;
+            uint64_t label = wl_new_initial_label(
+                (WLRect){0.0, 0.0, iconSize, iconSize}, "?");
+            if (r_is_objc_ptr(label)) {
+                r_msg2_main(tile, "addSubview:", label, 0, 0, 0);
+                r_msg2_main(label, "release", 0, 0, 0, 0);
             }
         }
 
-        uint64_t accessibilityLabel = r_nsstr_retained(name.UTF8String);
-        if (r_is_objc_ptr(accessibilityLabel)) {
-            r_msg2_main(tile, "setAccessibilityLabel:",
-                        accessibilityLabel, 0, 0, 0);
-            r_msg2_main(accessibilityLabel, "release", 0, 0, 0, 0);
-        }
-        if (!wl_bind_open_action(tile, workspace, bundleID.UTF8String))
+        r_msg2_main(tile, "setAccessibilityLabel:", bundleID, 0, 0, 0);
+        if (!wl_bind_open_action(tile, workspace, bundleID))
             actionFailures++;
-        if (!r_is_objc_ptr(nativeIcon) && !wl_install_long_press_guard(tile))
-            longPressGuardFailures++;
+        // Do not add a second long-press recognizer to every tile. The tap
+        // invocation is sufficient for launching, and omitting the redundant
+        // recognizer removes another expensive group of remote calls per app.
         r_msg2_main(scroll, "addSubview:", tile, 0, 0, 0);
-        if (r_is_objc_ptr(nativeIcon)) {
-            if (!wl_scale_native_icon_view(nativeIcon, tile, installed == 0))
-                scaleFailures++;
-            if (wl_disable_native_icon_competing_interactions(nativeIcon) > 0)
-                editingGestureGuards++;
-            if (wl_forbid_native_icon_editing(nativeIcon))
-                editingModeGuards++;
-            r_msg2_main(nativeIcon, "release", 0, 0, 0, 0);
-        }
         r_msg2_main(tile, "release", 0, 0, 0, 0);
         installed++;
-        if (installed == 1 || installed % 25 == 0 ||
-            installed == (int)apps.count) {
-            printf("[WATCHLAYOUT] overlay progress=%d/%lu\n",
-                   installed, (unsigned long)apps.count);
+        if (installed == 1 || installed % 20 == 0 || installed == appCount) {
+            log_user("[WATCHLAYOUT][BUILD] icons=%d/%d pressActions=%d imageFallbacks=%d.\n",
+                     installed, appCount, installed - actionFailures,
+                     imageFailures);
         }
     }
 
