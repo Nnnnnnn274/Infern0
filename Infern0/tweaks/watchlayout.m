@@ -52,6 +52,7 @@ typedef struct {
 
 static bool wl_bundle_should_be_visible(uint64_t bundle);
 static bool wl_apple_bundle_is_user_facing(const char *identifier);
+static bool wl_app_flag_is_true(uint64_t app, const char *selector);
 
 enum {
     // Keep the first render bounded so SpringBoard input remains responsive.
@@ -256,8 +257,8 @@ static int wl_installed_apps(WLAppEntry *out, int cap)
     for (uint64_t i = 0; i < count; i++) {
         uint64_t app = wl_safe_msg(applications, "objectAtIndex:", i, 0, 0, 0);
         if (!r_is_objc_ptr(app)) continue;
-        if (r_responds_main(app, "isHidden") &&
-            wl_safe_msg(app, "isHidden", 0, 0, 0, 0)) {
+        if (wl_app_flag_is_true(app, "isHidden") ||
+            wl_app_flag_is_true(app, "isInternalApplication")) {
             skippedHidden++;
             continue;
         }
@@ -280,6 +281,9 @@ static int wl_installed_apps(WLAppEntry *out, int cap)
                 strncmp(systemIdentifier, "com.apple.", 10) == 0 &&
                 wl_apple_bundle_is_user_facing(systemIdentifier);
             if (!isUserFacingApple) {
+                if (systemIdentifier[0])
+                    printf("[WATCHLAYOUT][CATALOG] filtered non-user-facing system bundle=%s\n",
+                           systemIdentifier);
                 skippedHidden++;
                 continue;
             }
@@ -297,7 +301,7 @@ static int wl_installed_apps(WLAppEntry *out, int cap)
         out[accepted++].bundleID = bundle;
     }
     r_settle_us(oldSettle);
-    log_user("[WATCHLAYOUT][CATALOG] scanned=%llu accepted=%d filteredPrivateApple=%d invalid=%d remoteStringReads=bounded-fail-open.\n",
+    log_user("[WATCHLAYOUT][CATALOG] scanned=%llu accepted=%d hiddenOrInternal=%d invalid=%d remoteStringReads=bounded.\n",
              (unsigned long long)count, accepted, skippedHidden,
              invalidIdentifiers);
     return accepted;
@@ -311,34 +315,52 @@ static bool wl_class_has_instance_method(uint64_t cls, const char *selector)
                      cls, sel, 0, 0, 0, 0, 0, 0) != 0;
 }
 
+static bool wl_app_flag_is_true(uint64_t app, const char *selector)
+{
+    return r_is_objc_ptr(app) && selector &&
+        r_responds_main(app, selector) &&
+        wl_safe_msg(app, selector, 0, 0, 0, 0) != 0;
+}
+
 static bool wl_apple_bundle_is_user_facing(const char *identifier)
 {
     if (!identifier || strncmp(identifier, "com.apple.", 10) != 0) return false;
-    // Keep the default permissive: Apple ships many legitimate user apps and
-    // their identifiers vary by OS release. Only known internal hosts are
-    // suppressed from the Watch Layout catalog.
-    static const char *const privateBundles[] = {
-        "com.apple.springboard", "com.apple.SpringBoard",
-        "com.apple.setupassistant", "com.apple.SetupAssistant",
-        "com.apple.WebSheet", "com.apple.websheet",
-        "com.apple.Siri", "com.apple.siri",
-        "com.apple.Diagnostics", "com.apple.DiagnosticsService",
-        "com.apple.InCallService", "com.apple.datadetectors",
-        "com.apple.PreferencesUIService", "com.apple.AppSSOAgent",
-        "com.apple.CoreAuthUI", "com.apple.PasscodeSettings",
+    // SBApplicationController also exposes launchable-looking service hosts.
+    // Apple system applications therefore fail closed and must be part of the
+    // user-facing catalog below. Third-party applications are not affected.
+    static const char *const visibleBundles[] = {
+        "com.apple.Preferences", "com.apple.settings",
+        "com.apple.MobileSMS", "com.apple.mobilephone",
+        "com.apple.MobileMail", "com.apple.mobilesafari",
+        "com.apple.camera", "com.apple.mobileslideshow",
+        "com.apple.AppStore", "com.apple.MobileStore",
+        "com.apple.Music", "com.apple.podcasts", "com.apple.tv",
+        "com.apple.iBooks", "com.apple.Maps", "com.apple.weather",
+        "com.apple.calculator", "com.apple.mobilecal",
+        "com.apple.mobilenotes", "com.apple.reminders",
+        "com.apple.mobiletimer", "com.apple.VoiceMemos",
+        "com.apple.compass", "com.apple.measure",
+        "com.apple.facetime", "com.apple.shortcuts",
+        "com.apple.Health", "com.apple.Fitness",
+        "com.apple.Passbook", "com.apple.Home",
+        "com.apple.findmy", "com.apple.tips", "com.apple.Translate",
+        "com.apple.freeform", "com.apple.journal",
+        "com.apple.Magnifier", "com.apple.MobileAddressBook",
+        "com.apple.DocumentsApp", "com.apple.Passwords",
+        "com.apple.GameCenter", "com.apple.news",
         NULL
     };
-    for (int i = 0; privateBundles[i]; i++)
-        if (strcmp(identifier, privateBundles[i]) == 0) return false;
-    return true;
+    for (int i = 0; visibleBundles[i]; i++)
+        if (strcmp(identifier, visibleBundles[i]) == 0) return true;
+    return false;
 }
 
 static bool wl_bundle_should_be_visible(uint64_t bundle)
 {
     if (!r_is_objc_ptr(bundle)) return false;
     char identifier[256] = {0};
-    // Fail open when SpringBoard cannot copy an identifier. A transient
-    // remote-read failure must never make a real user app disappear.
+    // Fail open here for third-party applications. System applications take
+    // the stricter path in wl_installed_apps and require a readable identifier.
     if (!r_read_nsstring(bundle, identifier, sizeof(identifier))) return true;
     if (strncmp(identifier, "com.apple.", 10) != 0) return true;
     bool allowed = wl_apple_bundle_is_user_facing(identifier);
