@@ -281,7 +281,7 @@ static int wl_installed_apps(WLAppEntry *out, int cap)
         out[accepted++].bundleID = bundle;
     }
     r_settle_us(oldSettle);
-    log_user("[WATCHLAYOUT][CATALOG] scanned=%llu accepted=%d hiddenOrPrivateApple=%d invalid=%d remoteStringReads=apple-only.\n",
+    log_user("[WATCHLAYOUT][CATALOG] scanned=%llu accepted=%d hiddenOrPrivateApple=%d invalid=%d remoteStringReads=bounded-fail-open.\n",
              (unsigned long long)count, accepted, skippedHidden,
              invalidIdentifiers);
     return accepted;
@@ -295,11 +295,9 @@ static bool wl_class_has_instance_method(uint64_t cls, const char *selector)
                      cls, sel, 0, 0, 0, 0, 0, 0) != 0;
 }
 
-static bool wl_apple_bundle_is_user_facing(uint64_t bundle)
+static bool wl_apple_bundle_is_user_facing(const char *identifier)
 {
-    if (!r_is_objc_ptr(bundle)) return false;
-    char identifier[256] = {0};
-    if (!r_read_nsstring(bundle, identifier, sizeof(identifier))) return false;
+    if (!identifier || !identifier[0]) return true;
     static const char *const allowed[] = {
         "com.apple.mobilesafari", "com.apple.mobileslideshow",
         "com.apple.camera", "com.apple.Maps", "com.apple.mobilecal",
@@ -319,13 +317,12 @@ static bool wl_apple_bundle_is_user_facing(uint64_t bundle)
 static bool wl_bundle_should_be_visible(uint64_t bundle)
 {
     if (!r_is_objc_ptr(bundle)) return false;
-    uint64_t prefix = r_cfstr("com.apple.");
-    bool isApple = r_is_objc_ptr(prefix) &&
-        r_responds_main(bundle, "hasPrefix:") &&
-        (wl_safe_msg(bundle, "hasPrefix:", prefix, 0, 0, 0) & 0xff) != 0;
-    if (r_is_objc_ptr(prefix))
-        r_dlsym_call(R_TIMEOUT, "CFRelease", prefix, 0, 0, 0, 0, 0, 0, 0);
-    return !isApple || wl_apple_bundle_is_user_facing(bundle);
+    char identifier[256] = {0};
+    // Fail open when SpringBoard cannot copy an identifier. A transient
+    // remote-read failure must never make a real user app disappear.
+    if (!r_read_nsstring(bundle, identifier, sizeof(identifier))) return true;
+    if (strncmp(identifier, "com.apple.", 10) != 0) return true;
+    return wl_apple_bundle_is_user_facing(identifier);
 }
 
 static uint64_t wl_fetch_icon_model(uint64_t bundleID,
