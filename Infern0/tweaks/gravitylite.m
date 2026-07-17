@@ -41,8 +41,6 @@ typedef struct {
 
 static uint64_t s_gravity_ptrs[64];
 static volatile int s_gravity_ptr_count = 0;
-static GravityLiteConfig s_gravity_config = {0};
-static volatile uint32_t s_gravity_refresh_tick = 0;
 static const uint64_t kGravityLiteOverlayTag = 0x47524156ULL; // "GRAV"
 static const double kGravityLiteSnapshotScale = 1.22;
 
@@ -1788,67 +1786,9 @@ static bool gl_build_group(uint64_t groups,
     return true;
 }
 
-static bool gl_groups_contains_list(uint64_t groups, uint64_t listView)
-{
-    uint64_t count = gl_array_count(groups);
-    if (count > 64) count = 64;
-    for (uint64_t i = 0; i < count; i++) {
-        uint64_t group = gl_array_object(groups, i);
-        if (gl_dict_get(group, "listView") == listView) return true;
-    }
-    return false;
-}
-
-static int gl_refresh_lazy_page_groups(uint64_t ctrl,
-                                       uint64_t mgr,
-                                       uint64_t groups,
-                                       uint64_t iconViewCls,
-                                       GravityLiteConfig config)
-{
-    if (!r_is_objc_ptr(groups) || !r_is_objc_ptr(iconViewCls)) return 0;
-    int added = 0;
-    uint64_t currentPage = gl_visible_root_list_view(ctrl, mgr, iconViewCls);
-    bool homePageVisible = r_is_objc_ptr(currentPage) &&
-                           gl_view_has_visible_window_rect(currentPage);
-
-    // Never synchronously probe every offscreen page. SpringBoard only makes a
-    // page's live icon geometry reliable while that page is current; capture it
-    // once on arrival and retain its independent animator for later revisits.
-    if (homePageVisible && !gl_groups_contains_list(groups, currentPage)) {
-        if (gl_build_group(groups, currentPage, iconViewCls, config, false, false, true)) {
-            added++;
-            log_user("[GRAVITY][LIVE-REFRESH] type=home-page list=0x%llx trigger=became-current result=attached.\n",
-                     currentPage);
-        }
-    }
-
-    // The App Library is scanned only after the Home page leaves the visible
-    // window. This avoids a large class-tree walk during initial Apply.
-    if (!homePageVisible) {
-        uint64_t libraryRoots[8] = {0};
-        int libraryCount = gl_collect_library_roots(libraryRoots, 8);
-        for (int i = 0; i < libraryCount; i++) {
-            if (gl_groups_contains_list(groups, libraryRoots[i]) ||
-                !gl_view_has_visible_window_rect(libraryRoots[i])) continue;
-            if (gl_build_group(groups, libraryRoots[i], iconViewCls, config, false, true, true)) {
-                added++;
-                log_user("[GRAVITY][LIVE-REFRESH] type=app-library root=0x%llx trigger=home-page-hidden result=attached.\n",
-                         libraryRoots[i]);
-            }
-        }
-    }
-    if (added > 0) {
-        log_user("[GRAVITY][LIVE-REFRESH] newlyAttachedGroups=%d totalGroups=%llu.\n",
-                 added, gl_array_count(groups));
-    }
-    return added;
-}
-
 bool gravitylite_stop_in_session(void)
 {
     __atomic_store_n(&s_gravity_ptr_count, 0, __ATOMIC_SEQ_CST);
-    __atomic_store_n(&s_gravity_refresh_tick, 0, __ATOMIC_SEQ_CST);
-    memset(&s_gravity_config, 0, sizeof(s_gravity_config));
     memset(s_gravity_ptrs, 0, sizeof(s_gravity_ptrs));
 
     uint64_t ctrl = gl_icon_controller();
@@ -1945,8 +1885,6 @@ bool gravitylite_apply_in_session(GravityLiteConfig config)
     (void)gravitylite_stop_in_session();
     __atomic_store_n(&s_gravity_ptr_count, 0, __ATOMIC_SEQ_CST);
     memset(s_gravity_ptrs, 0, sizeof(s_gravity_ptrs));
-    s_gravity_config = config;
-    __atomic_store_n(&s_gravity_refresh_tick, 0, __ATOMIC_SEQ_CST);
 
     uint64_t iconViewCls = r_class("SBIconView");
     if (!r_is_objc_ptr(iconViewCls)) {
@@ -1992,13 +1930,15 @@ bool gravitylite_apply_in_session(GravityLiteConfig config)
         int count = gl_collect_home_page_list_views(ctrl, mgr, iconViewCls,
                                                     listViews, LV_CAP);
         uint64_t currentPage = gl_visible_root_list_view(ctrl, mgr, iconViewCls);
+        if (!r_is_objc_ptr(currentPage))
+            currentPage = gl_current_root_list_view(ctrl, mgr);
         int currentIndex = -1;
         for (int i = 0; i < count; i++) {
             if (listViews[i] == currentPage) currentIndex = i;
-            else log_user("[GRAVITY][PAGE %d/%d] list=0x%llx result=deferred-offscreen; captureWhenCurrent=1.\n",
-                          i + 1, count, listViews[i]);
         }
 
+        int activeHomePages = 0;
+        int skippedUnloadedPages = 0;
         if (r_is_objc_ptr(currentPage)) {
             printf("[GRAVITY] Capturing current home screen page %d/%d...\n",
                    currentIndex >= 0 ? currentIndex + 1 : 1,
@@ -2009,13 +1949,62 @@ bool gravitylite_apply_in_session(GravityLiteConfig config)
             if (gl_build_group(groups, currentPage, iconViewCls, config, false, false, true)) {
                 built++;
                 homeBuilt = true;
-                log_user("[GRAVITY][PAGE %d/%d] list=0x%llx overlay=page-child animator=page-local collisionBounds=page-local result=active; deferredPagesAttachOnVisit=1.\n",
+                activeHomePages++;
+                log_user("[GRAVITY][PAGE %d/%d] list=0x%llx overlay=page-child animator=page-local collisionBounds=page-local result=active.\n",
                          currentIndex >= 0 ? currentIndex + 1 : 1,
                          count > 0 ? count : 1, currentPage);
             }
         }
 
-        log_user("[GRAVITY][LIBRARY] initialScan=deferred lazyRefreshArmed=1 trigger=home-page-hidden result=waiting-for-library-page.\n");
+        // The reference implementation proves that a page-local animator is
+        // stable. Extend that exact ownership model to sibling pages only when
+        // SpringBoard has already materialized real icon views for them. Each
+        // page gets its own overlay and animator; unloaded pages are untouched.
+        for (int i = 0; i < count; i++) {
+            uint64_t page = listViews[i];
+            if (!r_is_objc_ptr(page) || page == currentPage) continue;
+            if (!gl_list_has_icon_views(page, iconViewCls)) {
+                skippedUnloadedPages++;
+                log_user("[GRAVITY][PAGE %d/%d] list=0x%llx result=skipped-unloaded; noRemoteRetry=1.\n",
+                         i + 1, count, page);
+                continue;
+            }
+            log_user("[GRAVITY][PAGE %d/%d] list=0x%llx capture=starting ownership=isolated visibility=materialized-offscreen.\n",
+                     i + 1, count, page);
+            if (gl_build_group(groups, page, iconViewCls, config, false, false, true)) {
+                built++;
+                homeBuilt = true;
+                activeHomePages++;
+                log_user("[GRAVITY][PAGE %d/%d] list=0x%llx animator=page-local result=active.\n",
+                         i + 1, count, page);
+            } else {
+                log_user("[GRAVITY][PAGE %d/%d][WARN] list=0x%llx result=capture-failed; pageRestored=1 noRemoteRetry=1.\n",
+                         i + 1, count, page);
+            }
+        }
+
+        int activeLibraryGroups = 0;
+        uint64_t libraryRoots[8] = {0};
+        int libraryCount = gl_collect_library_roots(libraryRoots, 8);
+        for (int i = 0; i < libraryCount; i++) {
+            uint64_t root = libraryRoots[i];
+            uint64_t libraryItems[1] = {0};
+            if (!r_is_objc_ptr(root) ||
+                gl_collect_library_item_views(root, libraryItems, 1) <= 0) {
+                log_user("[GRAVITY][LIBRARY %d/%d] root=0x%llx result=skipped-unloaded; noRemoteRetry=1.\n",
+                         i + 1, libraryCount, root);
+                continue;
+            }
+            if (gl_build_group(groups, root, iconViewCls, config, false, true, true)) {
+                built++;
+                activeLibraryGroups++;
+                log_user("[GRAVITY][LIBRARY %d/%d] root=0x%llx animator=library-local result=active.\n",
+                         i + 1, libraryCount, root);
+            } else {
+                log_user("[GRAVITY][LIBRARY %d/%d][WARN] root=0x%llx result=capture-failed; libraryRestored=1 noRemoteRetry=1.\n",
+                         i + 1, libraryCount, root);
+            }
+        }
 
         if (r_is_objc_ptr(dockListView) && config.includeDock) {
             printf("[GRAVITY] Capturing dock icons...\n");
@@ -2044,9 +2033,9 @@ bool gravitylite_apply_in_session(GravityLiteConfig config)
         gl_set_state(ctrl, state);
         printf("[GRAVITY] Physics started — groups=%d home=%d dock=%d visiblePages=%d\n",
                built, homeBuilt, dockBuilt, count);
-        log_user("[GRAVITY][APPLY] completed discoveredPages=%d activeGroups=%d activeHomePages=%d deferredHomePages=%d dockRequested=%d dockActive=%d gravityBehaviors=%d pageIsolation=1 lazyPageAttach=1 result=success.\n",
-                 count, built, homeBuilt ? 1 : 0,
-                 count - (homeBuilt ? 1 : 0), config.includeDock, dockBuilt,
+        log_user("[GRAVITY][APPLY] completed discoveredPages=%d activeGroups=%d activeHomePages=%d skippedUnloadedPages=%d discoveredLibraryRoots=%d activeLibraryGroups=%d dockRequested=%d dockActive=%d gravityBehaviors=%d pageIsolation=1 staleObjectRetries=0 result=success.\n",
+                 count, built, activeHomePages, skippedUnloadedPages,
+                 libraryCount, activeLibraryGroups, config.includeDock, dockBuilt,
                  __atomic_load_n(&s_gravity_ptr_count, __ATOMIC_SEQ_CST));
         printf("[WARN] TO STOP GRAVITY: USE APP SWITCHER TO RETURN TO CYANIDE AND DEACTIVATE.\n");
 
@@ -2165,18 +2154,6 @@ bool gravitylite_explosion_in_session(double force)
 
 bool gravitylite_update_gravity_angle_in_session(double angle, double magnitude)
 {
-    uint32_t refreshTick = __atomic_add_fetch(&s_gravity_refresh_tick, 1, __ATOMIC_SEQ_CST);
-    if ((refreshTick % 100U) == 0U) {
-        uint64_t ctrl = gl_icon_controller();
-        uint64_t state = r_is_objc_ptr(ctrl) ? gl_get_state(ctrl) : 0;
-        uint64_t groups = r_is_objc_ptr(state) ? gl_dict_get(state, "groups") : 0;
-        uint64_t iconViewCls = r_class("SBIconView");
-        if (r_is_objc_ptr(groups) && r_is_objc_ptr(iconViewCls)) {
-            gl_refresh_lazy_page_groups(ctrl, gl_icon_manager(ctrl), groups,
-                                        iconViewCls, s_gravity_config);
-        }
-    }
-
     int count = __atomic_load_n(&s_gravity_ptr_count, __ATOMIC_SEQ_CST);
     if (count <= 0) return false;
     uint32_t oldSettle = r_settle_us(0);
@@ -2199,16 +2176,11 @@ bool gravitylite_update_gravity_angle_in_session(double angle, double magnitude)
         log_user("[GRAVITY][STEERING-RECOVERY] evictedStaleBehaviors=%d remainingGroups=%d action=stopped-retrying-invalid-vm-object.\n",
                  evicted, kept);
     }
-    if ((refreshTick % 100U) == 0U)
-        log_user("[GRAVITY][STEERING] angle=%.4f magnitude=%.2f groups=%d discoveryTick=%u result=updated.\n",
-                 angle, magnitude, kept, refreshTick);
     return kept > 0;
 }
 
 void gravitylite_forget_remote_state(void)
 {
     __atomic_store_n(&s_gravity_ptr_count, 0, __ATOMIC_SEQ_CST);
-    __atomic_store_n(&s_gravity_refresh_tick, 0, __ATOMIC_SEQ_CST);
     memset(s_gravity_ptrs, 0, sizeof(s_gravity_ptrs));
-    memset(&s_gravity_config, 0, sizeof(s_gravity_config));
 }
