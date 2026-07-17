@@ -54,7 +54,7 @@ static bool wl_bundle_should_be_visible(uint64_t bundle);
 
 enum {
     // Keep the first render bounded so SpringBoard input remains responsive.
-    WL_MAX_APPS = 256,
+    WL_MAX_APPS = 128,
     WL_MAX_LISTS = 64,
     WL_MAX_GESTURE_GUARDS = 8,
 };
@@ -403,6 +403,45 @@ static uint64_t wl_make_open_invocation(uint64_t workspace, uint64_t bundleID)
     return invocation;
 }
 
+static uint64_t wl_make_async_open_invocation(uint64_t openInvocation)
+{
+    if (!r_is_objc_ptr(openInvocation)) return 0;
+    uint64_t selector = r_sel("performSelectorOnMainThread:withObject:waitUntilDone:");
+    uint64_t signature = selector
+        ? r_msg2_main(openInvocation, "methodSignatureForSelector:", selector, 0, 0, 0)
+        : 0;
+    uint64_t invocationClass = r_class("NSInvocation");
+    uint64_t outer = r_is_objc_ptr(invocationClass) && r_is_objc_ptr(signature)
+        ? r_msg2_main(invocationClass, "invocationWithMethodSignature:", signature, 0, 0, 0)
+        : 0;
+    if (!r_is_objc_ptr(outer)) return 0;
+    r_msg2_main(outer, "setTarget:", openInvocation, 0, 0, 0);
+    r_msg2_main(outer, "setSelector:", selector, 0, 0, 0);
+
+    uint64_t invokeSelector = r_sel("invoke");
+    uint64_t argSelector = r_dlsym_call(R_TIMEOUT, "malloc", sizeof(invokeSelector), 0, 0, 0, 0, 0, 0, 0);
+    uint64_t argObject = r_dlsym_call(R_TIMEOUT, "malloc", sizeof(uint64_t), 0, 0, 0, 0, 0, 0, 0);
+    uint64_t argWait = r_dlsym_call(R_TIMEOUT, "malloc", sizeof(uint64_t), 0, 0, 0, 0, 0, 0, 0);
+    uint64_t zero = 0;
+    if (!argSelector || !argObject || !argWait ||
+        !remote_write(argSelector, &invokeSelector, sizeof(invokeSelector)) ||
+        !remote_write(argObject, &zero, sizeof(zero)) ||
+        !remote_write(argWait, &zero, sizeof(zero))) {
+        if (argSelector) r_free(argSelector);
+        if (argObject) r_free(argObject);
+        if (argWait) r_free(argWait);
+        return 0;
+    }
+    r_msg2_main(outer, "setArgument:atIndex:", argSelector, 2, 0, 0);
+    r_msg2_main(outer, "setArgument:atIndex:", argObject, 3, 0, 0);
+    r_msg2_main(outer, "setArgument:atIndex:", argWait, 4, 0, 0);
+    r_free(argSelector);
+    r_free(argObject);
+    r_free(argWait);
+    r_msg2_main(outer, "retainArguments", 0, 0, 0, 0);
+    return outer;
+}
+
 static bool wl_bind_open_action(uint64_t view,
                                 uint64_t workspace,
                                 uint64_t bundleID)
@@ -410,6 +449,8 @@ static bool wl_bind_open_action(uint64_t view,
     if (!r_is_objc_ptr(view) || !r_is_objc_ptr(bundleID)) return false;
     uint64_t openInvocation = wl_make_open_invocation(workspace, bundleID);
     if (!r_is_objc_ptr(openInvocation)) return false;
+    uint64_t asyncInvocation = wl_make_async_open_invocation(openInvocation);
+    if (r_is_objc_ptr(asyncInvocation)) openInvocation = asyncInvocation;
 
     uint64_t invokeSelector = r_sel("invoke");
     uint64_t tapClass = r_class("UITapGestureRecognizer");
@@ -652,6 +693,16 @@ static int wl_disable_native_icon_competing_interactions(uint64_t view)
     return disabled;
 }
 
+static bool wl_disable_native_tap_only(uint64_t view)
+{
+    if (!r_is_objc_ptr(view)) return false;
+    uint64_t tap = wl_safe_msg(view, "tapGestureRecognizer", 0, 0, 0, 0);
+    if (!r_is_objc_ptr(tap)) tap = r_ivar_value(view, "_tapGestureRecognizer");
+    if (!r_is_objc_ptr(tap) || !r_responds_main(tap, "setEnabled:")) return false;
+    r_msg2_main(tap, "setEnabled:", 0, 0, 0, 0);
+    return true;
+}
+
 static bool wl_forbid_native_icon_editing(uint64_t view)
 {
     if (!r_is_objc_ptr(view)) return false;
@@ -748,8 +799,6 @@ static uint64_t wl_new_native_icon_view(uint64_t bundleID,
     r_msg2_main(view, "setLabelHidden:", 1, 0, 0, 0);
     r_msg2_main(view, "setAllowsCloseBox:", 0, 0, 0, 0);
 
-    wl_disable_native_icon_competing_interactions(view);
-    wl_forbid_native_icon_editing(view);
     uint64_t contextMenu = wl_safe_msg(view, "contextMenuInteraction",
                                        0, 0, 0, 0);
     if (!r_is_objc_ptr(contextMenu)) {
@@ -911,7 +960,7 @@ bool watchlayout_apply_in_session(void)
         return false;
     }
 
-    printf("[WATCHLAYOUT] implementation=overlay-v6 scaleOwner=SBIconView editingGuard=forbid boundedReads=1\n");
+    printf("[WATCHLAYOUT] implementation=overlay-v7 scaleOwner=SBIconView nativeContextMenus=1 asyncLaunch=1 boundedReads=1\n");
 
     log_user("[WATCHLAYOUT][1/3] Reading the SpringBoard app catalog without remote string copies...\n");
     WLAppEntry apps[WL_MAX_APPS] = {0};
@@ -1065,7 +1114,7 @@ bool watchlayout_apply_in_session(void)
     int scaleFailures = 0;
     int editingGestureGuards = 0;
     int editingModeGuards = 0;
-    log_user("[WATCHLAYOUT][3/3] Building %d lightweight pressable icons...\n",
+    log_user("[WATCHLAYOUT][3/3] Building %d native pressable icons...\n",
              appCount);
     for (int appIndex = 0; appIndex < appCount; appIndex++) {
         uint64_t bundleID = apps[appIndex].bundleID;
@@ -1084,36 +1133,44 @@ bool watchlayout_apply_in_session(void)
         if (!r_is_objc_ptr(tile)) continue;
         wl_configure_round_wrapper(tile, iconSize);
 
-        // A native SBIconView costs dozens of cross-process calls per app and
-        // was the source of the apparently frozen first pass. UIImageView plus
-        // an invocation-backed tap gesture remains fully pressable while being
-        // much cheaper and avoiding editing-mode side effects.
-        uint64_t image = wl_fetch_icon_image(bundleID, &iconSource);
-        if (r_is_objc_ptr(image)) {
-            uint64_t imageView = wl_new_image_view(
-                (WLRect){0.0, 0.0, iconSize, iconSize}, image);
-            if (r_is_objc_ptr(imageView)) {
-                r_msg2_main(tile, "addSubview:", imageView, 0, 0, 0);
-                r_msg2_main(imageView, "release", 0, 0, 0, 0);
-            } else {
-                imageFailures++;
-            }
+        // Prefer a real SBIconView: SpringBoard supplies its normal tap,
+        // context-menu, edit, and delete behavior. The image tile remains a
+        // safe fallback for bundles that cannot be represented natively.
+        uint64_t nativeIcon = wl_new_native_icon_view(bundleID, manager, &iconSource);
+        if (r_is_objc_ptr(nativeIcon)) {
+            r_msg2_main(tile, "addSubview:", nativeIcon, 0, 0, 0);
+            nativeMenuIcons++;
+            // Keep the native context-menu/edit/delete recognizers, but move
+            // launch to the asynchronous tile action below so a tap does not
+            // synchronously block SpringBoard while the app opens.
+            (void)wl_disable_native_tap_only(nativeIcon);
+            if (!wl_scale_native_icon_view(nativeIcon, tile, installed == 0))
+                scaleFailures++;
+            if (!wl_bind_open_action(tile, workspace, bundleID))
+                actionFailures++;
+            r_msg2_main(nativeIcon, "release", 0, 0, 0, 0);
         } else {
             imageFailures++;
-            uint64_t label = wl_new_initial_label(
-                (WLRect){0.0, 0.0, iconSize, iconSize}, "?");
-            if (r_is_objc_ptr(label)) {
-                r_msg2_main(tile, "addSubview:", label, 0, 0, 0);
-                r_msg2_main(label, "release", 0, 0, 0, 0);
+            uint64_t image = wl_fetch_icon_image(bundleID, &iconSource);
+            if (r_is_objc_ptr(image)) {
+                uint64_t imageView = wl_new_image_view(
+                    (WLRect){0.0, 0.0, iconSize, iconSize}, image);
+                if (r_is_objc_ptr(imageView)) {
+                    r_msg2_main(tile, "addSubview:", imageView, 0, 0, 0);
+                    r_msg2_main(imageView, "release", 0, 0, 0, 0);
+                }
+            } else {
+                uint64_t label = wl_new_initial_label(
+                    (WLRect){0.0, 0.0, iconSize, iconSize}, "?");
+                if (r_is_objc_ptr(label)) {
+                    r_msg2_main(tile, "addSubview:", label, 0, 0, 0);
+                    r_msg2_main(label, "release", 0, 0, 0, 0);
+                }
             }
+            r_msg2_main(tile, "setAccessibilityLabel:", bundleID, 0, 0, 0);
+            if (!wl_bind_open_action(tile, workspace, bundleID))
+                actionFailures++;
         }
-
-        r_msg2_main(tile, "setAccessibilityLabel:", bundleID, 0, 0, 0);
-        if (!wl_bind_open_action(tile, workspace, bundleID))
-            actionFailures++;
-        // Do not add a second long-press recognizer to every tile. The tap
-        // invocation is sufficient for launching, and omitting the redundant
-        // recognizer removes another expensive group of remote calls per app.
         r_msg2_main(scroll, "addSubview:", tile, 0, 0, 0);
         r_msg2_main(tile, "release", 0, 0, 0, 0);
         installed++;
@@ -1156,7 +1213,7 @@ bool watchlayout_apply_in_session(void)
            longPressGuardFailures,
            overlayHeight, contentSize.height,
            s_compact_percent, s_icon_scale_percent);
-    log_user("[WATCHLAYOUT][APPLY] implementation=overlay-v6 overlay=scrolling-honeycomb layout=5/4 source=SBApplicationController lists=%d apps=%d systemAppsIncluded=1 folderContentsIncluded=0 nativeMenus=%d scaleFailures=%d editingGestureGuards=%d editingModeGuards=%d imageFailures=%d actionFailures=%d longPressGuardFailures=%d viewportHeight=%.1f compact=%d%% scale=%d%% mainThreadLaunch=1 boundedReads=1 iconModelWrites=0.\n",
+    log_user("[WATCHLAYOUT][APPLY] implementation=overlay-v7 overlay=scrolling-honeycomb layout=5/4 source=SBApplicationController lists=%d apps=%d privateAppleAppsFiltered=1 nativeMenus=%d scaleFailures=%d editingGestureGuards=%d editingModeGuards=%d imageFailures=%d actionFailures=%d longPressGuardFailures=%d viewportHeight=%.1f compact=%d%% scale=%d%% asyncLaunch=1 boundedReads=1 iconModelWrites=0.\n",
              s_list_count, installed, nativeMenuIcons,
              scaleFailures, editingGestureGuards, editingModeGuards,
              imageFailures, actionFailures,
