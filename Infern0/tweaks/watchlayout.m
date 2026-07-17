@@ -51,6 +51,7 @@ typedef struct {
 } WLAppEntry;
 
 static bool wl_bundle_should_be_visible(uint64_t bundle);
+static bool wl_apple_bundle_is_user_facing(const char *identifier);
 
 enum {
     // Keep the first render bounded so SpringBoard input remains responsive.
