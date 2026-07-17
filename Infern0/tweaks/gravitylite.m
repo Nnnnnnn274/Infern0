@@ -913,6 +913,23 @@ static uint64_t gl_current_root_list_view(uint64_t ctrl, uint64_t mgr)
     return list;
 }
 
+// Deliberately narrow resolver from the known-good reference implementation.
+// Avoid walking root-folder arrays or application windows: on some iOS builds
+// those collections contain short-lived objects that fail RemoteCall reads.
+static uint64_t gl_current_root_list_view_safe(uint64_t ctrl)
+{
+    uint64_t list = 0;
+    if (gl_safe_msg(ctrl, "hasOpenFolder", 0, 0, 0, 0))
+        list = gl_safe_msg(ctrl, "currentFolderIconList", 0, 0, 0, 0);
+    if (!r_is_objc_ptr(list))
+        list = gl_safe_msg(ctrl, "currentRootIconList", 0, 0, 0, 0);
+    if (!r_is_objc_ptr(list))
+        list = gl_safe_msg(ctrl, "currentRootIconListView", 0, 0, 0, 0);
+    if (!r_is_objc_ptr(list))
+        list = gl_safe_msg(ctrl, "currentIconListView", 0, 0, 0, 0);
+    return list;
+}
+
 // Several recent SpringBoard builds leave currentRootIconListView pointing at
 // one recycled page even after the user scrolls. Resolve the actually centered
 // page from live geometry and use the private selector only as a tie-breaker.
@@ -1924,86 +1941,31 @@ bool gravitylite_apply_in_session(GravityLiteConfig config)
             return false;
         }
 
-        enum { LV_CAP = 64 };
         uint64_t dockListView = gl_dock_list_view(ctrl, mgr);
-        uint64_t listViews[LV_CAP] = {0};
-        int count = gl_collect_home_page_list_views(ctrl, mgr, iconViewCls,
-                                                    listViews, LV_CAP);
-        uint64_t currentPage = gl_visible_root_list_view(ctrl, mgr, iconViewCls);
-        if (!r_is_objc_ptr(currentPage))
-            currentPage = gl_current_root_list_view(ctrl, mgr);
-        int currentIndex = -1;
-        for (int i = 0; i < count; i++) {
-            if (listViews[i] == currentPage) currentIndex = i;
-        }
-
-        int activeHomePages = 0;
-        int skippedUnloadedPages = 0;
+        log_user("[GRAVITY][PAGE-RESOLVE] mode=safe-current-page broadDiscovery=disabled windowTreeScan=disabled appLibraryScan=disabled.\n");
+        uint64_t currentPage = gl_current_root_list_view_safe(ctrl);
         if (r_is_objc_ptr(currentPage)) {
-            printf("[GRAVITY] Capturing current home screen page %d/%d...\n",
-                   currentIndex >= 0 ? currentIndex + 1 : 1,
-                   count > 0 ? count : 1);
-            log_user("[GRAVITY][PAGE %d/%d] list=0x%llx capture=starting ownership=isolated visibility=current.\n",
-                     currentIndex >= 0 ? currentIndex + 1 : 1,
-                     count > 0 ? count : 1, currentPage);
+            printf("[GRAVITY] Capturing current home screen page...\n");
+            log_user("[GRAVITY][PAGE] list=0x%llx capture=starting ownership=isolated resolver=SBIconController-current.\n",
+                     currentPage);
             if (gl_build_group(groups, currentPage, iconViewCls, config, false, false, true)) {
                 built++;
                 homeBuilt = true;
-                activeHomePages++;
-                log_user("[GRAVITY][PAGE %d/%d] list=0x%llx overlay=page-child animator=page-local collisionBounds=page-local result=active.\n",
-                         currentIndex >= 0 ? currentIndex + 1 : 1,
-                         count > 0 ? count : 1, currentPage);
+                log_user("[GRAVITY][PAGE] list=0x%llx overlay=page-child animator=page-local collisionBounds=page-local result=active.\n",
+                         currentPage);
+            } else {
+                log_user("[GRAVITY][PAGE][WARN] list=0x%llx result=capture-failed; pageRestored=1.\n",
+                         currentPage);
             }
+        } else {
+            log_user("[GRAVITY][PAGE][ERROR] safe current-page resolver returned no valid object; action=abort-before-mutation.\n");
         }
 
-        // The reference implementation proves that a page-local animator is
-        // stable. Extend that exact ownership model to sibling pages only when
-        // SpringBoard has already materialized real icon views for them. Each
-        // page gets its own overlay and animator; unloaded pages are untouched.
-        for (int i = 0; i < count; i++) {
-            uint64_t page = listViews[i];
-            if (!r_is_objc_ptr(page) || page == currentPage) continue;
-            if (!gl_list_has_icon_views(page, iconViewCls)) {
-                skippedUnloadedPages++;
-                log_user("[GRAVITY][PAGE %d/%d] list=0x%llx result=skipped-unloaded; noRemoteRetry=1.\n",
-                         i + 1, count, page);
-                continue;
-            }
-            log_user("[GRAVITY][PAGE %d/%d] list=0x%llx capture=starting ownership=isolated visibility=materialized-offscreen.\n",
-                     i + 1, count, page);
-            if (gl_build_group(groups, page, iconViewCls, config, false, false, true)) {
-                built++;
-                homeBuilt = true;
-                activeHomePages++;
-                log_user("[GRAVITY][PAGE %d/%d] list=0x%llx animator=page-local result=active.\n",
-                         i + 1, count, page);
-            } else {
-                log_user("[GRAVITY][PAGE %d/%d][WARN] list=0x%llx result=capture-failed; pageRestored=1 noRemoteRetry=1.\n",
-                         i + 1, count, page);
-            }
-        }
-
-        int activeLibraryGroups = 0;
-        uint64_t libraryRoots[8] = {0};
-        int libraryCount = gl_collect_library_roots(libraryRoots, 8);
-        for (int i = 0; i < libraryCount; i++) {
-            uint64_t root = libraryRoots[i];
-            uint64_t libraryItems[1] = {0};
-            if (!r_is_objc_ptr(root) ||
-                gl_collect_library_item_views(root, libraryItems, 1) <= 0) {
-                log_user("[GRAVITY][LIBRARY %d/%d] root=0x%llx result=skipped-unloaded; noRemoteRetry=1.\n",
-                         i + 1, libraryCount, root);
-                continue;
-            }
-            if (gl_build_group(groups, root, iconViewCls, config, false, true, true)) {
-                built++;
-                activeLibraryGroups++;
-                log_user("[GRAVITY][LIBRARY %d/%d] root=0x%llx animator=library-local result=active.\n",
-                         i + 1, libraryCount, root);
-            } else {
-                log_user("[GRAVITY][LIBRARY %d/%d][WARN] root=0x%llx result=capture-failed; libraryRestored=1 noRemoteRetry=1.\n",
-                         i + 1, libraryCount, root);
-            }
+        if (!homeBuilt) {
+            gl_release(groups);
+            gl_release(state);
+            printf("[GRAVITY] Current page could not be captured safely; dock was not modified.\n");
+            return false;
         }
 
         if (r_is_objc_ptr(dockListView) && config.includeDock) {
@@ -2023,8 +1985,7 @@ bool gravitylite_apply_in_session(GravityLiteConfig config)
         if (built <= 0) {
             gl_release(groups);
             gl_release(state);
-            printf("[GRAVITY] No icon groups could be captured from %d discovered page(s).\n",
-                   count);
+            printf("[GRAVITY] Current page could not be captured safely.\n");
             return false;
         }
 
@@ -2032,10 +1993,9 @@ bool gravitylite_apply_in_session(GravityLiteConfig config)
         gl_dict_set(state, "groups", groups);
         gl_set_state(ctrl, state);
         printf("[GRAVITY] Physics started — groups=%d home=%d dock=%d visiblePages=%d\n",
-               built, homeBuilt, dockBuilt, count);
-        log_user("[GRAVITY][APPLY] completed discoveredPages=%d activeGroups=%d activeHomePages=%d skippedUnloadedPages=%d discoveredLibraryRoots=%d activeLibraryGroups=%d dockRequested=%d dockActive=%d gravityBehaviors=%d pageIsolation=1 staleObjectRetries=0 result=success.\n",
-                 count, built, activeHomePages, skippedUnloadedPages,
-                 libraryCount, activeLibraryGroups, config.includeDock, dockBuilt,
+               built, homeBuilt, dockBuilt, 1);
+        log_user("[GRAVITY][APPLY] activeGroups=%d activeHomePages=%d dockRequested=%d dockActive=%d gravityBehaviors=%d safeCurrentPageOnly=1 broadDiscovery=0 appLibraryScan=0 staleObjectRetries=0 result=success.\n",
+                 built, homeBuilt ? 1 : 0, config.includeDock, dockBuilt,
                  __atomic_load_n(&s_gravity_ptr_count, __ATOMIC_SEQ_CST));
         printf("[WARN] TO STOP GRAVITY: USE APP SWITCHER TO RETURN TO CYANIDE AND DEACTIVATE.\n");
 
