@@ -51,7 +51,8 @@ typedef struct {
 } WLAppEntry;
 
 enum {
-    WL_MAX_APPS = 1024,
+    // Keep the first render bounded so SpringBoard input remains responsive.
+    WL_MAX_APPS = 256,
     WL_MAX_LISTS = 64,
     WL_MAX_GESTURE_GUARDS = 8,
 };
@@ -265,6 +266,10 @@ static int wl_installed_apps(WLAppEntry *out, int cap)
             invalidIdentifiers++;
             continue;
         }
+        if (!wl_bundle_should_be_visible(bundle)) {
+            skippedHidden++;
+            continue;
+        }
 
         bool duplicate = false;
         for (int j = 0; j < accepted; j++) {
@@ -274,7 +279,7 @@ static int wl_installed_apps(WLAppEntry *out, int cap)
         out[accepted++].bundleID = bundle;
     }
     r_settle_us(oldSettle);
-    log_user("[WATCHLAYOUT][CATALOG] scanned=%llu accepted=%d hidden=%d invalid=%d remoteStringReads=0.\n",
+    log_user("[WATCHLAYOUT][CATALOG] scanned=%llu accepted=%d hiddenOrPrivateApple=%d invalid=%d remoteStringReads=apple-only.\n",
              (unsigned long long)count, accepted, skippedHidden,
              invalidIdentifiers);
     return accepted;
@@ -286,6 +291,39 @@ static bool wl_class_has_instance_method(uint64_t cls, const char *selector)
     return r_is_objc_ptr(cls) && sel &&
         r_dlsym_call(R_TIMEOUT, "class_getInstanceMethod",
                      cls, sel, 0, 0, 0, 0, 0, 0) != 0;
+}
+
+static bool wl_apple_bundle_is_user_facing(uint64_t bundle)
+{
+    if (!r_is_objc_ptr(bundle)) return false;
+    char identifier[256] = {0};
+    if (!r_read_nsstring(bundle, identifier, sizeof(identifier))) return false;
+    static const char *const allowed[] = {
+        "com.apple.mobilesafari", "com.apple.mobileslideshow",
+        "com.apple.camera", "com.apple.Maps", "com.apple.mobilecal",
+        "com.apple.mobilephone", "com.apple.MobileSMS", "com.apple.mobilemail",
+        "com.apple.mobilenotes", "com.apple.mobiletimer", "com.apple.MobileAddressBook",
+        "com.apple.weather", "com.apple.news", "com.apple.stocks",
+        "com.apple.Home", "com.apple.shortcuts", "com.apple.reminders",
+        "com.apple.DocumentsApp", "com.apple.iBooks", "com.apple.tv",
+        "com.apple.podcasts", "com.apple.findmy", "com.apple.Health",
+        "com.apple.Passbook", NULL
+    };
+    for (int i = 0; allowed[i]; i++)
+        if (strcmp(identifier, allowed[i]) == 0) return true;
+    return false;
+}
+
+static bool wl_bundle_should_be_visible(uint64_t bundle)
+{
+    if (!r_is_objc_ptr(bundle)) return false;
+    uint64_t prefix = r_cfstr("com.apple.");
+    bool isApple = r_is_objc_ptr(prefix) &&
+        r_responds_main(bundle, "hasPrefix:") &&
+        (wl_safe_msg(bundle, "hasPrefix:", prefix, 0, 0, 0) & 0xff) != 0;
+    if (r_is_objc_ptr(prefix))
+        r_dlsym_call(R_TIMEOUT, "CFRelease", prefix, 0, 0, 0, 0, 0, 0, 0);
+    return !isApple || wl_apple_bundle_is_user_facing(bundle);
 }
 
 static uint64_t wl_fetch_icon_model(uint64_t bundleID,
