@@ -54,7 +54,7 @@ static bool wl_bundle_should_be_visible(uint64_t bundle);
 
 enum {
     // Keep the first render bounded so SpringBoard input remains responsive.
-    WL_MAX_APPS = 128,
+    WL_MAX_APPS = 500,
     WL_MAX_LISTS = 64,
     WL_MAX_GESTURE_GUARDS = 8,
 };
@@ -261,6 +261,22 @@ static int wl_installed_apps(WLAppEntry *out, int cap)
         if (!r_is_objc_ptr(bundle)) {
             invalidIdentifiers++;
             continue;
+        }
+        bool systemApp = false;
+        if (r_responds_main(app, "isSystemApplication"))
+            systemApp = wl_safe_msg(app, "isSystemApplication", 0, 0, 0, 0) != 0;
+        else if (r_responds_main(app, "isSystemApp"))
+            systemApp = wl_safe_msg(app, "isSystemApp", 0, 0, 0, 0) != 0;
+        if (systemApp) {
+            char systemIdentifier[256] = {0};
+            bool isUserFacingApple =
+                r_read_nsstring(bundle, systemIdentifier, sizeof(systemIdentifier)) &&
+                strncmp(systemIdentifier, "com.apple.", 10) == 0 &&
+                wl_apple_bundle_is_user_facing(systemIdentifier);
+            if (!isUserFacingApple) {
+                skippedHidden++;
+                continue;
+            }
         }
         if (!wl_bundle_should_be_visible(bundle)) {
             skippedHidden++;
