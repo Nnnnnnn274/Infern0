@@ -255,6 +255,11 @@ static int wl_installed_apps(WLAppEntry *out, int cap)
     for (uint64_t i = 0; i < count; i++) {
         uint64_t app = wl_safe_msg(applications, "objectAtIndex:", i, 0, 0, 0);
         if (!r_is_objc_ptr(app)) continue;
+        if (r_responds_main(app, "isHidden") &&
+            wl_safe_msg(app, "isHidden", 0, 0, 0, 0)) {
+            skippedHidden++;
+            continue;
+        }
         uint64_t bundle = wl_safe_msg(app, "bundleIdentifier", 0, 0, 0, 0);
         if (!r_is_objc_ptr(bundle))
             bundle = wl_safe_msg(app, "displayIdentifier", 0, 0, 0, 0);
