@@ -10,15 +10,23 @@
 #import "tweaks/powercuff.h"
 #import "tweaks/statbar.h"
 #import "tweaks/experimental_tweaks.h"
+#import "tweaks/nsbar.h"
+#import "tweaks/nicebarlite.h"
 #import "tweaks/axonlite.h"
 #import "tweaks/darksword_tweaks.h"
+#import "tweaks/darksword_drag.h"
 #import "tweaks/darksword_ota.h"
 #import "tweaks/darksword_layout.h"
 #import "tweaks/nano_registry.h"
 #import "tweaks/killallapps.h"
 #import "tweaks/themer.h"
+#import "tweaks/snowboardlite.h"
+#import "tweaks/livewp.h"
 #import "tweaks/gravitylite.h"
 #import "tweaks/sb_walk.h"
+#import "tweaks/appswitchergrid.h"
+#import "tweaks/hide_home_bar.h"
+#import "tweaks/QuickLoader.h"
 #import <CoreMotion/CoreMotion.h>
 
 #import <objc/runtime.h>
@@ -12520,18 +12528,29 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
         @{ @"title": @"Launch Options",     @"icon": @"bolt.fill",                          @"color": [UIColor systemRedColor],    @"section": @(SectionLaunch) },
         @{ @"title": @"SBCustomizer",       @"icon": @"square.grid.3x3.fill",               @"color": [UIColor systemRedColor],    @"section": @(SectionSBC) },
         @{ @"title": @"StatBar",            @"icon": @"thermometer.medium",                 @"color": [UIColor systemRedColor],    @"section": @(SectionStatBar) },
+        @{ @"title": @"NSBar",              @"icon": @"network",                            @"color": [UIColor systemRedColor],    @"section": @(SectionNSBar) },
+        @{ @"title": @"NiceBar Lite",       @"icon": @"textformat.size",                    @"color": [UIColor systemTealColor],   @"section": @(SectionNiceBarLite) },
 #if CYANIDE_EXPERIMENTAL_TWEAKS_AVAILABLE
         @{ @"title": @"Signal Display",     @"icon": @"antenna.radiowaves.left.and.right",  @"color": [UIColor systemRedColor],    @"section": @(SectionRSSI), @"indev": @YES },
 #endif
         @{ @"title": @"Axon Lite",          @"icon": @"bell.badge.fill",                    @"color": [UIColor systemRedColor],    @"section": @(SectionAxonLite) },
 #if CYANIDE_EXPERIMENTAL_TWEAKS_AVAILABLE
         @{ @"title": @"TypeBanner",         @"icon": @"ellipsis.bubble.fill",               @"color": [UIColor systemTealColor],   @"section": @(SectionTypeBanner), @"indev": @YES },
+        @{ @"title": @"Notification Island", @"icon": @"bell.and.waves.left.and.right.fill", @"color": [UIColor systemOrangeColor], @"section": @(SectionNotificationIsland), @"indev": @YES },
+        @{ @"title": @"IPA Decryptor (Beta)", @"icon": @"lock.open.fill",                    @"color": [UIColor systemPurpleColor], @"section": @(SectionIPADecryptor), @"indev": @YES },
+        @{ @"title": @"FastLockX Lite",     @"icon": @"lock.open.fill",                     @"color": [UIColor systemGreenColor],  @"section": @(SectionFastLockXLite) },
         @{ @"title": @"Cylinder Lite",      @"icon": @"perspective",                         @"color": [UIColor systemTealColor],   @"section": @(SectionCylinderLite) },
         @{ @"title": @"Clipboard Bar Lite", @"icon": @"face.smiling.fill",                   @"color": [UIColor systemPinkColor],   @"section": @(SectionBarmoji) },
 #endif
         @{ @"title": @"Gravity Lite",       @"icon": @"arrow.down.circle.fill",              @"color": [UIColor systemGreenColor],  @"section": @(SectionGravityLite) },
+        @{ @"title": @"App Switcher Grid",  @"icon": @"square.grid.2x2.fill",                @"color": [UIColor systemOrangeColor], @"section": @(SectionAppSwitcherGrid) },
+        @{ @"title": @"Location Simulator", @"icon": @"location.fill",                       @"color": [UIColor systemGreenColor],  @"section": @(SectionLocationSim) },
+        @{ @"title": @"SnowBoard Lite",     @"icon": @"square.stack.3d.up.fill",             @"color": [UIColor systemOrangeColor], @"section": @(SectionSnowBoardLite) },
+        @{ @"title": @"LiveWP",             @"icon": @"play.rectangle.fill",                 @"color": [UIColor systemPurpleColor], @"section": @(SectionLiveWP) },
+        @{ @"title": @"QuickLoader",        @"icon": @"bolt.fill",                           @"color": [UIColor systemYellowColor], @"section": @(SectionQuickLoader) },
         @{ @"title": @"Powercuff",          @"icon": @"bolt.slash.fill",                     @"color": [UIColor systemOrangeColor], @"section": @(SectionPowercuff) },
         @{ @"title": @"SpringBoard Tweaks", @"icon": @"apps.iphone",                         @"color": [UIColor systemIndigoColor], @"section": @(SectionDarkSwordTweaks) },
+        @{ @"title": @"Drag Coefficient",   @"icon": @"dial.medium.fill",                    @"color": [UIColor systemIndigoColor], @"section": @(SectionDragCoefficient) },
         @{ @"title": @"Home Layout Extras", @"icon": @"square.dashed.inset.filled",          @"color": [UIColor systemPurpleColor], @"section": @(SectionLayoutExtras) },
         @{ @"title": @"Infern0 Themer",     @"icon": @"paintpalette.fill",                   @"color": [UIColor systemPurpleColor], @"section": @(SectionThemer) },
 #if CYANIDE_EXPERIMENTAL_TWEAKS_AVAILABLE
@@ -12547,6 +12566,8 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
     return @[
         @{ @"title": @"OTA Updates",       @"icon": @"icloud.slash.fill",    @"color": [UIColor systemGrayColor],   @"section": @(SectionOTA) },
         @{ @"title": @"Watch Pairing",     @"icon": @"applewatch.radiowaves.left.and.right", @"color": [UIColor systemPurpleColor], @"section": @(SectionNanoRegistry) },
+        @{ @"title": @"Call Recording Sound", @"icon": @"speaker.slash.fill", @"color": [UIColor systemOrangeColor], @"section": @(SectionCallRecordingSound) },
+        @{ @"title": @"Hide Home Bar", @"icon": @"line.3.horizontal", @"color": [UIColor systemGrayColor], @"section": @(SectionHideHomeBar) },
     ];
 }
 
