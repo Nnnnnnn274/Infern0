@@ -299,6 +299,7 @@ static bool wl_apple_bundle_is_user_facing(const char *identifier)
 {
     if (!identifier || !identifier[0]) return true;
     static const char *const allowed[] = {
+        "com.apple.Preferences", "com.apple.Settings",
         "com.apple.mobilesafari", "com.apple.mobileslideshow",
         "com.apple.camera", "com.apple.Maps", "com.apple.mobilecal",
         "com.apple.mobilephone", "com.apple.MobileSMS", "com.apple.mobilemail",
