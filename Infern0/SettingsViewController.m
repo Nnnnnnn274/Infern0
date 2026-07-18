@@ -980,6 +980,8 @@ NSString * const kSettingsAxonLiteEnabled = @"AxonLiteEnabled";
 NSString * const kSettingsTypeBannerEnabled = @"TypeBannerEnabled";
 NSString * const kSettingsNotificationIslandEnabled = @"NotificationIslandEnabled";
 NSString * const kSettingsAppSwitcherGridEnabled = @"AppSwitcherGridEnabled";
+static NSString * const kSettingsAppSwitcherGridLayout = @"AppSwitcherGridLayout";
+static NSString * const kSettingsAppSwitcherGridAnimation = @"AppSwitcherGridAnimation";
 NSString * const kSettingsFastLockXLiteEnabled = @"FastLockXLiteEnabled";
 static NSString * const kSettingsFastLockXLiteBlockMusic = @"FastLockXLiteBlockMusic";
 static NSString * const kSettingsFastLockXLiteBlockFlashlight = @"FastLockXLiteBlockFlashlight";
@@ -7046,7 +7048,44 @@ static BOOL settings_key_is_tweakloader(NSString *key)
 
 static BOOL settings_key_is_appswitchergrid(NSString *key)
 {
-    return [key isEqualToString:kSettingsAppSwitcherGridEnabled];
+    return [key isEqualToString:kSettingsAppSwitcherGridEnabled] ||
+           [key isEqualToString:kSettingsAppSwitcherGridLayout] ||
+           [key isEqualToString:kSettingsAppSwitcherGridAnimation];
+}
+
+static NSString *settings_appswitcher_layout_title(NSInteger value)
+{
+    switch (value) {
+        case AppSwitcherLayoutAutomatic: return @"Automatic";
+        case AppSwitcherLayoutDeck: return @"Classic Deck";
+        case AppSwitcherLayoutGridCompact: return @"Compact Grid";
+        case AppSwitcherLayoutGridLarge: return @"Large Grid";
+        default: return @"Balanced Grid";
+    }
+}
+
+static NSString *settings_appswitcher_animation_title(NSInteger value)
+{
+    switch (value) {
+        case AppSwitcherAnimationSnappy: return @"Snappy";
+        case AppSwitcherAnimationSmooth: return @"Smooth";
+        case AppSwitcherAnimationBouncy: return @"Bouncy";
+        default: return @"System";
+    }
+}
+
+static AppSwitcherGridConfig settings_appswitcher_config_from_defaults(NSUserDefaults *defaults)
+{
+    NSInteger layout = [defaults integerForKey:kSettingsAppSwitcherGridLayout];
+    NSInteger animation = [defaults integerForKey:kSettingsAppSwitcherGridAnimation];
+    if (layout < AppSwitcherLayoutAutomatic || layout > AppSwitcherLayoutGridLarge)
+        layout = AppSwitcherLayoutGridBalanced;
+    if (animation < AppSwitcherAnimationSystem || animation > AppSwitcherAnimationBouncy)
+        animation = AppSwitcherAnimationSystem;
+    return (AppSwitcherGridConfig) {
+        .layout = (AppSwitcherLayoutMode)layout,
+        .animation = (AppSwitcherAnimationMode)animation,
+    };
 }
 
 static BOOL settings_key_is_gravitylite(NSString *key)
@@ -8259,7 +8298,8 @@ static void settings_schedule_live_apply_for_key(NSString *key)
                     if (settings_cleanup_in_progress() ||
                         ![d boolForKey:kSettingsAppSwitcherGridEnabled] ||
                         !g_springboard_rc_ready) return;
-                    bool ok = appswitchergrid_apply_in_session();
+                    AppSwitcherGridConfig config = settings_appswitcher_config_from_defaults(d);
+                    bool ok = appswitchergrid_apply_config_in_session(config);
                     settings_mark_tweak_applied(kSettingsAppSwitcherGridEnabled,
                                                 ok && [d boolForKey:kSettingsAppSwitcherGridEnabled]);
                     printf("[SETTINGS] live App Switcher Grid apply result=%d\n", ok);
@@ -8937,6 +8977,8 @@ void settings_register_defaults(void)
         kSettingsLiveWPMoodTiltDegrees: @3,
 
         kSettingsAppSwitcherGridEnabled: @NO,
+        kSettingsAppSwitcherGridLayout: @(AppSwitcherLayoutGridBalanced),
+        kSettingsAppSwitcherGridAnimation: @(AppSwitcherAnimationSystem),
 
         kSettingsQuickLoaderEnabled: @NO,
         kSettingsRepoTweaksEnabled: @NO,
@@ -9064,7 +9106,7 @@ static void settings_log_tweak_plan_details(NSUserDefaults *d, BOOL pendingOnly)
         { kSettingsSnapperEnabled, "Snapper", "shows the configured crop-frame overlay" },
         { kSettingsPullOverEnabled, "PullOver", "shows the configured slide-over tray shell" },
         { kSettingsAlkalineEnabled, "Alkaline", "tints visible battery views with the configured color" },
-        { kSettingsAppSwitcherGridEnabled, "App Switcher Grid", "patches SpringBoard's app-switcher layout in memory" },
+        { kSettingsAppSwitcherGridEnabled, "App Switcher Grid", "applies the selected deck/grid layout and fluid-animation preset to SpringBoard's live switcher settings" },
         { kSettingsGravityLiteEnabled, "Gravity Lite", "gives every Home Screen page an isolated live-icon gravity, collision, bounce, and motion-steering simulation" },
         { kSettingsLayoutExtrasEnabled, "Home Layout Extras", "adds the configured padding and scaling to home and dock icons" },
         { kSettingsThemerEnabled, "Themer", "replaces app icon imagery using the selected local theme" },
@@ -9996,7 +10038,8 @@ static void settings_run_actions_internal(BOOL pendingOnly)
 
                     if (runAppSwitcherGrid) {
                         settings_progress(&step, total, "Enabling App Switcher Grid");
-                        bool ok = appswitchergrid_apply_in_session();
+                        AppSwitcherGridConfig config = settings_appswitcher_config_from_defaults(d);
+                        bool ok = appswitchergrid_apply_config_in_session(config);
                         settings_mark_tweak_applied(kSettingsAppSwitcherGridEnabled,
                                                     ok && [d boolForKey:kSettingsAppSwitcherGridEnabled]);
                         printf("[SETTINGS] App Switcher Grid result=%d\n", ok);
@@ -12165,16 +12208,32 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
 - (NSArray<NSDictionary *> *)appSwitcherGridRows
 {
     BOOL applied = settings_tweak_is_applied(kSettingsAppSwitcherGridEnabled);
+    NSUserDefaults *defaults = NSUserDefaults.standardUserDefaults;
+    NSString *layout = settings_appswitcher_layout_title([defaults integerForKey:kSettingsAppSwitcherGridLayout]);
+    NSString *animation = settings_appswitcher_animation_title([defaults integerForKey:kSettingsAppSwitcherGridAnimation]);
     return @[
         @{ @"kind": @"info",
-           @"title": applied ? @"Current Style: Grid" : @"Current Style: Stock",
-           @"subtitle": @"This is a runtime SpringBoard method patch. It does not write system files; respring restores the stock app switcher." },
+           @"title": applied ? [NSString stringWithFormat:@"Active: %@", layout] : @"Current Style: Stock",
+           @"subtitle": applied
+               ? [NSString stringWithFormat:@"%@ animation is active. All changes are session-only and reversible.", animation]
+               : @"Choose a layout and animation, then enable this tweak and run Apply." },
+        @{ @"kind": @"button",
+           @"title": @"Switcher Layout",
+           @"subtitle": layout,
+           @"action": @"appswitchergrid-layout" },
+        @{ @"kind": @"button",
+           @"title": @"Animation Feel",
+           @"subtitle": animation,
+           @"action": @"appswitchergrid-animation" },
         @{ @"kind": @"info",
-           @"title": @"Session note",
-           @"subtitle": @"If you respring after Hide Home Bar, run App Switcher Grid again because respring resets this live SpringBoard patch." },
+           @"title": @"How it works",
+           @"subtitle": @"Automatic follows the device default, Deck shows stacked cards, and the three Grid modes change card scale and spacing. Animation presets tune SpringBoard's real switcher springs—no overlay animation is faked." },
+        @{ @"kind": @"button",
+           @"title": @"View Detailed Activity Log",
+           @"action": @"view-log" },
         @{ @"kind": @"button",
            @"title": @"Restore Stock Switcher",
-           @"subtitle": @"Restores the original switcher style in the active SpringBoard session when available.",
+           @"subtitle": @"Restores the original style, grid values, and animation springs in the active session.",
            @"action": @"appswitchergrid-restore",
            @"destructive": @YES },
     ];
@@ -12260,7 +12319,11 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
         [out addObject:@{@"title": @"Cellular (dBm)",   @"value": [d boolForKey:kSettingsRSSIDisplayCell] ? @"On" : @"Off"}];
     } else if (section == SectionAppSwitcherGrid) {
         [out addObject:@{@"title": @"Switcher style",
-                         @"value": settings_tweak_is_applied(kSettingsAppSwitcherGridEnabled) ? @"Grid" : @"Stock"}];
+                         @"value": settings_tweak_is_applied(kSettingsAppSwitcherGridEnabled)
+                             ? settings_appswitcher_layout_title([d integerForKey:kSettingsAppSwitcherGridLayout])
+                             : @"Stock"}];
+        [out addObject:@{@"title": @"Animation",
+                         @"value": settings_appswitcher_animation_title([d integerForKey:kSettingsAppSwitcherGridAnimation])}];
     } else if (section == SectionFastLockXLite) {
         BOOL alwaysOnIntent = [d boolForKey:kSettingsFastLockXLiteEnabled];
         BOOL alwaysOnApplied = settings_tweak_is_applied(kSettingsFastLockXLiteEnabled);
@@ -16641,6 +16704,41 @@ void cyanide_present_contact(UIViewController *host)
     settings_present_controller(editor, self);
 }
 
+- (void)presentAppSwitcherPresetPickerForKey:(NSString *)key
+{
+    BOOL layoutPicker = [key isEqualToString:kSettingsAppSwitcherGridLayout];
+    NSArray<NSString *> *titles = layoutPicker
+        ? @[@"Automatic", @"Classic Deck", @"Compact Grid", @"Balanced Grid", @"Large Grid"]
+        : @[@"System", @"Snappy", @"Smooth", @"Bouncy"];
+    UIAlertController *picker = [UIAlertController
+        alertControllerWithTitle:layoutPicker ? @"Switcher Layout" : @"Animation Feel"
+                       message:layoutPicker
+                           ? @"Grid presets use different card scales and spacing."
+                           : @"These presets tune SpringBoard's switcher spring response and damping."
+                preferredStyle:UIAlertControllerStyleActionSheet];
+    __weak typeof(self) weakSelf = self;
+    [titles enumerateObjectsUsingBlock:^(NSString *title, NSUInteger index, __unused BOOL *stop) {
+        [picker addAction:[UIAlertAction actionWithTitle:title
+                                                  style:UIAlertActionStyleDefault
+                                                handler:^(__unused UIAlertAction *action) {
+            NSUserDefaults *defaults = NSUserDefaults.standardUserDefaults;
+            [defaults setInteger:(NSInteger)index forKey:key];
+            [defaults synchronize];
+            settings_note_package_configuration_changed(key);
+            settings_schedule_live_apply_for_key(key);
+            log_user("[ASG] Selected %s: %s.\n",
+                     layoutPicker ? "layout" : "animation", title.UTF8String);
+            __strong typeof(weakSelf) strongSelf = weakSelf;
+            [strongSelf reloadSectionOrAll:SectionAppSwitcherGrid];
+            [strongSelf presentApplyLogIfRunning];
+        }]];
+    }];
+    [picker addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
+    picker.popoverPresentationController.sourceView = self.view;
+    picker.popoverPresentationController.sourceRect = self.view.bounds;
+    settings_present_controller(picker, self);
+}
+
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath
 {
     [tableView deselectRowAtIndexPath:indexPath animated:YES];
@@ -17300,6 +17398,14 @@ void cyanide_present_contact(UIViewController *host)
         NSDictionary *row = [self rowsForSection:indexPath.section][indexPath.row];
         if (![row[@"kind"] isEqualToString:@"button"]) return;
         NSString *action = row[@"action"];
+        if ([action isEqualToString:@"appswitchergrid-layout"]) {
+            [self presentAppSwitcherPresetPickerForKey:kSettingsAppSwitcherGridLayout];
+            return;
+        }
+        if ([action isEqualToString:@"appswitchergrid-animation"]) {
+            [self presentAppSwitcherPresetPickerForKey:kSettingsAppSwitcherGridAnimation];
+            return;
+        }
         if ([action isEqualToString:@"appswitchergrid-restore"]) {
             NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
             [d setBool:NO forKey:kSettingsAppSwitcherGridEnabled];

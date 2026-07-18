@@ -454,8 +454,8 @@ static const NSInteger kSecDarkSwordTweaks  = 13;
 
         Package *appSwitcherGrid = [[Package alloc] initWithIdentifier:@"com.darksword.appswitchergrid"
                                            name:@"App Switcher Grid"
-                               shortDescription:@"Grid-style app switcher"
-                                longDescription:@"Applies a runtime SpringBoard method patch that makes the app switcher use grid/deck style.\n\nThis does not write system files. A respring restores the stock app switcher. If you respring after Hide Home Bar, run App Switcher Grid again because respring resets this live SpringBoard patch.\n\nPorted from d1y/cyanide-ios."
+                               shortDescription:@"Deck and multi-size Grid switcher with spring animations"
+                                longDescription:@"Changes SpringBoard's live app-switcher settings without writing system files. Choose Automatic, Classic Deck, Compact Grid, Balanced Grid, or Large Grid, then pair it with System, Snappy, Smooth, or Bouncy switcher animations.\n\nThe tweak captures the original layout, spacing, scale, response, and damping values before changing them, so Restore Stock Switcher can put the active session back exactly. A respring also restores stock behavior.\n\nInspired by d1y/cyanide-ios, iPadSwitcher, and NewGridSwitcherBig."
                                         version:version
                                          author:@"rooootdev"
                                        category:@"SpringBoard"
@@ -464,7 +464,11 @@ static const NSInteger kSecDarkSwordTweaks  = 13;
                                      enabledKey:kSettingsAppSwitcherGridEnabled
                                           isNew:NO];
         appSwitcherGrid.settingsSection = kSecAppSwitcherGrid;
-        appSwitcherGrid.unstableWarning = @"Beta: patches SpringBoard runtime methods in memory. Respring restores stock, but unsupported builds may glitch the app switcher or crash SpringBoard. Re-run after any respring.";
+        appSwitcherGrid.knownIssues = @[
+            @"SpringBoard may cache an already-open switcher. Close it fully and reopen it after changing a layout preset.",
+            @"Animation presets gracefully fall back to System when the current iOS build does not expose compatible fluid-animation settings.",
+        ];
+        appSwitcherGrid.unstableWarning = @"Beta: changes private SpringBoard switcher settings in memory. Unsupported iOS builds are rejected before mutation; Restore Stock Switcher or a respring returns to stock.";
 
         Package *quickLoader = [[Package alloc] initWithIdentifier:@"com.darksword.quickloader"
                                            name:@"QuickLoader"
