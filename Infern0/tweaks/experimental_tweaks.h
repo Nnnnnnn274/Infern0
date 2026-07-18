@@ -23,6 +23,7 @@
 #import "experimental/fastlockx_lite.h"
 #import "experimental/cylinderlite.h"
 #import "experimental/barmoji.h"
+#import "experimental/magma.h"
 #import "watchlayout.h"
 #import "experimental/customizers.h"
 #import "amfi_bypass.h"

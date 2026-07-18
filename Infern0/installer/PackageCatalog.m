@@ -657,9 +657,9 @@ static const NSInteger kSecDarkSwordTweaks  = 13;
         betterCCXI.settingsSection = kSecBetterCCXI;
 
         Package *magma = [[Package alloc] initWithIdentifier:@"com.darksword.magma"
-                                           name:@"Magma Evo Lite"
-                               shortDescription:@"Tint Control Center glyphs"
-                                longDescription:@"Granular live-session Control Center color customization. Toggle glyphs, brightness and volume sliders, media controls, and module backgrounds can be enabled independently, with configurable RGBA tint and detailed logs."
+                                           name:@"Magma 2"
+                               shortDescription:@"Safe, contrast-aware Control Center colors"
+                                longDescription:@"A rewritten live-session Control Center color customizer. Magma 2 colors verified toggle accents, contrast-aware selected glyphs, brightness and volume fills, media controls, and optional module backgrounds.\n\nUnlike the retired implementation, it scans only the visible Control Center window, recognizes specialized color properties, and enforces strict view, depth, child, and property limits. It never mutates controllers, gesture handling, layout geometry, slider values, or material recipes. Every owned property is captured for exact restoration, with detailed per-pass logs."
                                         version:version
                                          author:@"Nnnnnnn274"
                                        category:@"Control Center"
@@ -668,6 +668,11 @@ static const NSInteger kSecDarkSwordTweaks  = 13;
                                      enabledKey:kSettingsMagmaEnabled
                                           isNew:YES];
         magma.settingsSection = kSecMagma;
+        magma.unstableWarning = @"Beta: module background tinting is the broadest visual option and remains off by default. Toggle, slider, and media coloring use narrower verified targets.";
+        magma.knownIssues = @[
+            @"Open Control Center after applying; Magma 2 waits without mutation while Control Center is closed.",
+            @"Apple may replace some media-control classes between iOS releases. Unsupported media leaves are skipped and reported in the detailed log.",
+        ];
 
         Package *betterCCIcons = [[Package alloc] initWithIdentifier:@"com.darksword.betterccicons"
                                            name:@"BetterCCIcons"

@@ -6843,7 +6843,7 @@ static void settings_log_split_tweak_config(NSString *masterKey, NSUserDefaults 
                  (long)[d integerForKey:kSettingsBetterCCXIDepthLimit],
                  (long)[d integerForKey:kSettingsBetterCCXIModuleScalePct]);
     } else if ([masterKey isEqualToString:kSettingsMagmaEnabled]) {
-        log_user("[%s] Magma Evo config: rgba=%ld/%ld/%ld/%ld%% toggles=%d sliders=%d media=%d background=%d.\n", tag,
+        log_user("[%s] Magma 2 config: rgba=%ld/%ld/%ld/%ld%% toggles=%d sliders=%d media=%d background=%d scanCap=180 propertyCap=96.\n", tag,
                  (long)[d integerForKey:kSettingsMagmaRed],
                  (long)[d integerForKey:kSettingsMagmaGreen],
                  (long)[d integerForKey:kSettingsMagmaBlue],
@@ -9086,7 +9086,7 @@ static void settings_log_tweak_plan_details(NSUserDefaults *d, BOOL pendingOnly)
         { kSettingsModuleSpacingEnabled, "Module Corners Lite", "applies the configured Control Center module radius" },
         { kSettingsSugarCaneEnabled, "SugarCane", "adds live percentage labels to brightness and volume controls" },
         { kSettingsBetterCCXIEnabled, "BetterCCXI / Prysm Lite", "applies configurable Control Center module scale, depth, and lift" },
-        { kSettingsMagmaEnabled, "Magma Evo Lite", "colors selected Control Center toggle, slider, media, and background groups" },
+        { kSettingsMagmaEnabled, "Magma 2", "colors verified Control Center toggle, slider, media, and background properties with bounded scans and contrast-aware glyphs" },
         { kSettingsBetterCCIconsEnabled, "BetterCCIcons", "rounds visible Control Center icon and module layers" },
         { kSettingsCCNoPlatterDimEnabled, "CCNoPlatterDim", "reduces dimming on expanded Control Center platters" },
         { kSettingsCCStatusEnabled, "CC Header Lite", "adds reusable Wi-Fi/IP labels to Control Center without claiming live network values" },
@@ -9836,12 +9836,12 @@ static void settings_run_actions_internal(BOOL pendingOnly)
                     }
 
                     if (runMagma) {
-                        settings_progress(&step, total, "Applying Magma Evo Lite");
+                        settings_progress(&step, total, "Applying Magma 2");
                         settings_log_split_tweak_config(kSettingsMagmaEnabled, d, "RUN");
                         bool ok = magma_apply_in_session();
                         settings_mark_tweak_applied(kSettingsMagmaEnabled, ok && [d boolForKey:kSettingsMagmaEnabled]);
                         printf("[SETTINGS] Magma result=%d\n", ok);
-                        log_user("%s Magma Evo Lite %s.\n", ok ? "[OK]" : "[WARN]", ok ? "selected Control Center groups colored" : "did not find Control Center views");
+                        log_user("%s Magma 2 %s.\n", ok ? "[OK]" : "[WAIT]", ok ? "safe Control Center targets colored" : "is waiting for Control Center to open");
                         cyanide_upload_log_milestone(ok ? @"magma-applied" : @"magma-failed");
                     }
 
@@ -11631,16 +11631,17 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
 - (NSArray<NSDictionary *> *)magmaRows
 {
     return @[
-        @{ @"kind": @"toggle", @"key": kSettingsMagmaEnabled, @"title": @"Enable Magma" },
+        @{ @"kind": @"toggle", @"key": kSettingsMagmaEnabled, @"title": @"Enable Magma 2" },
         @{ @"kind": @"slider", @"key": kSettingsMagmaRed, @"title": @"Red", @"min": @0, @"max": @255, @"step": @1, @"default": @255 },
         @{ @"kind": @"slider", @"key": kSettingsMagmaGreen, @"title": @"Green", @"min": @0, @"max": @255, @"step": @1, @"default": @71 },
         @{ @"kind": @"slider", @"key": kSettingsMagmaBlue, @"title": @"Blue", @"min": @0, @"max": @255, @"step": @1, @"default": @20 },
         @{ @"kind": @"slider", @"key": kSettingsMagmaAlphaPct, @"title": @"Tint alpha", @"min": @5, @"max": @100, @"step": @1, @"default": @100, @"unit": @"%" },
-        @{ @"kind": @"toggle", @"key": kSettingsMagmaColorToggles, @"title": @"Color toggles and glyphs" },
-        @{ @"kind": @"toggle", @"key": kSettingsMagmaColorSliders, @"title": @"Color brightness and volume sliders" },
-        @{ @"kind": @"toggle", @"key": kSettingsMagmaColorMedia, @"title": @"Color media controls" },
-        @{ @"kind": @"toggle", @"key": kSettingsMagmaColorBackground, @"title": @"Color module backgrounds" },
-        @{ @"kind": @"info", @"title": @"Magma Evo Lite", @"subtitle": @"Each Control Center group can be colored independently. All discovered SpringBoard windows are scanned and changes are session-only." },
+        @{ @"kind": @"toggle", @"key": kSettingsMagmaColorToggles, @"title": @"Toggle accents and glyphs" },
+        @{ @"kind": @"toggle", @"key": kSettingsMagmaColorSliders, @"title": @"Brightness and volume fills" },
+        @{ @"kind": @"toggle", @"key": kSettingsMagmaColorMedia, @"title": @"Media buttons and labels" },
+        @{ @"kind": @"toggle", @"key": kSettingsMagmaColorBackground, @"title": @"Module background tint (Beta)" },
+        @{ @"kind": @"info", @"title": @"Magma 2 Safety Model", @"subtitle": @"Only the visible Control Center window is scanned. Magma 2 recognizes specialized color properties, caps each pass at 180 views and 96 properties, and never changes controllers, gestures, layouts, slider values, or material recipes." },
+        @{ @"kind": @"info", @"title": @"Contrast-aware glyphs", @"subtitle": @"Selected glyphs automatically use a light or dark foreground based on your accent color so controls remain readable." },
         @{ @"kind": @"button", @"title": @"View Detailed Activity Log", @"action": @"view-log" },
     ];
 }
@@ -12381,7 +12382,7 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
         addSimpleSummary(@"BetterCCXI", kSettingsBetterCCXIEnabled);
         [out addObject:@{@"title": @"Lift", @"value": [@([d integerForKey:kSettingsBetterCCXIZLift]) stringValue]}];
     } else if (section == SectionMagma) {
-        addSimpleSummary(@"Magma", kSettingsMagmaEnabled);
+        addSimpleSummary(@"Magma 2", kSettingsMagmaEnabled);
         [out addObject:@{@"title": @"RGB", @"value": [NSString stringWithFormat:@"%ld/%ld/%ld",
                                                        (long)[d integerForKey:kSettingsMagmaRed],
                                                        (long)[d integerForKey:kSettingsMagmaGreen],
@@ -12900,7 +12901,7 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
         return @"Prysm-ish session treatment for module scale, depth, and lift without persistent Control Center preference rewrites.";
     }
     if (s == SectionMagma) {
-        return @"Granular session-only coloring for Control Center toggles, sliders, media controls, and module backgrounds.";
+        return @"Bounded, contrast-aware session coloring for verified Control Center toggle, slider, media, and background properties.";
     }
     if (s == SectionBetterCCIcons) {
         return @"Rounds visible Control Center module/icon layers for a softer icon style.";

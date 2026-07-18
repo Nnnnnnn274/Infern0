@@ -69,10 +69,6 @@ __attribute__((used)) uintptr_t hapticcc_stop_in_session() { return 0; }
 __attribute__((used)) uintptr_t hidellabels_apply_in_session() { return 0; }
 __attribute__((used)) uintptr_t hidellabels_forget_remote_state() { return 0; }
 __attribute__((used)) uintptr_t hidellabels_stop_in_session() { return 0; }
-__attribute__((used)) uintptr_t magma_apply_in_session() { return 0; }
-__attribute__((used)) uintptr_t magma_configure() { return 0; }
-__attribute__((used)) uintptr_t magma_forget_remote_state() { return 0; }
-__attribute__((used)) uintptr_t magma_stop_in_session() { return 0; }
 __attribute__((used)) uintptr_t modulespacing_apply_in_session() { return 0; }
 __attribute__((used)) uintptr_t modulespacing_configure() { return 0; }
 __attribute__((used)) uintptr_t modulespacing_forget_remote_state() { return 0; }
