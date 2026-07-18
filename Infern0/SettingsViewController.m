@@ -6726,7 +6726,7 @@ static void settings_log_pancake_config(NSUserDefaults *d, const char *prefix)
 
 static void settings_log_cylinderlite_config(NSUserDefaults *d, const char *prefix)
 {
-    log_user("[%s] Cylinder Lite config: engine=page-layer anchorGeometry=1 refresh=250ms depth=%ld perspective=%ld pageCap=%ld iconReads=0 iconMutations=0 taps=preserved.\n",
+    log_user("[%s] Cylinder Lite config: engine=scalar-page-layer anchorGeometry=1 refresh=250ms depth=%ld curveDistance=%ld pageCap=%ld remoteReads=0 iconMutations=0 taps=preserved.\n",
              prefix ?: "CFG",
              (long)[d integerForKey:kSettingsCylinderLiteDepth],
              (long)[d integerForKey:kSettingsCylinderLitePerspective],
@@ -10320,6 +10320,7 @@ typedef NS_ENUM(NSInteger, SettingsSection) {
     SectionFreePlacement,
     SectionCopypastaLite,
     SectionAppLibraryStudio,
+    SectionAMFIBypass,
     SectionCount,
 };
 
@@ -11729,7 +11730,7 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
         @{ @"kind": @"toggle", @"key": kSettingsCylinderLiteEnabled, @"title": @"Enable Cylinder Lite" },
         @{ @"kind": @"info", @"title": @"Safer page animation", @"subtitle": @"Cylinder snapshots loaded pages once when Run starts, transforms each page as one layer, and reads only one anchor page per refresh. It never scans or mutates individual icon objects." },
         @{ @"kind": @"slider", @"key": kSettingsCylinderLiteDepth, @"title": @"Page depth", @"min": @-80, @"max": @0, @"step": @1, @"default": @-10, @"unit": @"z" },
-        @{ @"kind": @"slider", @"key": kSettingsCylinderLitePerspective, @"title": @"Perspective distance", @"min": @250, @"max": @1600, @"step": @25, @"default": @650 },
+        @{ @"kind": @"slider", @"key": kSettingsCylinderLitePerspective, @"title": @"Curve distance", @"min": @250, @"max": @1600, @"step": @25, @"default": @650 },
         @{ @"kind": @"info", @"title": @"VM safety", @"subtitle": @"Automatic view-tree rediscovery is disabled. Two transport failures open a circuit breaker and stop further remote calls. Run again to rebuild the snapshot; Dock and App Library stay untouched." },
         @{ @"kind": @"button", @"title": @"View Detailed Activity Log", @"action": @"view-log" },
     ];
@@ -11768,6 +11769,27 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
         @{ @"kind": @"info", @"title": @"Beehive geometry", @"subtitle": @"Creates a vertically scrolling grid with alternating rows of five and four circular icons. It is one continuous Watch-style surface instead of separate Home Screen pages." },
         @{ @"kind": @"info", @"title": @"Interaction", @"subtitle": @"Uses native SBIconViews when available and gives every tile a dedicated launch action, so icons remain pressable. System apps are included; the Dock stays stock." },
         @{ @"kind": @"info", @"title": @"Session safety", @"subtitle": @"The stock Home Screen lists are hidden, never rewritten. Disabling restores their original visibility. Failed discovery stops after a small read budget and waits 30 seconds before retrying." },
+        @{ @"kind": @"button", @"title": @"View Detailed Activity Log", @"action": @"view-log" },
+    ];
+}
+
+- (NSArray<NSDictionary *> *)amfiBypassRows
+{
+    return @[
+        @{ @"kind": @"info",
+           @"title": @"Current-process test",
+           @"subtitle": @"Attempts the existing AMFI OSEntitlements state patch on infern0 itself. The effect is temporary and ends when infern0 exits." },
+        @{ @"kind": @"info",
+           @"title": @"Verified result",
+           @"subtitle": @"Success is shown only when valid, platform, and transmuted flags all read back as enabled. Protected-memory rejection is a failure." },
+        @{ @"kind": @"button",
+           @"title": @"Run AMFI Bypass Test",
+           @"subtitle": @"Acquires kernel primitives, patches infern0, then verifies the result.",
+           @"action": @"amfi-run" },
+        @{ @"kind": @"button",
+           @"title": @"Dump Current AMFI State",
+           @"subtitle": @"Read-only diagnostic dump for the current infern0 process.",
+           @"action": @"amfi-dump" },
         @{ @"kind": @"button", @"title": @"View Detailed Activity Log", @"action": @"view-log" },
     ];
 }
@@ -12583,6 +12605,7 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
         case SectionFreePlacement: return cyanide_experimental_tweaks_available() ? self.freePlacementRows : @[];
         case SectionCopypastaLite: return self.copypastaLiteRows;
         case SectionAppLibraryStudio: return cyanide_experimental_tweaks_available() ? self.appLibraryStudioRows : @[];
+        case SectionAMFIBypass: return self.amfiBypassRows;
         default: return @[];
     }
 }
@@ -12639,6 +12662,7 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
         @{ @"title": @"Watch Pairing",     @"icon": @"applewatch.radiowaves.left.and.right", @"color": [UIColor systemPurpleColor], @"section": @(SectionNanoRegistry) },
         @{ @"title": @"Call Recording Sound", @"icon": @"speaker.slash.fill", @"color": [UIColor systemOrangeColor], @"section": @(SectionCallRecordingSound) },
         @{ @"title": @"Hide Home Bar", @"icon": @"line.3.horizontal", @"color": [UIColor systemGrayColor], @"section": @(SectionHideHomeBar) },
+        @{ @"title": @"AMFI Bypass Test", @"icon": @"checkmark.shield.fill", @"color": [UIColor systemRedColor], @"section": @(SectionAMFIBypass) },
     ];
 }
 
@@ -12717,6 +12741,7 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
                 destination = RootSectionThemesAndVisuals; break;
             case SectionPowercuff: case SectionDarkSwordTweaks: case SectionDragCoefficient:
             case SectionNanoRegistry: case SectionCallRecordingSound: case SectionHideHomeBar:
+            case SectionAMFIBypass:
                 destination = RootSectionSystem; break;
             default:
                 destination = RootSectionUtilities; break;
@@ -12867,6 +12892,9 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
     }
     if (s == SectionHideHomeBar) {
         return @"Persistent MaterialKit asset edit. Apply or restore it by itself, then respring. The log records the target path, write result, and pending-respring state.";
+    }
+    if (s == SectionAMFIBypass) {
+        return @"Manual current-process test. It acquires kernel primitives, attempts the existing AMFI OSEntitlements flag patch on infern0, and verifies the flags by reading them back. Nothing is installed and the effect ends when infern0 exits.";
     }
     if (s == SectionTypeBanner) {
         return @"Partial TypeMillennium port. Detection runs against imagent using original-thread RemoteCall probes, while SpringBoard renders a prewarmed banner window.";
@@ -15568,6 +15596,50 @@ void cyanide_present_contact(UIViewController *host)
     [self presentViewController:nav animated:YES completion:completion];
 }
 
+- (void)runAMFIBypassAction:(NSString *)action
+{
+    BOOL dumpOnly = [action isEqualToString:@"amfi-dump"];
+    __weak typeof(self) weakSelf = self;
+    dispatch_block_t startAction = ^{
+        dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+            BOOL actionLockAcquired = settings_try_claim_actions_lock(
+                dumpOnly ? "AMFI state dump" : "AMFI bypass test",
+                "[AMFI] Another infern0 action is already running.");
+            if (!actionLockAcquired) return;
+
+            @try {
+                log_user("[AMFI][UI] %s requested from Packages > AMFI Bypass Test.\n",
+                         dumpOnly ? "Read-only state dump" : "Verified bypass test");
+                if (!settings_ensure_kexploit()) {
+                    log_user("[AMFI][FAIL] Kernel primitives were not acquired; no AMFI state was touched.\n");
+                    return;
+                }
+                log_user("[AMFI][KRW] Kernel read/write session is ready.\n");
+
+                if (dumpOnly) {
+                    log_user("[AMFI][DUMP] Beginning current-process AMFI diagnostic dump.\n");
+                    amfi_dump_self();
+                    log_user("[AMFI][DUMP] Diagnostic dump finished.\n");
+                } else {
+                    bool ok = amfi_patch_self();
+                    log_user("[AMFI][RESULT] Current-process bypass test %s.\n",
+                             ok ? "PASSED verification" : "FAILED verification");
+                }
+            } @finally {
+                settings_release_actions_lock();
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    __strong typeof(weakSelf) strongSelf = weakSelf;
+                    [strongSelf.tableView reloadData];
+                    [[NSNotificationCenter defaultCenter]
+                        postNotificationName:kSettingsActionsDidCompleteNotification
+                                      object:nil];
+                });
+            }
+        });
+    };
+    [self presentActivityLogWithCompletion:startAction];
+}
+
 - (void)toggleChanged:(UISwitch *)sender
 {
     if (!settings_device_supported()) {
@@ -16959,6 +17031,33 @@ void cyanide_present_contact(UIViewController *host)
 
     if (indexPath.section == SectionOTA) {
         settings_run_ota_action(indexPath.row == 0);
+        return;
+    }
+
+    if (indexPath.section == SectionAMFIBypass) {
+        NSDictionary *row = [self rowsForSection:indexPath.section][indexPath.row];
+        if (![row[@"kind"] isEqualToString:@"button"]) return;
+        NSString *action = row[@"action"];
+        if ([action isEqualToString:@"amfi-dump"]) {
+            [self runAMFIBypassAction:action];
+            return;
+        }
+        if ([action isEqualToString:@"amfi-run"]) {
+            UIAlertController *alert = [UIAlertController
+                alertControllerWithTitle:@"Run AMFI Bypass Test?"
+                                 message:@"This experimental test writes to infern0's current kernel-backed AMFI state, then reads it back for verification. It is temporary and may fail on protected or unsupported layouts."
+                          preferredStyle:UIAlertControllerStyleAlert];
+            [alert addAction:[UIAlertAction actionWithTitle:@"Cancel"
+                                                       style:UIAlertActionStyleCancel
+                                                     handler:nil]];
+            __weak typeof(self) weakSelf = self;
+            [alert addAction:[UIAlertAction actionWithTitle:@"Run Test"
+                                                       style:UIAlertActionStyleDestructive
+                                                     handler:^(__unused UIAlertAction *selected) {
+                [weakSelf runAMFIBypassAction:@"amfi-run"];
+            }]];
+            settings_present_controller(alert, self);
+        }
         return;
     }
 
