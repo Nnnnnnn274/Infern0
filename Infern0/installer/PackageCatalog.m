@@ -780,8 +780,8 @@ static const NSInteger kSecDarkSwordTweaks  = 13;
 
         Package *cylinderLite = [[Package alloc] initWithIdentifier:@"com.darksword.cylinderlite"
                                            name:@"Cylinder Lite"
-                               shortDescription:@"Live cylindrical page-swipe animations"
-                                longDescription:@"Tracks each loaded Home Screen page in its window coordinate space and continuously updates pressable live icon layers while you swipe. Centered pages settle at their captured stock transforms; incoming and outgoing pages rotate around a configurable cylindrical perspective. Newly loaded pages are discovered by the visual refresh loop, while Dock and App Library lists remain untouched."
+                               shortDescription:@"Low-traffic cylindrical page-swipe animations"
+                                longDescription:@"Transforms loaded Home Screen pages as whole layers instead of scanning and mutating hundreds of individual icons. A one-time baseline records page positions; steady-state refreshes read one anchor page and derive the shared scroll offset for every page. Centered pages settle at their captured stock transform, icon taps keep their native behavior, and Dock and App Library lists remain untouched. A two-failure circuit breaker stops remote calls if the VM transport becomes unhealthy."
                                         version:version
                                          author:@"zeroxjf"
                                        category:@"Home Screen"
@@ -1160,7 +1160,6 @@ static const NSInteger kSecDarkSwordTweaks  = 13;
             @"com.darksword.layoutextras",
             @"com.darksword.gravitylite",
             @"com.darksword.appswitchergrid",
-            @"com.darksword.magma",
             @"com.darksword.quickloader",
             @"com.darksword.fastlockx-lite",
             @"com.darksword.nanoregistry",

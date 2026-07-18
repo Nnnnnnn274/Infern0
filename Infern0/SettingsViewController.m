@@ -2248,7 +2248,9 @@ static BOOL settings_fugap_install_allowed(void) { return cyanide_experimental_t
 static BOOL settings_modulespacing_install_allowed(void) { return cyanide_experimental_tweaks_available(); }
 static BOOL settings_sugarcane_install_allowed(void) { return cyanide_experimental_tweaks_available(); }
 static BOOL settings_betterccxi_install_allowed(void) { return cyanide_experimental_tweaks_available(); }
-static BOOL settings_magma_install_allowed(void) { return cyanide_experimental_tweaks_available(); }
+// Magma is retired: keep the symbols available for exact cleanup of an older
+// active session, but never expose or schedule a new application.
+static BOOL settings_magma_install_allowed(void) { return NO; }
 static BOOL settings_betterccicons_install_allowed(void) { return cyanide_experimental_tweaks_available(); }
 static BOOL settings_ccnoplatterdim_install_allowed(void) { return cyanide_experimental_tweaks_available(); }
 static BOOL settings_ccstatus_install_allowed(void) { return cyanide_experimental_tweaks_available(); }
@@ -5964,7 +5966,6 @@ static BOOL settings_visual_refresh_enabled(NSUserDefaults *d)
            [d boolForKey:kSettingsModuleSpacingEnabled] ||
            [d boolForKey:kSettingsSugarCaneEnabled] ||
            [d boolForKey:kSettingsBetterCCXIEnabled] ||
-           [d boolForKey:kSettingsMagmaEnabled] ||
            [d boolForKey:kSettingsBetterCCIconsEnabled] ||
            [d boolForKey:kSettingsCCNoPlatterDimEnabled] ||
            [d boolForKey:kSettingsCCStatusEnabled] ||
@@ -6006,7 +6007,6 @@ static BOOL settings_visual_refresh_tick(NSUserDefaults *d, BOOL advanceHeavySca
                                 [d boolForKey:kSettingsFUGapEnabled] ||
                                 [d boolForKey:kSettingsModuleSpacingEnabled]; break;
             case 2: attempted = attempted || [d boolForKey:kSettingsBetterCCXIEnabled] ||
-                                [d boolForKey:kSettingsMagmaEnabled] ||
                                 [d boolForKey:kSettingsBetterCCIconsEnabled]; break;
             case 3: attempted = attempted || [d boolForKey:kSettingsCCNoPlatterDimEnabled] ||
                                 [d boolForKey:kSettingsCCStatusEnabled] ||
@@ -6045,8 +6045,6 @@ static BOOL settings_visual_refresh_tick(NSUserDefaults *d, BOOL advanceHeavySca
 
     if (slot == 2 && [d boolForKey:kSettingsBetterCCXIEnabled])
         settings_visual_refresh_mark_if_ready(kSettingsBetterCCXIEnabled, betterccxi_apply_in_session());
-    if (slot == 2 && [d boolForKey:kSettingsMagmaEnabled])
-        settings_visual_refresh_mark_if_ready(kSettingsMagmaEnabled, magma_apply_in_session());
     if (slot == 2 && [d boolForKey:kSettingsBetterCCIconsEnabled])
         settings_visual_refresh_mark_if_ready(kSettingsBetterCCIconsEnabled, betterccicons_apply_in_session());
 
@@ -6078,7 +6076,7 @@ static BOOL settings_visual_refresh_tick(NSUserDefaults *d, BOOL advanceHeavySca
         settings_visual_refresh_mark_if_ready(kSettingsHapticCCEnabled, hapticcc_apply_in_session());
     if ([d boolForKey:kSettingsCylinderLiteEnabled])
         settings_visual_refresh_mark_if_ready(kSettingsCylinderLiteEnabled,
-                                              cylinderlite_refresh_in_session(slot == 0));
+                                              cylinderlite_refresh_in_session(false));
     return attempted;
 }
 
@@ -6728,11 +6726,11 @@ static void settings_log_pancake_config(NSUserDefaults *d, const char *prefix)
 
 static void settings_log_cylinderlite_config(NSUserDefaults *d, const char *prefix)
 {
-    log_user("[%s] Cylinder Lite config: animation=page-position-driven refresh=100ms depth=%ld perspective=%ld scanLimit=512 requestedLimit=%ld pages=all taps=preserved.\n",
+    log_user("[%s] Cylinder Lite config: engine=page-layer anchorGeometry=1 refresh=250ms depth=%ld perspective=%ld pageCap=%ld iconReads=0 iconMutations=0 taps=preserved.\n",
              prefix ?: "CFG",
              (long)[d integerForKey:kSettingsCylinderLiteDepth],
              (long)[d integerForKey:kSettingsCylinderLitePerspective],
-             (long)[d integerForKey:kSettingsCylinderLiteMaxIcons]);
+             MIN(16L, MAX(3L, (long)[d integerForKey:kSettingsCylinderLiteMaxIcons] / 32L)));
 }
 
 static void settings_configure_control_center_tweaks(NSUserDefaults *d)
@@ -7580,6 +7578,14 @@ static NSString *settings_resolve_icon_layout_conflict(NSUserDefaults *d, NSStri
     [d synchronize];
     log_user("[MIGRATION] Cleared the retired Free Placement preference; Watch Layout now owns an independent scrolling overlay.\n");
     return kSettingsFreePlacementEnabled;
+}
+
+static void settings_retire_magma_preference(NSUserDefaults *d)
+{
+    if (![d boolForKey:kSettingsMagmaEnabled]) return;
+    [d setBool:NO forKey:kSettingsMagmaEnabled];
+    [d synchronize];
+    log_user("[MIGRATION] Disabled retired Magma; cleanup will restore any color properties still owned by its previous live session.\n");
 }
 
 static NSArray<NSString *> *settings_resolve_statusbar_conflicts(NSUserDefaults *d, NSString *preferredKey)
@@ -9160,6 +9166,7 @@ static void settings_run_actions_internal(BOOL pendingOnly)
         @try {
             // Remove the retired Free Placement preference left by older builds.
             settings_resolve_icon_layout_conflict(d, kSettingsWatchLayoutEnabled);
+            settings_retire_magma_preference(d);
             settings_resolve_statusbar_conflicts(d, nil);
             BOOL patchSandboxExt = [d boolForKey:kSettingsRunPatchSandboxExt];
             BOOL runPowercuff = settings_enabled_tweak_should_run(d, kSettingsPowercuffEnabled, pendingOnly);
@@ -11720,10 +11727,10 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
 {
     return @[
         @{ @"kind": @"toggle", @"key": kSettingsCylinderLiteEnabled, @"title": @"Enable Cylinder Lite" },
-        @{ @"kind": @"info", @"title": @"Live page animation", @"subtitle": @"Transforms follow each page's window position while swiping. Centered pages return to their captured stock transform and newly loaded pages join automatically." },
-        @{ @"kind": @"slider", @"key": kSettingsCylinderLiteDepth, @"title": @"Icon depth", @"min": @-80, @"max": @0, @"step": @1, @"default": @-10, @"unit": @"z" },
+        @{ @"kind": @"info", @"title": @"Safer page animation", @"subtitle": @"Cylinder snapshots loaded pages once when Run starts, transforms each page as one layer, and reads only one anchor page per refresh. It never scans or mutates individual icon objects." },
+        @{ @"kind": @"slider", @"key": kSettingsCylinderLiteDepth, @"title": @"Page depth", @"min": @-80, @"max": @0, @"step": @1, @"default": @-10, @"unit": @"z" },
         @{ @"kind": @"slider", @"key": kSettingsCylinderLitePerspective, @"title": @"Perspective distance", @"min": @250, @"max": @1600, @"step": @25, @"default": @650 },
-        @{ @"kind": @"info", @"title": @"Coverage", @"subtitle": @"Scans up to 512 live icons across every discovered Home Screen page and preserves icon interaction." },
+        @{ @"kind": @"info", @"title": @"VM safety", @"subtitle": @"Automatic view-tree rediscovery is disabled. Two transport failures open a circuit breaker and stop further remote calls. Run again to rebuild the snapshot; Dock and App Library stay untouched." },
         @{ @"kind": @"button", @"title": @"View Detailed Activity Log", @"action": @"view-log" },
     ];
 }
@@ -12928,7 +12935,7 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
         return @"Uses the current navigation controller's native interactive edge-back recognizer. Touch limits are configurable, and disabling Pancake restores the recognizer's exact prior values.";
     }
     if (s == SectionCylinderLite) {
-        return @"Applies perspective depth to every discovered Home Screen page. It keeps each live SBIconView interactive so icons continue to open normally.";
+        return @"Applies a low-traffic cylindrical transform to loaded Home Screen page layers. Individual icon objects are never scanned or mutated, so taps keep their stock behavior.";
     }
     if (s == SectionBarmoji) {
         return @"Adds eight real emoji buttons and three clipboard slots near the bottom of SpringBoard. Pressing one copies its text to the system pasteboard; app-keyboard injection is intentionally outside this Lite port.";
