@@ -1160,6 +1160,7 @@ static const NSInteger kSecDarkSwordTweaks  = 13;
             @"com.darksword.layoutextras",
             @"com.darksword.gravitylite",
             @"com.darksword.appswitchergrid",
+            @"com.darksword.magma",
             @"com.darksword.quickloader",
             @"com.darksword.fastlockx-lite",
             @"com.darksword.nanoregistry",
