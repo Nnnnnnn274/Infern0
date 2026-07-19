@@ -5,7 +5,6 @@
 
 #import "lockscreenoverlay.h"
 #import "../remote_objc.h"
-#import "../sb_walk.h"
 #import "../../LogTextView.h"
 
 #import <Foundation/Foundation.h>
@@ -41,11 +40,6 @@ static int s_accent_style = 0;
 static int s_glass_alpha = 72;
 static bool s_hide_quick_actions = true;
 static bool s_hide_page_dots = true;
-
-static bool lso_contains(const char *text, const char *needle)
-{
-    return text && needle && strstr(text, needle) != NULL;
-}
 
 static uint64_t lso_safe_msg(uint64_t object, const char *selector,
                              uint64_t a0, uint64_t a1, uint64_t a2, uint64_t a3)
@@ -88,18 +82,53 @@ static uint64_t lso_accent_color(void)
     }
 }
 
+static bool lso_is_kind_of_named_class(uint64_t object, const char *name)
+{
+    if (!r_is_objc_ptr(object) || !name) return false;
+    uint64_t cls = r_class(name);
+    return r_is_objc_ptr(cls) &&
+           (r_msg2_main(object, "isKindOfClass:", cls, 0, 0, 0) & 0xff) != 0;
+}
+
+static bool lso_controller_matches(uint64_t controller, int depth)
+{
+    static const char *classes[] = {
+        "CSCoverSheetViewController",
+        "CSCombinedListViewController",
+        "CSMainPageViewController",
+        "CSPageViewController",
+        "SBDashBoardViewController",
+        "SBDashBoardCombinedListViewController",
+        "SBLockScreenViewController",
+    };
+    if (!r_is_objc_ptr(controller) || depth > 5) return false;
+    for (unsigned i = 0; i < sizeof(classes) / sizeof(classes[0]); i++)
+        if (lso_is_kind_of_named_class(controller, classes[i])) return true;
+
+    uint64_t children = lso_safe_msg(controller, "childViewControllers", 0, 0, 0, 0);
+    uint64_t count = r_is_objc_ptr(children)
+        ? r_msg2_main(children, "count", 0, 0, 0, 0) : 0;
+    if (count > 24) count = 24;
+    for (uint64_t i = 0; i < count; i++) {
+        uint64_t child = r_msg2_main(children, "objectAtIndex:", i, 0, 0, 0);
+        if (lso_controller_matches(child, depth + 1)) return true;
+    }
+    return false;
+}
+
 static bool lso_window_matches(uint64_t window)
 {
-    char name[160] = {0};
+    static const char *classes[] = {
+        "CSCoverSheetWindow",
+        "CSLockScreenWindow",
+        "SBDashBoardWindow",
+        "SBLockScreenWindow",
+    };
     if (!r_is_objc_ptr(window)) return false;
-    (void)sb_read_class_name(window, name, sizeof(name));
-    if (lso_contains(name, "CoverSheet") || lso_contains(name, "LockScreen") ||
-        lso_contains(name, "DashBoard")) return true;
-    uint64_t controller = lso_safe_msg(window, "rootViewController", 0, 0, 0, 0);
-    memset(name, 0, sizeof(name));
-    (void)sb_read_class_name(controller, name, sizeof(name));
-    return lso_contains(name, "CoverSheet") || lso_contains(name, "LockScreen") ||
-           lso_contains(name, "DashBoard") || lso_contains(name, "CSCombined");
+    for (unsigned i = 0; i < sizeof(classes) / sizeof(classes[0]); i++)
+        if (lso_is_kind_of_named_class(window, classes[i])) return true;
+    return lso_controller_matches(
+        lso_safe_msg(window, "rootViewController", 0, 0, 0, 0), 0);
 }
 
 static bool lso_window_visible(uint64_t window)
@@ -113,17 +142,49 @@ static bool lso_window_visible(uint64_t window)
 static uint64_t lso_find_window(bool *visible)
 {
     if (visible) *visible = false;
-    uint64_t windows[64] = {0};
-    int count = sb_collect_windows(windows, 64);
-    for (int i = count - 1; i >= 0; i--) {
-        if (lso_window_matches(windows[i]) && lso_window_visible(windows[i])) {
-            if (visible) *visible = true;
-            return windows[i];
+    uint64_t appClass = r_class("UIApplication");
+    uint64_t app = r_is_objc_ptr(appClass)
+        ? r_msg2_main(appClass, "sharedApplication", 0, 0, 0, 0) : 0;
+    if (!r_is_objc_ptr(app)) return 0;
+
+    uint64_t fallback = 0;
+    uint64_t scenes = lso_safe_msg(app, "connectedScenes", 0, 0, 0, 0);
+    if (r_is_objc_ptr(scenes) && r_responds_main(scenes, "allObjects"))
+        scenes = lso_safe_msg(scenes, "allObjects", 0, 0, 0, 0);
+    uint64_t sceneCount = r_is_objc_ptr(scenes)
+        ? r_msg2_main(scenes, "count", 0, 0, 0, 0) : 0;
+    if (sceneCount > 16) sceneCount = 16;
+    for (uint64_t s = 0; s < sceneCount; s++) {
+        uint64_t scene = r_msg2_main(scenes, "objectAtIndex:", s, 0, 0, 0);
+        uint64_t windows = lso_safe_msg(scene, "windows", 0, 0, 0, 0);
+        uint64_t count = r_is_objc_ptr(windows)
+            ? r_msg2_main(windows, "count", 0, 0, 0, 0) : 0;
+        if (count > 32) count = 32;
+        for (uint64_t i = 0; i < count; i++) {
+            uint64_t window = r_msg2_main(windows, "objectAtIndex:", i, 0, 0, 0);
+            if (!lso_window_matches(window)) continue;
+            if (lso_window_visible(window)) {
+                if (visible) *visible = true;
+                return window;
+            }
+            fallback = window;
         }
     }
-    for (int i = count - 1; i >= 0; i--)
-        if (lso_window_matches(windows[i])) return windows[i];
-    return 0;
+
+    uint64_t windows = lso_safe_msg(app, "windows", 0, 0, 0, 0);
+    uint64_t count = r_is_objc_ptr(windows)
+        ? r_msg2_main(windows, "count", 0, 0, 0, 0) : 0;
+    if (count > 64) count = 64;
+    for (uint64_t i = 0; i < count; i++) {
+        uint64_t window = r_msg2_main(windows, "objectAtIndex:", i, 0, 0, 0);
+        if (!lso_window_matches(window)) continue;
+        if (lso_window_visible(window)) {
+            if (visible) *visible = true;
+            return window;
+        }
+        fallback = window;
+    }
+    return fallback;
 }
 
 static uint64_t lso_new_view(LSOFrame frame)
@@ -201,24 +262,43 @@ static void lso_hide_stock_view(uint64_t view)
     r_msg2_main(view, "setHidden:", 1, 0, 0, 0);
 }
 
+static bool lso_matches_any_class(uint64_t object,
+                                  const char *const *classes,
+                                  unsigned count)
+{
+    for (unsigned i = 0; i < count; i++)
+        if (lso_is_kind_of_named_class(object, classes[i])) return true;
+    return false;
+}
+
 static void lso_scan_and_hide(uint64_t view, int depth, bool lockContext, int *visited)
 {
     if (!r_is_objc_ptr(view) || !visited || depth > 12 || *visited >= LSO_MAX_VISITED) return;
     (*visited)++;
-    char name[160] = {0};
-    (void)sb_read_class_name(view, name, sizeof(name));
-    bool lockClass = lso_contains(name, "LockScreen") || lso_contains(name, "CoverSheet") ||
-                     lso_contains(name, "CSMainPage") || lso_contains(name, "CSCombined") ||
-                     lso_contains(name, "DashBoard");
+    static const char *lockClasses[] = {
+        "CSCoverSheetView", "CSMainPageView", "CSCombinedListView",
+        "SBDashBoardView", "SBLockScreenView",
+    };
+    static const char *clockClasses[] = {
+        "SBFLockScreenDateView", "SBFLockScreenDateSubtitleView",
+        "CSDateView", "CSCoverSheetDateView", "SBUIProudLockIconView",
+    };
+    static const char *quickClasses[] = {
+        "CSQuickActionsView", "CSQuickActionsButton", "CSCameraQuickActionButton",
+        "CSFlashlightQuickActionButton", "SBDashBoardQuickActionsView",
+    };
+    static const char *dotClasses[] = {
+        "CSPageControl", "CSPageIndicator", "SBDashBoardPageControl",
+    };
+    bool lockClass = lso_matches_any_class(
+        view, lockClasses, sizeof(lockClasses) / sizeof(lockClasses[0]));
     lockContext = lockContext || lockClass;
-    bool clock = lso_contains(name, "LockScreenDateView") ||
-                 lso_contains(name, "CSDateView") ||
-                 lso_contains(name, "CoverSheetDateView") ||
-                 lso_contains(name, "SBFLockScreenDateView") ||
-                 lso_contains(name, "LockScreenClockView");
-    bool quick = lso_contains(name, "QuickAction") || lso_contains(name, "CameraGrabber") ||
-                 lso_contains(name, "Flashlight");
-    bool dots = lso_contains(name, "PageControl") || lso_contains(name, "PageIndicator");
+    bool clock = lso_matches_any_class(
+        view, clockClasses, sizeof(clockClasses) / sizeof(clockClasses[0]));
+    bool quick = lso_matches_any_class(
+        view, quickClasses, sizeof(quickClasses) / sizeof(quickClasses[0]));
+    bool dots = lso_matches_any_class(
+        view, dotClasses, sizeof(dotClasses) / sizeof(dotClasses[0]));
     if (lockContext && (clock || (s_hide_quick_actions && quick) || (s_hide_page_dots && dots)))
         lso_hide_stock_view(view);
 
