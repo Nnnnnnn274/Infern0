@@ -26,6 +26,7 @@
 #import "experimental/magma.h"
 #import "watchlayout.h"
 #import "experimental/customizers.h"
+#import "experimental/lockscreenoverlay.h"
 #import "amfi_bypass.h"
 #import "kpac_bypass.h"
 #import "msm_trustcache.h"

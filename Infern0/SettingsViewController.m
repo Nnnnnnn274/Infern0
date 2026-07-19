@@ -1071,6 +1071,13 @@ NSString * const kSettingsWatchLayoutEnabled = @"WatchLayoutEnabled";
 static NSString * const kSettingsWatchLayoutCompactPct = @"WatchLayoutCompactPct";
 static NSString * const kSettingsWatchLayoutScalePct = @"WatchLayoutScalePct";
 NSString * const kSettingsLockCustomizerEnabled = @"LockCustomizerEnabled";
+NSString * const kSettingsLockScreenOverlayEnabled = @"LockScreenOverlayEnabled";
+static NSString * const kSettingsLockScreenOverlayYOffset = @"LockScreenOverlayYOffset";
+static NSString * const kSettingsLockScreenOverlayWidthPct = @"LockScreenOverlayWidthPct";
+static NSString * const kSettingsLockScreenOverlayAccentStyle = @"LockScreenOverlayAccentStyle";
+static NSString * const kSettingsLockScreenOverlayGlassAlphaPct = @"LockScreenOverlayGlassAlphaPct";
+static NSString * const kSettingsLockScreenOverlayHideQuickActions = @"LockScreenOverlayHideQuickActions";
+static NSString * const kSettingsLockScreenOverlayHidePageDots = @"LockScreenOverlayHidePageDots";
 static NSString * const kSettingsLockCustomizerClockScalePct = @"LockCustomizerClockScalePct";
 static NSString * const kSettingsLockCustomizerXOffset = @"LockCustomizerXOffset";
 static NSString * const kSettingsLockCustomizerYOffset = @"LockCustomizerYOffset";
@@ -1683,6 +1690,12 @@ static bool settings_stop_pullover_registered(BOOL springboardWillDie)
     return pullover_stop_in_session();
 }
 
+static bool settings_stop_lockscreenoverlay_registered(BOOL springboardWillDie)
+{
+    (void)springboardWillDie;
+    return lockscreenoverlay_stop_in_session();
+}
+
 static bool settings_stop_layout_extras_registered(BOOL springboardWillDie)
 {
     if (springboardWillDie) {
@@ -1770,6 +1783,7 @@ static void settings_each_springboard_cleanup_entry(void (^block)(const Settings
         { kSettingsWatchLayoutEnabled, "Watch Layout", NULL, settings_stop_watchlayout_registered, watchlayout_forget_remote_state, NULL, YES, YES },
         { kSettingsAppLibraryStudioEnabled, "App Library Studio", NULL, settings_stop_applibrarystudio_registered, applibrarystudio_forget_remote_state, NULL, YES, YES },
         { kSettingsLockCustomizerEnabled, "Lock Screen Customizer", NULL, settings_stop_lockcustomizer_registered, lockcustomizer_forget_remote_state, NULL, YES, YES },
+        { kSettingsLockScreenOverlayEnabled, "Lock Screen Overlay", NULL, settings_stop_lockscreenoverlay_registered, lockscreenoverlay_forget_remote_state, NULL, YES, YES },
         { kSettingsFreePlacementEnabled, "Free Placement Lite", NULL, settings_stop_freeplacement_registered, freeplacement_forget_remote_state, NULL, YES, YES },
         { kSettingsBlurryBadgesEnabled, "BlurryBadges", NULL, settings_stop_blurrybadges_registered, blurrybadges_forget_remote_state, NULL, YES, YES },
         { kSettingsSnapperEnabled, "Snapper", NULL, settings_stop_snapper_registered, snapper_forget_remote_state, NULL, YES, YES },
@@ -5978,6 +5992,7 @@ static BOOL settings_visual_refresh_enabled(NSUserDefaults *d)
            [d boolForKey:kSettingsWatchLayoutEnabled] ||
            [d boolForKey:kSettingsAppLibraryStudioEnabled] ||
            [d boolForKey:kSettingsLockCustomizerEnabled] ||
+           [d boolForKey:kSettingsLockScreenOverlayEnabled] ||
            [d boolForKey:kSettingsFreePlacementEnabled];
 }
 
@@ -6015,6 +6030,7 @@ static BOOL settings_visual_refresh_tick(NSUserDefaults *d, BOOL advanceHeavySca
                                 [d boolForKey:kSettingsFreePlacementEnabled] ||
                                 [d boolForKey:kSettingsAppLibraryStudioEnabled]; break;
             case 5: attempted = attempted || [d boolForKey:kSettingsLockCustomizerEnabled] ||
+                                [d boolForKey:kSettingsLockScreenOverlayEnabled] ||
                                 [d boolForKey:kSettingsAlkalineEnabled] ||
                                 [d boolForKey:kSettingsSecureCCEnabled]; break;
             default: break;
@@ -6064,6 +6080,8 @@ static BOOL settings_visual_refresh_tick(NSUserDefaults *d, BOOL advanceHeavySca
 
     if (slot == 5 && [d boolForKey:kSettingsLockCustomizerEnabled])
         settings_visual_refresh_mark_if_ready(kSettingsLockCustomizerEnabled, lockcustomizer_apply_in_session());
+    if (slot == 5 && [d boolForKey:kSettingsLockScreenOverlayEnabled])
+        settings_visual_refresh_mark_if_ready(kSettingsLockScreenOverlayEnabled, lockscreenoverlay_apply_in_session());
     if (slot == 5 && [d boolForKey:kSettingsAlkalineEnabled])
         settings_visual_refresh_mark_if_ready(kSettingsAlkalineEnabled, alkaline_apply_in_session());
     if (slot == 5 && [d boolForKey:kSettingsSecureCCEnabled])
@@ -6806,6 +6824,12 @@ static void settings_configure_control_center_tweaks(NSUserDefaults *d)
                              (int)[d integerForKey:kSettingsLockCustomizerMetalLightIntensityPct],
                              (int)[d integerForKey:kSettingsLockCustomizerMetalLightThickness],
                              (int)[d integerForKey:kSettingsLockCustomizerMetalLightStyle]);
+    lockscreenoverlay_configure((int)[d integerForKey:kSettingsLockScreenOverlayYOffset],
+                                (int)[d integerForKey:kSettingsLockScreenOverlayWidthPct],
+                                (int)[d integerForKey:kSettingsLockScreenOverlayAccentStyle],
+                                (int)[d integerForKey:kSettingsLockScreenOverlayGlassAlphaPct],
+                                [d boolForKey:kSettingsLockScreenOverlayHideQuickActions],
+                                [d boolForKey:kSettingsLockScreenOverlayHidePageDots]);
     NSInteger freeX = [d objectForKey:kSettingsFreePlacementHorizontalStep] ? [d integerForKey:kSettingsFreePlacementHorizontalStep] : 8;
     NSInteger freeY = [d objectForKey:kSettingsFreePlacementVerticalStep] ? [d integerForKey:kSettingsFreePlacementVerticalStep] : 5;
     NSInteger freeStagger = [d objectForKey:kSettingsFreePlacementStaggerPct] ? [d integerForKey:kSettingsFreePlacementStaggerPct] : 35;
@@ -6921,6 +6945,14 @@ static void settings_log_split_tweak_config(NSString *masterKey, NSUserDefaults 
                  (long)[d integerForKey:kSettingsLockCustomizerMetalLightIntensityPct],
                  (long)[d integerForKey:kSettingsLockCustomizerMetalLightThickness],
                  (long)[d integerForKey:kSettingsLockCustomizerMetalLightStyle]);
+    } else if ([masterKey isEqualToString:kSettingsLockScreenOverlayEnabled]) {
+        log_user("[%s] Lock Screen Overlay config: engine=standalone-overlay-v1 y=%ldpt width=%ld%% accent=%ld glass=%ld%% hideQuick=%d hideDots=%d.\n", tag,
+                 (long)[d integerForKey:kSettingsLockScreenOverlayYOffset],
+                 (long)[d integerForKey:kSettingsLockScreenOverlayWidthPct],
+                 (long)[d integerForKey:kSettingsLockScreenOverlayAccentStyle],
+                 (long)[d integerForKey:kSettingsLockScreenOverlayGlassAlphaPct],
+                 [d boolForKey:kSettingsLockScreenOverlayHideQuickActions],
+                 [d boolForKey:kSettingsLockScreenOverlayHidePageDots]);
     } else if ([masterKey isEqualToString:kSettingsFreePlacementEnabled]) {
         log_user("[%s] Free Placement Lite config: horizontalStep=%ld verticalStep=%ld stagger=%ld%%; live icon taps preserved.\n", tag,
                  (long)[d integerForKey:kSettingsFreePlacementHorizontalStep],
@@ -7021,6 +7053,13 @@ static NSString *settings_split_tweak_master_key_for_key(NSString *key)
         [key isEqualToString:kSettingsLockCustomizerMetalLightIntensityPct] ||
         [key isEqualToString:kSettingsLockCustomizerMetalLightThickness] ||
         [key isEqualToString:kSettingsLockCustomizerMetalLightStyle]) return kSettingsLockCustomizerEnabled;
+    if ([key isEqualToString:kSettingsLockScreenOverlayEnabled] ||
+        [key isEqualToString:kSettingsLockScreenOverlayYOffset] ||
+        [key isEqualToString:kSettingsLockScreenOverlayWidthPct] ||
+        [key isEqualToString:kSettingsLockScreenOverlayAccentStyle] ||
+        [key isEqualToString:kSettingsLockScreenOverlayGlassAlphaPct] ||
+        [key isEqualToString:kSettingsLockScreenOverlayHideQuickActions] ||
+        [key isEqualToString:kSettingsLockScreenOverlayHidePageDots]) return kSettingsLockScreenOverlayEnabled;
     if ([key isEqualToString:kSettingsFreePlacementEnabled] ||
         [key isEqualToString:kSettingsFreePlacementHorizontalStep] ||
         [key isEqualToString:kSettingsFreePlacementVerticalStep] ||
@@ -8185,6 +8224,14 @@ static void settings_schedule_live_apply_for_key(NSString *key)
                         freeplacement_stop_in_session();
                         settings_mark_tweak_applied(kSettingsFreePlacementEnabled, NO);
                     }
+                    if ([d boolForKey:kSettingsLockScreenOverlayEnabled] &&
+                        [d boolForKey:kSettingsLockCustomizerEnabled]) {
+                        [d setBool:NO forKey:kSettingsLockCustomizerEnabled];
+                        [d synchronize];
+                        lockcustomizer_stop_in_session();
+                        settings_mark_tweak_applied(kSettingsLockCustomizerEnabled, NO);
+                        log_user("[LOCKOVERLAY][CONFLICT] Restored and disabled the retired Lock Screen Customizer before live overlay apply.\n");
+                    }
                     settings_configure_control_center_tweaks(d);
                     settings_log_split_tweak_config(masterKey, d, "LIVE");
                     bool ok = true;
@@ -8248,6 +8295,9 @@ static void settings_schedule_live_apply_for_key(NSString *key)
                     } else if ([masterKey isEqualToString:kSettingsLockCustomizerEnabled]) {
                         ok = [d boolForKey:kSettingsLockCustomizerEnabled] ? lockcustomizer_apply_in_session() : lockcustomizer_stop_in_session();
                         settings_mark_tweak_applied(kSettingsLockCustomizerEnabled, ok && [d boolForKey:kSettingsLockCustomizerEnabled]);
+                    } else if ([masterKey isEqualToString:kSettingsLockScreenOverlayEnabled]) {
+                        ok = [d boolForKey:kSettingsLockScreenOverlayEnabled] ? lockscreenoverlay_apply_in_session() : lockscreenoverlay_stop_in_session();
+                        settings_mark_tweak_applied(kSettingsLockScreenOverlayEnabled, ok && [d boolForKey:kSettingsLockScreenOverlayEnabled]);
                     } else if ([masterKey isEqualToString:kSettingsFreePlacementEnabled]) {
                         ok = [d boolForKey:kSettingsFreePlacementEnabled] ? freeplacement_apply_in_session() : freeplacement_stop_in_session();
                         settings_mark_tweak_applied(kSettingsFreePlacementEnabled, ok && [d boolForKey:kSettingsFreePlacementEnabled]);
@@ -8900,6 +8950,13 @@ void settings_register_defaults(void)
         kSettingsLockCustomizerMetalLightIntensityPct: @72,
         kSettingsLockCustomizerMetalLightThickness: @5,
         kSettingsLockCustomizerMetalLightStyle: @0,
+        kSettingsLockScreenOverlayEnabled: @NO,
+        kSettingsLockScreenOverlayYOffset: @0,
+        kSettingsLockScreenOverlayWidthPct: @88,
+        kSettingsLockScreenOverlayAccentStyle: @0,
+        kSettingsLockScreenOverlayGlassAlphaPct: @72,
+        kSettingsLockScreenOverlayHideQuickActions: @YES,
+        kSettingsLockScreenOverlayHidePageDots: @YES,
         kSettingsFreePlacementEnabled: @NO,
         kSettingsFreePlacementHorizontalStep: @8,
         kSettingsFreePlacementVerticalStep: @5,
@@ -9032,6 +9089,7 @@ void settings_register_defaults(void)
             kSettingsWatchLayoutEnabled,
             kSettingsAppLibraryStudioEnabled,
             kSettingsLockCustomizerEnabled,
+            kSettingsLockScreenOverlayEnabled,
             kSettingsFreePlacementEnabled,
             kSettingsBlurryBadgesEnabled,
             kSettingsSnapperEnabled,
@@ -9107,6 +9165,7 @@ static void settings_log_tweak_plan_details(NSUserDefaults *d, BOOL pendingOnly)
         { kSettingsWatchLayoutEnabled, "Watch Layout", "builds one scrolling Apple Watch-style honeycomb of pressable circular app icons" },
         { kSettingsAppLibraryStudioEnabled, "App Library Studio", "resizes and spaces live App Library icons and optionally removes the leading Today View page" },
         { kSettingsLockCustomizerEnabled, "Lock Screen Customizer", "moves live Lock Screen content and adds configurable Metal Lock Light edge lighting" },
+        { kSettingsLockScreenOverlayEnabled, "Lock Screen Overlay", "replaces the stock clock area with a standalone glass overlay and restores it exactly on cleanup" },
         { kSettingsFreePlacementEnabled, "Free Placement Lite", "offsets live Home Screen icons with a reversible staggered layout" },
         { kSettingsBlurryBadgesEnabled, "BlurryBadges", "tints visible notification badges with the configured color" },
         { kSettingsSnapperEnabled, "Snapper", "shows the configured crop-frame overlay" },
@@ -9233,6 +9292,15 @@ static void settings_run_actions_internal(BOOL pendingOnly)
             BOOL runWatchLayout = settings_enabled_tweak_should_run(d, kSettingsWatchLayoutEnabled, springBoardPendingOnly);
             BOOL runAppLibraryStudio = settings_enabled_tweak_should_run(d, kSettingsAppLibraryStudioEnabled, springBoardPendingOnly);
             BOOL runLockCustomizer = settings_enabled_tweak_should_run(d, kSettingsLockCustomizerEnabled, springBoardPendingOnly);
+            BOOL runLockScreenOverlay = settings_enabled_tweak_should_run(d, kSettingsLockScreenOverlayEnabled, springBoardPendingOnly);
+            if ([d boolForKey:kSettingsLockScreenOverlayEnabled] &&
+                [d boolForKey:kSettingsLockCustomizerEnabled]) {
+                [d setBool:NO forKey:kSettingsLockCustomizerEnabled];
+                [d synchronize];
+                runLockCustomizer = NO;
+                settings_mark_tweak_applied(kSettingsLockCustomizerEnabled, NO);
+                log_user("[LOCKOVERLAY][CONFLICT] Disabled the retired Lock Screen Customizer so both engines cannot own the same stock clock views.\n");
+            }
             BOOL runFreePlacement = settings_enabled_tweak_should_run(d, kSettingsFreePlacementEnabled, springBoardPendingOnly);
             BOOL runBlurryBadges = settings_blurrybadges_install_allowed() && settings_enabled_tweak_should_run(d, kSettingsBlurryBadgesEnabled, springBoardPendingOnly);
             BOOL runSnapper = settings_snapper_install_allowed() && settings_enabled_tweak_should_run(d, kSettingsSnapperEnabled, springBoardPendingOnly);
@@ -9254,7 +9322,7 @@ static void settings_run_actions_internal(BOOL pendingOnly)
                 settings_note_themer_stage_conflict(YES);
             }
             BOOL cleanupDisabledSpringBoardTweaks = settings_disabled_applied_springboard_cleanup_needed(d);
-            BOOL needsSpringBoardWork = runSBC || runDarkTweaks || runStatBar || runNSBar || runNiceBarLite || runRSSI || runAxonLite || runGravityLite || runLayoutExtras || runTypeBanner || runNotificationIsland || runVelvet || runCleanNC || runUnderTime || runZeppelinLite || runCleanHomeScreen || runRealCC || runCleanCC || runFUGap || runModuleSpacing || runSugarCane || runBetterCCXI || runMagma || runBetterCCIcons || runCCNoPlatterDim || runCCStatus || runHapticCC || runSecureCC || runHideLabels || runFakeClockUp || runPancake || runCylinderLite || runBarmoji || runRoundedIcons || runWatchLayout || runAppLibraryStudio || runLockCustomizer || runFreePlacement || runBlurryBadges || runSnapper || runPullOver || runAlkaline || runTweakLoader || runAppSwitcherGrid || runThemer || runSnowBoardLite || runLiveWP || runStageStrip || runFastLockXLite || runQuickLoader || runRepoTweaks || cleanupDisabledSpringBoardTweaks;
+            BOOL needsSpringBoardWork = runSBC || runDarkTweaks || runStatBar || runNSBar || runNiceBarLite || runRSSI || runAxonLite || runGravityLite || runLayoutExtras || runTypeBanner || runNotificationIsland || runVelvet || runCleanNC || runUnderTime || runZeppelinLite || runCleanHomeScreen || runRealCC || runCleanCC || runFUGap || runModuleSpacing || runSugarCane || runBetterCCXI || runMagma || runBetterCCIcons || runCCNoPlatterDim || runCCStatus || runHapticCC || runSecureCC || runHideLabels || runFakeClockUp || runPancake || runCylinderLite || runBarmoji || runRoundedIcons || runWatchLayout || runAppLibraryStudio || runLockCustomizer || runLockScreenOverlay || runFreePlacement || runBlurryBadges || runSnapper || runPullOver || runAlkaline || runTweakLoader || runAppSwitcherGrid || runThemer || runSnowBoardLite || runLiveWP || runStageStrip || runFastLockXLite || runQuickLoader || runRepoTweaks || cleanupDisabledSpringBoardTweaks;
             BOOL runSandboxEscape = [d boolForKey:kSettingsRunSandboxEscape] && (!pendingOnly || needsSpringBoardWork);
             // TypeBanner prewarms its hidden SpringBoard window during Apply
             // and reuses the open SpringBoard session for text-only updates.
@@ -9312,6 +9380,7 @@ static void settings_run_actions_internal(BOOL pendingOnly)
             if (runWatchLayout) total++;
             if (runAppLibraryStudio) total++;
             if (runLockCustomizer) total++;
+            if (runLockScreenOverlay) total++;
             if (runFreePlacement) total++;
             if (runBlurryBadges) total++;
             if (runSnapper) total++;
@@ -9363,6 +9432,7 @@ static void settings_run_actions_internal(BOOL pendingOnly)
             if (runWatchLayout) [enabledTweaks addObject:@"watch-layout"];
             if (runAppLibraryStudio) [enabledTweaks addObject:@"app-library-studio"];
             if (runLockCustomizer) [enabledTweaks addObject:@"lock-customizer"];
+            if (runLockScreenOverlay) [enabledTweaks addObject:@"lock-screen-overlay"];
             if (runFreePlacement) [enabledTweaks addObject:@"free-placement"];
             if (runBlurryBadges) [enabledTweaks addObject:@"blurrybadges"];
             if (runSnapper) [enabledTweaks addObject:@"snapper"];
@@ -9986,6 +10056,16 @@ static void settings_run_actions_internal(BOOL pendingOnly)
                         log_user("%s Lock Screen Customizer %s.\n", ok ? "[OK]" : "[WARN]", ok ? "applied to matched live views" : "found no supported Lock Screen views yet");
                     }
 
+                    if (runLockScreenOverlay) {
+                        settings_progress(&step, total, "Building Lock Screen Overlay");
+                        settings_log_split_tweak_config(kSettingsLockScreenOverlayEnabled, d, "RUN");
+                        bool ok = lockscreenoverlay_apply_in_session();
+                        settings_mark_tweak_applied(kSettingsLockScreenOverlayEnabled,
+                                                    ok && [d boolForKey:kSettingsLockScreenOverlayEnabled]);
+                        log_user("%s Lock Screen Overlay %s.\n", ok ? "[OK]" : "[WAIT]",
+                                 ok ? "attached and stock clock views hidden" : "is waiting for a class-verified Cover Sheet host");
+                    }
+
                     if (runFreePlacement) {
                         settings_progress(&step, total, "Applying Free Placement Lite");
                         settings_log_split_tweak_config(kSettingsFreePlacementEnabled, d, "RUN");
@@ -10321,6 +10401,7 @@ typedef NS_ENUM(NSInteger, SettingsSection) {
     SectionCopypastaLite,
     SectionAppLibraryStudio,
     SectionAMFIBypass,
+    SectionLockScreenOverlay,
     SectionCount,
 };
 
@@ -11906,6 +11987,33 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
     ];
 }
 
+- (NSArray<NSDictionary *> *)lockScreenOverlayRows
+{
+    return @[
+        @{ @"kind": @"toggle", @"key": kSettingsLockScreenOverlayEnabled,
+           @"title": @"Enable Lock Screen Overlay" },
+        @{ @"kind": @"info", @"title": @"Standalone overlay engine",
+           @"subtitle": @"Uses the Watch Layout approach: a separately retained, noninteractive UIKit overlay is attached to the verified Cover Sheet window. Stock views are hidden only after attachment succeeds." },
+        @{ @"kind": @"slider", @"key": kSettingsLockScreenOverlayYOffset,
+           @"title": @"Vertical position", @"min": @-180, @"max": @260,
+           @"step": @1, @"default": @0, @"unit": @"pt" },
+        @{ @"kind": @"slider", @"key": kSettingsLockScreenOverlayWidthPct,
+           @"title": @"Panel width", @"min": @68, @"max": @96,
+           @"step": @1, @"default": @88, @"unit": @"%" },
+        @{ @"kind": @"stepper", @"key": kSettingsLockScreenOverlayAccentStyle,
+           @"title": @"Accent (0 cyan, 1 violet, 2 red, 3 gold)",
+           @"min": @0, @"max": @3, @"default": @0 },
+        @{ @"kind": @"slider", @"key": kSettingsLockScreenOverlayGlassAlphaPct,
+           @"title": @"Glass darkness", @"min": @25, @"max": @95,
+           @"step": @1, @"default": @72, @"unit": @"%" },
+        @{ @"kind": @"toggle", @"key": kSettingsLockScreenOverlayHideQuickActions,
+           @"title": @"Hide camera and flashlight" },
+        @{ @"kind": @"toggle", @"key": kSettingsLockScreenOverlayHidePageDots,
+           @"title": @"Hide page dots" },
+        @{ @"kind": @"button", @"title": @"View Detailed Activity Log", @"action": @"view-log" },
+    ];
+}
+
 - (void)updateSearchResultsForSearchController:(UISearchController *)searchController
 {
     NSString *query = [searchController.searchBar.text stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet] ?: @"";
@@ -12606,6 +12714,7 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
         case SectionCopypastaLite: return self.copypastaLiteRows;
         case SectionAppLibraryStudio: return cyanide_experimental_tweaks_available() ? self.appLibraryStudioRows : @[];
         case SectionAMFIBypass: return self.amfiBypassRows;
+        case SectionLockScreenOverlay: return self.lockScreenOverlayRows;
         default: return @[];
     }
 }
@@ -12652,6 +12761,7 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
 #endif
         @{ @"title": @"Watch Layout", @"icon": @"circle.grid.3x3.fill", @"color": [UIColor systemGreenColor], @"section": @(SectionWatchLayout) },
         @{ @"title": @"Lock Screen Customizer", @"icon": @"lock.rectangle", @"color": [UIColor systemIndigoColor], @"section": @(SectionLockCustomizer), @"experimental": @YES },
+        @{ @"title": @"Lock Screen Overlay", @"icon": @"sparkles.rectangle.stack.fill", @"color": [UIColor systemCyanColor], @"section": @(SectionLockScreenOverlay), @"experimental": @YES },
     ];
 }
 
@@ -12721,7 +12831,7 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
             case SectionAppLibraryStudio: case SectionCylinderLite: case SectionHideLabels:
             case SectionCleanHomeScreen: case SectionBlurryBadges:
                 destination = RootSectionHomeScreen; break;
-            case SectionLockCustomizer: case SectionFastLockXLite: case SectionAxonLite:
+            case SectionLockCustomizer: case SectionLockScreenOverlay: case SectionFastLockXLite: case SectionAxonLite:
             case SectionVelvet: case SectionCleanNC: case SectionTypeBanner:
             case SectionNotificationIsland: case SectionUnderTime:
                 destination = RootSectionLockAndNotifications; break;
@@ -12976,6 +13086,9 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
     }
     if (s == SectionLockCustomizer) {
         return @"Resizes and repositions the live Lock Screen clock and optionally hides quick actions or page dots. Changes are session-based, logged, and restored on uninstall.";
+    }
+    if (s == SectionLockScreenOverlay) {
+        return @"Independent Watch Layout-style Cover Sheet overlay. It builds a glass clock panel first, verifies attachment, and only then hides matched stock clock controls. The time is refreshed by infern0's visual loop; cleanup removes the overlay and restores every saved alpha.";
     }
     if (s == SectionFreePlacement) {
         return @"Applies a configurable staggered offset pattern to every discovered live Home Screen icon. Icons remain pressable and saved stock frames are restored on uninstall; per-icon dragging is not included yet.";

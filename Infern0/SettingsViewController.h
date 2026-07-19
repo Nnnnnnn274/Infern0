@@ -101,6 +101,7 @@ extern NSString * const kSettingsBarmojiEnabled;
 extern NSString * const kSettingsRoundedIconsEnabled;
 extern NSString * const kSettingsWatchLayoutEnabled;
 extern NSString * const kSettingsLockCustomizerEnabled;
+extern NSString * const kSettingsLockScreenOverlayEnabled;
 extern NSString * const kSettingsFreePlacementEnabled;
 extern NSString * const kSettingsCopypastaLiteEnabled;
 extern NSString * const kSettingsAppLibraryStudioEnabled;

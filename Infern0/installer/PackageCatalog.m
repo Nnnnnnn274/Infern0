@@ -166,6 +166,7 @@ static const NSInteger kSecFreePlacement    = 60;
 static const NSInteger kSecCopypastaLite    = 61;
 static const NSInteger kSecAppLibraryStudio = 62;
 static const NSInteger kSecAMFIBypass       = 63;
+static const NSInteger kSecLockScreenOverlay = 64;
 static const NSInteger kSecDarkSwordTweaks  = 13;
 
 + (NSArray<Package *> *)allPackages
@@ -844,6 +845,21 @@ static const NSInteger kSecDarkSwordTweaks  = 13;
                                      enabledKey:kSettingsLockCustomizerEnabled
                                           isNew:YES];
         lockCustomizer.settingsSection = kSecLockCustomizer;
+        lockCustomizer.installDisabledReason = @"Retired: the original live-view customizer is not stable enough for new installs. Use Lock Screen Overlay instead.";
+
+        Package *lockScreenOverlay = [[Package alloc] initWithIdentifier:@"com.darksword.lockscreenoverlay"
+                                           name:@"Lock Screen Overlay"
+                               shortDescription:@"Replace the stock clock area with a glass infern0 overlay"
+                                longDescription:@"A standalone, noninteractive Cover Sheet overlay built with the same retained-overlay architecture as Watch Layout. It presents a large locale-aware clock, date, infern0 status line, configurable glass panel, and cyan, violet, red, or gold accents. The overlay must attach successfully before the stock clock, quick actions, or page dots are hidden. Cleanup removes the overlay and restores every captured stock alpha exactly. Notifications and media controls remain native and usable."
+                                        version:version
+                                         author:@"Nnnnnnn274"
+                                       category:@"Lock Screen"
+                                     symbolName:@"sparkles.rectangle.stack.fill"
+                                           kind:PackageInstallKindToggle
+                                     enabledKey:kSettingsLockScreenOverlayEnabled
+                                          isNew:YES];
+        lockScreenOverlay.settingsSection = kSecLockScreenOverlay;
+        lockScreenOverlay.unstableWarning = @"Beta: Cover Sheet class names can differ by iOS build. If the verified host is unavailable, the tweak fails closed and leaves the stock Lock Screen visible.";
 
         Package *freePlacement = [[Package alloc] initWithIdentifier:@"com.darksword.freeplacementlite"
                                            name:@"Free Placement Lite"
@@ -1142,6 +1158,7 @@ static const NSInteger kSecDarkSwordTweaks  = 13;
             roundedIcons,
             watchLayout,
             lockCustomizer,
+            lockScreenOverlay,
             freePlacement,
             appLibraryStudio,
             blurryBadges,
@@ -1193,6 +1210,7 @@ static const NSInteger kSecDarkSwordTweaks  = 13;
             @"com.darksword.barmoji",
             @"com.darksword.watchlayout",
             @"com.darksword.lockcustomizer",
+            @"com.darksword.lockscreenoverlay",
         ]];
         list = [list filteredArrayUsingPredicate:[NSPredicate predicateWithBlock:^BOOL(Package *package, NSDictionary *bindings) {
             (void)bindings;
