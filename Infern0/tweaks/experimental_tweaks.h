@@ -28,6 +28,7 @@
 #import "experimental/customizers.h"
 #import "experimental/lockscreenoverlay.h"
 #import "experimental/vesta_lite.h"
+#import "experimental/magsafe_enabler.h"
 #import "amfi_bypass.h"
 #import "kpac_bypass.h"
 #import "msm_trustcache.h"

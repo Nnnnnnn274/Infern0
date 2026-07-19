@@ -141,6 +141,8 @@ extern NSString * const kSettingsQuickLoaderEnabled;
 
 extern NSString * const kSettingsRepoTweaksEnabled;
 
+extern NSString * const kSettingsMagsafeEnabled;
+
 extern NSString * const kSettingsExperimentalTweaksEnabled;
 
 extern NSString * const kSettingsLogUploadEnabled;

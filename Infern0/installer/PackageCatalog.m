@@ -167,6 +167,7 @@ static const NSInteger kSecCopypastaLite    = 61;
 static const NSInteger kSecAppLibraryStudio = 62;
 static const NSInteger kSecAMFIBypass       = 63;
 static const NSInteger kSecLockScreenOverlay = 64;
+static const NSInteger kSecMagsafe          = 65;
 static const NSInteger kSecDarkSwordTweaks  = 13;
 
 + (NSArray<Package *> *)allPackages
@@ -861,6 +862,20 @@ static const NSInteger kSecDarkSwordTweaks  = 13;
         lockScreenOverlay.settingsSection = kSecLockScreenOverlay;
         lockScreenOverlay.unstableWarning = @"Beta: Cover Sheet class names can differ by iOS build. If the verified host is unavailable, the tweak fails closed and leaves the stock Lock Screen visible.";
 
+        Package *magsafe = [[Package alloc] initWithIdentifier:@"com.darksword.magsafe"
+                                           name:@"MagSafe Enabler"
+                               shortDescription:@"Animated charging ring on charger connection"
+                                longDescription:@"Community port of MagSafe Enabler by Iggy05, based on MinePlayer16's cyanide implementation and rewritten for infern0. When iOS reports a charging or full battery state, it presents an animated circular battery ring in a dedicated touch-through SpringBoard window, then hides it after the configured duration. Ring size, position, thickness, animation speed, opacity, and accent are adjustable. The rewrite avoids private-window scanning and never changes stock SpringBoard views. Detailed logs cover configuration, battery events, creation, presentation, timed hiding, and cleanup."
+                                        version:version
+                                         author:@"Iggy05 + MinePlayer16 + infern0"
+                                       category:@"Themes"
+                                     symbolName:@"battery.100.bolt"
+                                           kind:PackageInstallKindToggle
+                                     enabledKey:kSettingsMagsafeEnabled
+                                          isNew:YES];
+        magsafe.settingsSection = kSecMagsafe;
+        magsafe.unstableWarning = @"Session overlay: infern0 must remain alive to observe later charger changes. iOS public battery APIs cannot distinguish MagSafe, Qi, and cable charging, so every charging source triggers it.";
+
         Package *freePlacement = [[Package alloc] initWithIdentifier:@"com.darksword.freeplacementlite"
                                            name:@"Free Placement Lite"
                                shortDescription:@"Configurable free-form icon offsets"
@@ -1159,6 +1174,7 @@ static const NSInteger kSecDarkSwordTweaks  = 13;
             watchLayout,
             lockCustomizer,
             lockScreenOverlay,
+            magsafe,
             freePlacement,
             appLibraryStudio,
             blurryBadges,
@@ -1212,6 +1228,7 @@ static const NSInteger kSecDarkSwordTweaks  = 13;
             @"com.darksword.lockcustomizer",
             @"com.darksword.lockscreenoverlay",
             @"com.darksword.vestalite",
+            @"com.darksword.magsafe",
         ]];
         list = [list filteredArrayUsingPredicate:[NSPredicate predicateWithBlock:^BOOL(Package *package, NSDictionary *bindings) {
             (void)bindings;

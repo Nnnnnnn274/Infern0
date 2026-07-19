@@ -1184,6 +1184,15 @@ NSString * const kSettingsQuickLoaderEnabled = @"QuickLoaderEnabled";
 
 NSString * const kSettingsRepoTweaksEnabled = @"RepoTweaksEnabled";
 
+NSString * const kSettingsMagsafeEnabled = @"MagsafeEnabled";
+static NSString * const kSettingsMagsafeSize = @"MagsafeSize";
+static NSString * const kSettingsMagsafeYPosition = @"MagsafeYPosition";
+static NSString * const kSettingsMagsafeRingWidth = @"MagsafeRingWidth";
+static NSString * const kSettingsMagsafeAnimationDurationMs = @"MagsafeAnimationDurationMs";
+static NSString * const kSettingsMagsafeDisplaySeconds = @"MagsafeDisplaySeconds";
+static NSString * const kSettingsMagsafeBackgroundAlphaPct = @"MagsafeBackgroundAlphaPct";
+static NSString * const kSettingsMagsafeAccentStyle = @"MagsafeAccentStyle";
+
 // Internal gate for unfinished in-development tweaks. There is no public
 // account gate; beta packages that are ready for testing stay visible.
 NSString * const kSettingsExperimentalTweaksEnabled = @"ExperimentalTweaksEnabled";
@@ -1208,6 +1217,8 @@ static BOOL settings_cleanup_in_progress(void);
 static BOOL settings_screen_awake_cached(void);
 static BOOL settings_screen_locked_cached(void);
 static void settings_restart_gravity_motion_if_active(const char *reason);
+static void settings_install_magsafe_battery_monitor(void);
+static volatile uint64_t g_magsafe_hide_generation = 0;
 static void settings_stop_gravity_motion(void);
 
 extern int  escape_sbx_demo2(void);
@@ -1736,6 +1747,13 @@ static bool settings_stop_repotweaks_registered(BOOL springboardWillDie)
     return repotweaks_stop_in_session();
 }
 
+static bool settings_stop_magsafe_registered(BOOL springboardWillDie)
+{
+    (void)springboardWillDie;
+    __sync_add_and_fetch(&g_magsafe_hide_generation, 1);
+    return magsafe_enabler_stop_in_session();
+}
+
 static void settings_each_springboard_cleanup_entry(void (^block)(const SettingsSpringBoardTweakCleanupEntry *entry))
 {
     if (!block) return;
@@ -1792,6 +1810,7 @@ static void settings_each_springboard_cleanup_entry(void (^block)(const Settings
         { kSettingsTweakLoaderEnabled, "TweakLoader", NULL, settings_stop_tweakloader_registered, tweakloader_forget_remote_state, NULL, YES, YES },
         { kSettingsQuickLoaderEnabled, "QuickLoader", NULL, settings_stop_quickloader_registered, NULL, NULL, YES, YES },
         { kSettingsRepoTweaksEnabled, "RepoTweaks", NULL, settings_stop_repotweaks_registered, NULL, NULL, YES, YES },
+        { kSettingsMagsafeEnabled, "MagSafe Enabler", NULL, settings_stop_magsafe_registered, magsafe_enabler_forget_remote_state, NULL, YES, YES },
         { nil, "Kill All Apps", NULL, NULL, killallapps_forget_remote_state, NULL, NO, NO },
     };
     size_t count = sizeof(entries) / sizeof(entries[0]);
@@ -6839,6 +6858,88 @@ static void settings_configure_control_center_tweaks(NSUserDefaults *d)
                                (int)[d integerForKey:kSettingsAppLibraryStudioVerticalSpacing],
                                [d boolForKey:kSettingsAppLibraryStudioHideLabels],
                                [d boolForKey:kSettingsAppLibraryStudioDisableTodayView]);
+    magsafe_enabler_configure((int)[d integerForKey:kSettingsMagsafeSize],
+                              (int)[d integerForKey:kSettingsMagsafeYPosition],
+                              (int)[d integerForKey:kSettingsMagsafeRingWidth],
+                              (int)[d integerForKey:kSettingsMagsafeAnimationDurationMs],
+                              (int)[d integerForKey:kSettingsMagsafeBackgroundAlphaPct],
+                              (int)[d integerForKey:kSettingsMagsafeAccentStyle]);
+}
+
+// Called while settings_rc_lock() is held. A generation token ensures that an
+// older delayed hide can never dismiss a newer charging animation.
+static bool settings_magsafe_show_for_current_battery_locked(NSUserDefaults *d,
+                                                               const char *reason)
+{
+    UIDevice *device = UIDevice.currentDevice;
+    UIDeviceBatteryState state = device.batteryState;
+    float level = device.batteryLevel;
+    if (state != UIDeviceBatteryStateCharging && state != UIDeviceBatteryStateFull) {
+        __sync_add_and_fetch(&g_magsafe_hide_generation, 1);
+        bool hidden = magsafe_enabler_hide();
+        log_user("[MAGSAFE][BATTERY] reason=%s state=%ld; overlay hidden result=%d.\n",
+                 reason ?: "unknown", (long)state, hidden);
+        return hidden;
+    }
+
+    settings_configure_control_center_tweaks(d);
+    bool applied = magsafe_enabler_apply_in_session();
+    bool shown = applied && magsafe_enabler_show(level >= 0.0f ? level : 0.0f);
+    uint64_t generation = __sync_add_and_fetch(&g_magsafe_hide_generation, 1);
+    NSInteger seconds = MAX(2, MIN(10, [d integerForKey:kSettingsMagsafeDisplaySeconds]));
+    log_user("[MAGSAFE][BATTERY] reason=%s state=%ld level=%.0f%% apply=%d show=%d autoHide=%lds generation=%llu.\n",
+             reason ?: "unknown", (long)state,
+             level >= 0.0f ? level * 100.0f : 0.0f,
+             applied, shown, (long)seconds, (unsigned long long)generation);
+
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(seconds * NSEC_PER_SEC)),
+                   dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
+        if (generation != g_magsafe_hide_generation) return;
+        NSUserDefaults *liveDefaults = NSUserDefaults.standardUserDefaults;
+        if (![liveDefaults boolForKey:kSettingsMagsafeEnabled]) return;
+        @synchronized (settings_rc_lock()) {
+            if (generation != g_magsafe_hide_generation ||
+                settings_cleanup_in_progress() || !g_springboard_rc_ready) return;
+            bool hidden = magsafe_enabler_hide();
+            log_user("[MAGSAFE][TIMER] generation=%llu auto-hide result=%d.\n",
+                     (unsigned long long)generation, hidden);
+        }
+    });
+    return shown;
+}
+
+static void settings_handle_magsafe_battery_change(const char *reason)
+{
+    NSUserDefaults *d = NSUserDefaults.standardUserDefaults;
+    if (![d boolForKey:kSettingsMagsafeEnabled]) return;
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+        @synchronized (settings_rc_lock()) {
+            if (settings_cleanup_in_progress() ||
+                ![d boolForKey:kSettingsMagsafeEnabled] || !g_springboard_rc_ready) return;
+            bool shown = settings_magsafe_show_for_current_battery_locked(d, reason);
+            settings_mark_tweak_applied(kSettingsMagsafeEnabled,
+                                        [d boolForKey:kSettingsMagsafeEnabled] && shown);
+        }
+        settings_notify_package_queue_changed_async();
+    });
+}
+
+static void settings_install_magsafe_battery_monitor(void)
+{
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        dispatch_async(dispatch_get_main_queue(), ^{
+            UIDevice.currentDevice.batteryMonitoringEnabled = YES;
+            [[NSNotificationCenter defaultCenter]
+                addObserverForName:UIDeviceBatteryStateDidChangeNotification
+                            object:UIDevice.currentDevice
+                             queue:NSOperationQueue.mainQueue
+                        usingBlock:^(__unused NSNotification *note) {
+                settings_handle_magsafe_battery_change("battery-state-notification");
+            }];
+            log_user("[MAGSAFE][MONITOR] Battery-state observer installed; charging source is intentionally treated as generic because public UIDevice APIs do not distinguish cable, Qi, and MagSafe.\n");
+        });
+    });
 }
 
 static void settings_log_split_tweak_config(NSString *masterKey, NSUserDefaults *d, const char *prefix)
@@ -6965,6 +7066,15 @@ static void settings_log_split_tweak_config(NSString *masterKey, NSUserDefaults 
                  (long)[d integerForKey:kSettingsAppLibraryStudioVerticalSpacing],
                  [d boolForKey:kSettingsAppLibraryStudioHideLabels],
                  [d boolForKey:kSettingsAppLibraryStudioDisableTodayView]);
+    } else if ([masterKey isEqualToString:kSettingsMagsafeEnabled]) {
+        log_user("[%s] MagSafe Enabler config: size=%ldpt y=%ldpt ring=%ldpt animation=%ldms visible=%lds background=%ld%% accent=%ld engine=owned-touch-through-window remoteReads=0 stockMutations=0.\n", tag,
+                 (long)[d integerForKey:kSettingsMagsafeSize],
+                 (long)[d integerForKey:kSettingsMagsafeYPosition],
+                 (long)[d integerForKey:kSettingsMagsafeRingWidth],
+                 (long)[d integerForKey:kSettingsMagsafeAnimationDurationMs],
+                 (long)[d integerForKey:kSettingsMagsafeDisplaySeconds],
+                 (long)[d integerForKey:kSettingsMagsafeBackgroundAlphaPct],
+                 (long)[d integerForKey:kSettingsMagsafeAccentStyle]);
     }
 }
 
@@ -7070,6 +7180,14 @@ static NSString *settings_split_tweak_master_key_for_key(NSString *key)
         [key isEqualToString:kSettingsAppLibraryStudioVerticalSpacing] ||
         [key isEqualToString:kSettingsAppLibraryStudioHideLabels] ||
         [key isEqualToString:kSettingsAppLibraryStudioDisableTodayView]) return kSettingsAppLibraryStudioEnabled;
+    if ([key isEqualToString:kSettingsMagsafeEnabled] ||
+        [key isEqualToString:kSettingsMagsafeSize] ||
+        [key isEqualToString:kSettingsMagsafeYPosition] ||
+        [key isEqualToString:kSettingsMagsafeRingWidth] ||
+        [key isEqualToString:kSettingsMagsafeAnimationDurationMs] ||
+        [key isEqualToString:kSettingsMagsafeDisplaySeconds] ||
+        [key isEqualToString:kSettingsMagsafeBackgroundAlphaPct] ||
+        [key isEqualToString:kSettingsMagsafeAccentStyle]) return kSettingsMagsafeEnabled;
     return nil;
 }
 
@@ -8301,6 +8419,15 @@ static void settings_schedule_live_apply_for_key(NSString *key)
                     } else if ([masterKey isEqualToString:kSettingsFreePlacementEnabled]) {
                         ok = [d boolForKey:kSettingsFreePlacementEnabled] ? freeplacement_apply_in_session() : freeplacement_stop_in_session();
                         settings_mark_tweak_applied(kSettingsFreePlacementEnabled, ok && [d boolForKey:kSettingsFreePlacementEnabled]);
+                    } else if ([masterKey isEqualToString:kSettingsMagsafeEnabled]) {
+                        if ([d boolForKey:kSettingsMagsafeEnabled]) {
+                            ok = settings_magsafe_show_for_current_battery_locked(d, "live-settings");
+                        } else {
+                            __sync_add_and_fetch(&g_magsafe_hide_generation, 1);
+                            ok = magsafe_enabler_stop_in_session();
+                        }
+                        settings_mark_tweak_applied(kSettingsMagsafeEnabled,
+                                                    ok && [d boolForKey:kSettingsMagsafeEnabled]);
                     }
                     printf("[SETTINGS] live split tweak %s owner=%s result=%d\n", key.UTF8String, masterKey.UTF8String, ok);
                 }
@@ -9045,6 +9172,14 @@ void settings_register_defaults(void)
 
         kSettingsQuickLoaderEnabled: @NO,
         kSettingsRepoTweaksEnabled: @NO,
+        kSettingsMagsafeEnabled: @NO,
+        kSettingsMagsafeSize: @200,
+        kSettingsMagsafeYPosition: @300,
+        kSettingsMagsafeRingWidth: @12,
+        kSettingsMagsafeAnimationDurationMs: @1200,
+        kSettingsMagsafeDisplaySeconds: @5,
+        kSettingsMagsafeBackgroundAlphaPct: @82,
+        kSettingsMagsafeAccentStyle: @0,
 
         kSettingsExperimentalTweaksEnabled: @YES,
 
@@ -9096,6 +9231,7 @@ void settings_register_defaults(void)
             kSettingsPullOverEnabled,
             kSettingsAlkalineEnabled,
             kSettingsTweakLoaderEnabled,
+            kSettingsMagsafeEnabled,
         ];
         for (NSString *key in privateKeys) {
             if ([defaults boolForKey:key]) {
@@ -9119,6 +9255,7 @@ void settings_register_defaults(void)
         [defaults synchronize];
     }
     settings_install_screen_awake_observers();
+    settings_install_magsafe_battery_monitor();
 }
 
 typedef struct {
@@ -9170,6 +9307,7 @@ static void settings_log_tweak_plan_details(NSUserDefaults *d, BOOL pendingOnly)
         { kSettingsBlurryBadgesEnabled, "BlurryBadges", "tints visible notification badges with the configured color" },
         { kSettingsSnapperEnabled, "Snapper", "shows the configured crop-frame overlay" },
         { kSettingsPullOverEnabled, "Vesta Lite", "shows a right-edge handle that opens the app drawer" },
+        { kSettingsMagsafeEnabled, "MagSafe Enabler", "creates a touch-through charging ring and reacts to battery-state changes" },
         { kSettingsAlkalineEnabled, "Alkaline", "tints visible battery views with the configured color" },
         { kSettingsAppSwitcherGridEnabled, "App Switcher Grid", "applies the selected deck/grid layout and fluid-animation preset to SpringBoard's live switcher settings" },
         { kSettingsGravityLiteEnabled, "Gravity Lite", "gives every Home Screen page an isolated live-icon gravity, collision, bounce, and motion-steering simulation" },
@@ -9317,12 +9455,13 @@ static void settings_run_actions_internal(BOOL pendingOnly)
             BOOL runGravityLite = settings_enabled_tweak_should_run(d, kSettingsGravityLiteEnabled, springBoardPendingOnly);
             BOOL runQuickLoader = settings_enabled_tweak_should_run(d, kSettingsQuickLoaderEnabled, springBoardPendingOnly);
             BOOL runRepoTweaks = settings_enabled_tweak_should_run(d, kSettingsRepoTweaksEnabled, springBoardPendingOnly);
+            BOOL runMagsafe = settings_enabled_tweak_should_run(d, kSettingsMagsafeEnabled, springBoardPendingOnly);
             BOOL stagePausesThemerLive = settings_themer_dynamic_updates_blocked_by_stage(d);
             if (stagePausesThemerLive) {
                 settings_note_themer_stage_conflict(YES);
             }
             BOOL cleanupDisabledSpringBoardTweaks = settings_disabled_applied_springboard_cleanup_needed(d);
-            BOOL needsSpringBoardWork = runSBC || runDarkTweaks || runStatBar || runNSBar || runNiceBarLite || runRSSI || runAxonLite || runGravityLite || runLayoutExtras || runTypeBanner || runNotificationIsland || runVelvet || runCleanNC || runUnderTime || runZeppelinLite || runCleanHomeScreen || runRealCC || runCleanCC || runFUGap || runModuleSpacing || runSugarCane || runBetterCCXI || runMagma || runBetterCCIcons || runCCNoPlatterDim || runCCStatus || runHapticCC || runSecureCC || runHideLabels || runFakeClockUp || runPancake || runCylinderLite || runBarmoji || runRoundedIcons || runWatchLayout || runAppLibraryStudio || runLockCustomizer || runLockScreenOverlay || runFreePlacement || runBlurryBadges || runSnapper || runPullOver || runAlkaline || runTweakLoader || runAppSwitcherGrid || runThemer || runSnowBoardLite || runLiveWP || runStageStrip || runFastLockXLite || runQuickLoader || runRepoTweaks || cleanupDisabledSpringBoardTweaks;
+            BOOL needsSpringBoardWork = runSBC || runDarkTweaks || runStatBar || runNSBar || runNiceBarLite || runRSSI || runAxonLite || runGravityLite || runLayoutExtras || runTypeBanner || runNotificationIsland || runVelvet || runCleanNC || runUnderTime || runZeppelinLite || runCleanHomeScreen || runRealCC || runCleanCC || runFUGap || runModuleSpacing || runSugarCane || runBetterCCXI || runMagma || runBetterCCIcons || runCCNoPlatterDim || runCCStatus || runHapticCC || runSecureCC || runHideLabels || runFakeClockUp || runPancake || runCylinderLite || runBarmoji || runRoundedIcons || runWatchLayout || runAppLibraryStudio || runLockCustomizer || runLockScreenOverlay || runFreePlacement || runBlurryBadges || runSnapper || runPullOver || runAlkaline || runTweakLoader || runAppSwitcherGrid || runThemer || runSnowBoardLite || runLiveWP || runStageStrip || runFastLockXLite || runQuickLoader || runRepoTweaks || runMagsafe || cleanupDisabledSpringBoardTweaks;
             BOOL runSandboxEscape = [d boolForKey:kSettingsRunSandboxEscape] && (!pendingOnly || needsSpringBoardWork);
             // TypeBanner prewarms its hidden SpringBoard window during Apply
             // and reuses the open SpringBoard session for text-only updates.
@@ -9392,6 +9531,7 @@ static void settings_run_actions_internal(BOOL pendingOnly)
             if (runFastLockXLite) total++;
             if (runQuickLoader) total++;
             if (runRepoTweaks) total++;
+            if (runMagsafe) total++;
             if (cleanupDisabledSpringBoardTweaks) total++;
             NSUInteger step = 0;
             BOOL startStageStripControlLoopAfterInstall = NO;
@@ -9451,6 +9591,7 @@ static void settings_run_actions_internal(BOOL pendingOnly)
             if (runStageStrip) [enabledTweaks addObject:@"stagestrip"];
             if (runQuickLoader) [enabledTweaks addObject:@"quickloader"];
             if (runRepoTweaks) [enabledTweaks addObject:@"repotweaks"];
+            if (runMagsafe) [enabledTweaks addObject:@"magsafe-enabler"];
             if (cleanupDisabledSpringBoardTweaks) [enabledTweaks addObject:@"cleanup"];
             if (forceSpringBoardRefresh) [enabledTweaks addObject:@"springboard-refresh"];
             log_user("[PLAN] %lu stages: %s\n",
@@ -10104,6 +10245,17 @@ static void settings_run_actions_internal(BOOL pendingOnly)
                         cyanide_upload_log_milestone(ok ? @"pullover-applied" : @"pullover-failed");
                     }
 
+                    if (runMagsafe) {
+                        settings_progress(&step, total, "Arming MagSafe charging overlay");
+                        settings_log_split_tweak_config(kSettingsMagsafeEnabled, d, "RUN");
+                        bool ok = settings_magsafe_show_for_current_battery_locked(d, "apply-run");
+                        settings_mark_tweak_applied(kSettingsMagsafeEnabled,
+                                                    ok && [d boolForKey:kSettingsMagsafeEnabled]);
+                        log_user("%s MagSafe Enabler %s.\n", ok ? "[OK]" : "[WAIT]",
+                                 ok ? "armed; overlay synchronized with the current battery state" : "could not arm the session overlay");
+                        cyanide_upload_log_milestone(ok ? @"magsafe-applied" : @"magsafe-waiting");
+                    }
+
                     if (runAlkaline) {
                         settings_progress(&step, total, "Applying Alkaline");
                         settings_log_split_tweak_config(kSettingsAlkalineEnabled, d, "RUN");
@@ -10402,6 +10554,7 @@ typedef NS_ENUM(NSInteger, SettingsSection) {
     SectionAppLibraryStudio,
     SectionAMFIBypass,
     SectionLockScreenOverlay,
+    SectionMagsafe,
     SectionCount,
 };
 
@@ -12014,6 +12167,40 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
     ];
 }
 
+- (NSArray<NSDictionary *> *)magsafeRows
+{
+    return @[
+        @{ @"kind": @"toggle", @"key": kSettingsMagsafeEnabled,
+           @"title": @"Enable MagSafe Enabler" },
+        @{ @"kind": @"slider", @"key": kSettingsMagsafeSize,
+           @"title": @"Ring size", @"min": @150, @"max": @280,
+           @"step": @2, @"default": @200, @"unit": @"pt" },
+        @{ @"kind": @"slider", @"key": kSettingsMagsafeYPosition,
+           @"title": @"Vertical position", @"min": @80, @"max": @620,
+           @"step": @5, @"default": @300, @"unit": @"pt" },
+        @{ @"kind": @"slider", @"key": kSettingsMagsafeRingWidth,
+           @"title": @"Ring thickness", @"min": @4, @"max": @26,
+           @"step": @1, @"default": @12, @"unit": @"pt" },
+        @{ @"kind": @"slider", @"key": kSettingsMagsafeAnimationDurationMs,
+           @"title": @"Animation duration", @"min": @350, @"max": @3000,
+           @"step": @50, @"default": @1200, @"unit": @"ms" },
+        @{ @"kind": @"slider", @"key": kSettingsMagsafeDisplaySeconds,
+           @"title": @"Visible duration", @"min": @2, @"max": @10,
+           @"step": @1, @"default": @5, @"unit": @"sec" },
+        @{ @"kind": @"slider", @"key": kSettingsMagsafeBackgroundAlphaPct,
+           @"title": @"Background opacity", @"min": @20, @"max": @100,
+           @"step": @1, @"default": @82, @"unit": @"%" },
+        @{ @"kind": @"stepper", @"key": kSettingsMagsafeAccentStyle,
+           @"title": @"Accent (0 auto, 1 cyan, 2 violet, 3 orange)",
+           @"min": @0, @"max": @3, @"default": @0 },
+        @{ @"kind": @"info", @"title": @"Charging trigger",
+           @"subtitle": @"Shows whenever iOS reports charging or full. Public iOS APIs do not identify whether the source is MagSafe, Qi, or a cable, so all charger types use the animation." },
+        @{ @"kind": @"info", @"title": @"Session-safe overlay",
+           @"subtitle": @"Creates one owned, touch-through SpringBoard window. It does not scan private windows, hide stock views, or leave persistent layout changes." },
+        @{ @"kind": @"button", @"title": @"View Detailed Activity Log", @"action": @"view-log" },
+    ];
+}
+
 - (void)updateSearchResultsForSearchController:(UISearchController *)searchController
 {
     NSString *query = [searchController.searchBar.text stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet] ?: @"";
@@ -12602,6 +12789,15 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
         [out addObject:@{@"title": @"Tray", @"value": [NSString stringWithFormat:@"%ldpt wide / %ldpt max",
                                                        (long)[d integerForKey:kSettingsPullOverWidth],
                                                        (long)[d integerForKey:kSettingsPullOverMaxHeight]]}];
+    } else if (section == SectionMagsafe) {
+        BOOL intent = [d boolForKey:kSettingsMagsafeEnabled];
+        BOOL applied = settings_tweak_is_applied(kSettingsMagsafeEnabled);
+        [out addObject:@{@"title": @"MagSafe Enabler",
+                         @"value": applied ? @"Armed" : (intent ? @"Queued" : @"Off")}];
+        [out addObject:@{@"title": @"Ring",
+                         @"value": [NSString stringWithFormat:@"%ldpt / %lds",
+                                    (long)[d integerForKey:kSettingsMagsafeSize],
+                                    (long)[d integerForKey:kSettingsMagsafeDisplaySeconds]]}];
     } else if (section == SectionAlkaline) {
         BOOL intent = [d boolForKey:kSettingsAlkalineEnabled];
         BOOL applied = settings_tweak_is_applied(kSettingsAlkalineEnabled);
@@ -12715,6 +12911,7 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
         case SectionAppLibraryStudio: return cyanide_experimental_tweaks_available() ? self.appLibraryStudioRows : @[];
         case SectionAMFIBypass: return self.amfiBypassRows;
         case SectionLockScreenOverlay: return self.lockScreenOverlayRows;
+        case SectionMagsafe: return self.magsafeRows;
         default: return @[];
     }
 }
@@ -12762,6 +12959,7 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
         @{ @"title": @"Watch Layout", @"icon": @"circle.grid.3x3.fill", @"color": [UIColor systemGreenColor], @"section": @(SectionWatchLayout) },
         @{ @"title": @"Lock Screen Customizer", @"icon": @"lock.rectangle", @"color": [UIColor systemIndigoColor], @"section": @(SectionLockCustomizer), @"experimental": @YES },
         @{ @"title": @"Lock Screen Overlay", @"icon": @"sparkles.rectangle.stack.fill", @"color": [UIColor systemCyanColor], @"section": @(SectionLockScreenOverlay), @"experimental": @YES },
+        @{ @"title": @"MagSafe Enabler", @"icon": @"battery.100.bolt", @"color": [UIColor systemGreenColor], @"section": @(SectionMagsafe), @"experimental": @YES },
     ];
 }
 
@@ -12847,7 +13045,7 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
             case SectionStageStrip:
                 destination = RootSectionMultitasking; break;
             case SectionThemer: case SectionSnowBoardLite: case SectionLiveWP:
-            case SectionBarmoji:
+            case SectionBarmoji: case SectionMagsafe:
                 destination = RootSectionThemesAndVisuals; break;
             case SectionPowercuff: case SectionDarkSwordTweaks: case SectionDragCoefficient:
             case SectionNanoRegistry: case SectionCallRecordingSound: case SectionHideHomeBar:
@@ -13089,6 +13287,9 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
     }
     if (s == SectionLockScreenOverlay) {
         return @"Independent Watch Layout-style Cover Sheet overlay. It builds a glass clock panel first, verifies attachment, and only then hides matched stock clock controls. The time is refreshed by infern0's visual loop; cleanup removes the overlay and restores every saved hidden state. The engine uses no remote VM or struct-return reads.";
+    }
+    if (s == SectionMagsafe) {
+        return @"Displays a configurable animated battery ring in one owned, touch-through SpringBoard window whenever iOS reports charging. It never scans private windows or modifies stock views. Cable, Qi, and MagSafe all trigger it because public battery APIs do not expose the charger type.";
     }
     if (s == SectionFreePlacement) {
         return @"Applies a configurable staggered offset pattern to every discovered live Home Screen icon. Icons remain pressable and saved stock frames are restored on uninstall; per-icon dragging is not included yet.";
