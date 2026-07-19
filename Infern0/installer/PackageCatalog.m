@@ -168,6 +168,7 @@ static const NSInteger kSecAppLibraryStudio = 62;
 static const NSInteger kSecAMFIBypass       = 63;
 static const NSInteger kSecLockScreenOverlay = 64;
 static const NSInteger kSecMagsafe          = 65;
+static const NSInteger kSecUpsideDown       = 66;
 static const NSInteger kSecDarkSwordTweaks  = 13;
 
 + (NSArray<Package *> *)allPackages
@@ -876,6 +877,20 @@ static const NSInteger kSecDarkSwordTweaks  = 13;
         magsafe.settingsSection = kSecMagsafe;
         magsafe.unstableWarning = @"Session overlay: infern0 must remain alive to observe later charger changes. iOS public battery APIs cannot distinguish MagSafe, Qi, and cable charging, so every charging source triggers it.";
 
+        Package *upsideDown = [[Package alloc] initWithIdentifier:@"com.darksword.upsidedown"
+                                           name:@"Upside Down"
+                               shortDescription:@"Allow upside-down portrait on Home and Lock Screen"
+                                longDescription:@"Community port of lara/Banana's Upside Down implementation from hxhlb/cyanide. It allows SpringBoard's Home Screen and Lock Screen to rotate into upside-down portrait while Rotation Lock is disabled. infern0 preflights all five private orientation methods before changing anything, stores and verifies every exact original implementation, checks every replacement, and rolls the entire transaction back if a single target fails. Disable or Clean Up restores stock behavior with per-target activity logs; a respring is the final fallback. No system files are written."
+                                        version:version
+                                         author:@"lara / Banana + hxhlb + infern0"
+                                       category:@"SpringBoard"
+                                     symbolName:@"arrow.up.and.down.circle.fill"
+                                           kind:PackageInstallKindToggle
+                                     enabledKey:kSettingsUpsideDownEnabled
+                                          isNew:YES];
+        upsideDown.settingsSection = kSecUpsideDown;
+        upsideDown.unstableWarning = @"Experimental session patch: private SpringBoard orientation methods vary by iOS build. The implementation fails closed or rolls back on mismatch, but incorrect rotation or a SpringBoard respring remains possible.";
+
         Package *freePlacement = [[Package alloc] initWithIdentifier:@"com.darksword.freeplacementlite"
                                            name:@"Free Placement Lite"
                                shortDescription:@"Configurable free-form icon offsets"
@@ -1175,6 +1190,7 @@ static const NSInteger kSecDarkSwordTweaks  = 13;
             lockCustomizer,
             lockScreenOverlay,
             magsafe,
+            upsideDown,
             freePlacement,
             appLibraryStudio,
             blurryBadges,
@@ -1229,6 +1245,7 @@ static const NSInteger kSecDarkSwordTweaks  = 13;
             @"com.darksword.lockscreenoverlay",
             @"com.darksword.vestalite",
             @"com.darksword.magsafe",
+            @"com.darksword.upsidedown",
         ]];
         list = [list filteredArrayUsingPredicate:[NSPredicate predicateWithBlock:^BOOL(Package *package, NSDictionary *bindings) {
             (void)bindings;

@@ -1185,6 +1185,7 @@ NSString * const kSettingsQuickLoaderEnabled = @"QuickLoaderEnabled";
 NSString * const kSettingsRepoTweaksEnabled = @"RepoTweaksEnabled";
 
 NSString * const kSettingsMagsafeEnabled = @"MagsafeEnabled";
+NSString * const kSettingsUpsideDownEnabled = @"UpsideDownEnabled";
 static NSString * const kSettingsMagsafeSize = @"MagsafeSize";
 static NSString * const kSettingsMagsafeYPosition = @"MagsafeYPosition";
 static NSString * const kSettingsMagsafeRingWidth = @"MagsafeRingWidth";
@@ -1754,6 +1755,15 @@ static bool settings_stop_magsafe_registered(BOOL springboardWillDie)
     return magsafe_enabler_stop_in_session();
 }
 
+static bool settings_stop_upsidedown_registered(BOOL springboardWillDie)
+{
+    if (springboardWillDie) {
+        upsidedown_forget_remote_state();
+        return true;
+    }
+    return upsidedown_stop_in_session();
+}
+
 static void settings_each_springboard_cleanup_entry(void (^block)(const SettingsSpringBoardTweakCleanupEntry *entry))
 {
     if (!block) return;
@@ -1811,6 +1821,7 @@ static void settings_each_springboard_cleanup_entry(void (^block)(const Settings
         { kSettingsQuickLoaderEnabled, "QuickLoader", NULL, settings_stop_quickloader_registered, NULL, NULL, YES, YES },
         { kSettingsRepoTweaksEnabled, "RepoTweaks", NULL, settings_stop_repotweaks_registered, NULL, NULL, YES, YES },
         { kSettingsMagsafeEnabled, "MagSafe Enabler", NULL, settings_stop_magsafe_registered, magsafe_enabler_forget_remote_state, NULL, YES, YES },
+        { kSettingsUpsideDownEnabled, "Upside Down", NULL, settings_stop_upsidedown_registered, upsidedown_forget_remote_state, NULL, YES, YES },
         { nil, "Kill All Apps", NULL, NULL, killallapps_forget_remote_state, NULL, NO, NO },
     };
     size_t count = sizeof(entries) / sizeof(entries[0]);
@@ -7188,6 +7199,7 @@ static NSString *settings_split_tweak_master_key_for_key(NSString *key)
         [key isEqualToString:kSettingsMagsafeDisplaySeconds] ||
         [key isEqualToString:kSettingsMagsafeBackgroundAlphaPct] ||
         [key isEqualToString:kSettingsMagsafeAccentStyle]) return kSettingsMagsafeEnabled;
+    if ([key isEqualToString:kSettingsUpsideDownEnabled]) return kSettingsUpsideDownEnabled;
     return nil;
 }
 
@@ -8428,6 +8440,12 @@ static void settings_schedule_live_apply_for_key(NSString *key)
                         }
                         settings_mark_tweak_applied(kSettingsMagsafeEnabled,
                                                     ok && [d boolForKey:kSettingsMagsafeEnabled]);
+                    } else if ([masterKey isEqualToString:kSettingsUpsideDownEnabled]) {
+                        ok = [d boolForKey:kSettingsUpsideDownEnabled]
+                            ? upsidedown_apply_in_session()
+                            : upsidedown_stop_in_session();
+                        settings_mark_tweak_applied(kSettingsUpsideDownEnabled,
+                                                    ok && [d boolForKey:kSettingsUpsideDownEnabled]);
                     }
                     printf("[SETTINGS] live split tweak %s owner=%s result=%d\n", key.UTF8String, masterKey.UTF8String, ok);
                 }
@@ -9180,6 +9198,7 @@ void settings_register_defaults(void)
         kSettingsMagsafeDisplaySeconds: @5,
         kSettingsMagsafeBackgroundAlphaPct: @82,
         kSettingsMagsafeAccentStyle: @0,
+        kSettingsUpsideDownEnabled: @NO,
 
         kSettingsExperimentalTweaksEnabled: @YES,
 
@@ -9232,6 +9251,7 @@ void settings_register_defaults(void)
             kSettingsAlkalineEnabled,
             kSettingsTweakLoaderEnabled,
             kSettingsMagsafeEnabled,
+            kSettingsUpsideDownEnabled,
         ];
         for (NSString *key in privateKeys) {
             if ([defaults boolForKey:key]) {
@@ -9308,6 +9328,7 @@ static void settings_log_tweak_plan_details(NSUserDefaults *d, BOOL pendingOnly)
         { kSettingsSnapperEnabled, "Snapper", "shows the configured crop-frame overlay" },
         { kSettingsPullOverEnabled, "Vesta Lite", "shows a right-edge handle that opens the app drawer" },
         { kSettingsMagsafeEnabled, "MagSafe Enabler", "creates a touch-through charging ring and reacts to battery-state changes" },
+        { kSettingsUpsideDownEnabled, "Upside Down", "patches five SpringBoard orientation methods transactionally for upside-down portrait" },
         { kSettingsAlkalineEnabled, "Alkaline", "tints visible battery views with the configured color" },
         { kSettingsAppSwitcherGridEnabled, "App Switcher Grid", "applies the selected deck/grid layout and fluid-animation preset to SpringBoard's live switcher settings" },
         { kSettingsGravityLiteEnabled, "Gravity Lite", "gives every Home Screen page an isolated live-icon gravity, collision, bounce, and motion-steering simulation" },
@@ -9456,12 +9477,13 @@ static void settings_run_actions_internal(BOOL pendingOnly)
             BOOL runQuickLoader = settings_enabled_tweak_should_run(d, kSettingsQuickLoaderEnabled, springBoardPendingOnly);
             BOOL runRepoTweaks = settings_enabled_tweak_should_run(d, kSettingsRepoTweaksEnabled, springBoardPendingOnly);
             BOOL runMagsafe = settings_enabled_tweak_should_run(d, kSettingsMagsafeEnabled, springBoardPendingOnly);
+            BOOL runUpsideDown = settings_enabled_tweak_should_run(d, kSettingsUpsideDownEnabled, springBoardPendingOnly);
             BOOL stagePausesThemerLive = settings_themer_dynamic_updates_blocked_by_stage(d);
             if (stagePausesThemerLive) {
                 settings_note_themer_stage_conflict(YES);
             }
             BOOL cleanupDisabledSpringBoardTweaks = settings_disabled_applied_springboard_cleanup_needed(d);
-            BOOL needsSpringBoardWork = runSBC || runDarkTweaks || runStatBar || runNSBar || runNiceBarLite || runRSSI || runAxonLite || runGravityLite || runLayoutExtras || runTypeBanner || runNotificationIsland || runVelvet || runCleanNC || runUnderTime || runZeppelinLite || runCleanHomeScreen || runRealCC || runCleanCC || runFUGap || runModuleSpacing || runSugarCane || runBetterCCXI || runMagma || runBetterCCIcons || runCCNoPlatterDim || runCCStatus || runHapticCC || runSecureCC || runHideLabels || runFakeClockUp || runPancake || runCylinderLite || runBarmoji || runRoundedIcons || runWatchLayout || runAppLibraryStudio || runLockCustomizer || runLockScreenOverlay || runFreePlacement || runBlurryBadges || runSnapper || runPullOver || runAlkaline || runTweakLoader || runAppSwitcherGrid || runThemer || runSnowBoardLite || runLiveWP || runStageStrip || runFastLockXLite || runQuickLoader || runRepoTweaks || runMagsafe || cleanupDisabledSpringBoardTweaks;
+            BOOL needsSpringBoardWork = runSBC || runDarkTweaks || runStatBar || runNSBar || runNiceBarLite || runRSSI || runAxonLite || runGravityLite || runLayoutExtras || runTypeBanner || runNotificationIsland || runVelvet || runCleanNC || runUnderTime || runZeppelinLite || runCleanHomeScreen || runRealCC || runCleanCC || runFUGap || runModuleSpacing || runSugarCane || runBetterCCXI || runMagma || runBetterCCIcons || runCCNoPlatterDim || runCCStatus || runHapticCC || runSecureCC || runHideLabels || runFakeClockUp || runPancake || runCylinderLite || runBarmoji || runRoundedIcons || runWatchLayout || runAppLibraryStudio || runLockCustomizer || runLockScreenOverlay || runFreePlacement || runBlurryBadges || runSnapper || runPullOver || runAlkaline || runTweakLoader || runAppSwitcherGrid || runThemer || runSnowBoardLite || runLiveWP || runStageStrip || runFastLockXLite || runQuickLoader || runRepoTweaks || runMagsafe || runUpsideDown || cleanupDisabledSpringBoardTweaks;
             BOOL runSandboxEscape = [d boolForKey:kSettingsRunSandboxEscape] && (!pendingOnly || needsSpringBoardWork);
             // TypeBanner prewarms its hidden SpringBoard window during Apply
             // and reuses the open SpringBoard session for text-only updates.
@@ -9532,6 +9554,7 @@ static void settings_run_actions_internal(BOOL pendingOnly)
             if (runQuickLoader) total++;
             if (runRepoTweaks) total++;
             if (runMagsafe) total++;
+            if (runUpsideDown) total++;
             if (cleanupDisabledSpringBoardTweaks) total++;
             NSUInteger step = 0;
             BOOL startStageStripControlLoopAfterInstall = NO;
@@ -9592,6 +9615,7 @@ static void settings_run_actions_internal(BOOL pendingOnly)
             if (runQuickLoader) [enabledTweaks addObject:@"quickloader"];
             if (runRepoTweaks) [enabledTweaks addObject:@"repotweaks"];
             if (runMagsafe) [enabledTweaks addObject:@"magsafe-enabler"];
+            if (runUpsideDown) [enabledTweaks addObject:@"upside-down"];
             if (cleanupDisabledSpringBoardTweaks) [enabledTweaks addObject:@"cleanup"];
             if (forceSpringBoardRefresh) [enabledTweaks addObject:@"springboard-refresh"];
             log_user("[PLAN] %lu stages: %s\n",
@@ -10256,6 +10280,17 @@ static void settings_run_actions_internal(BOOL pendingOnly)
                         cyanide_upload_log_milestone(ok ? @"magsafe-applied" : @"magsafe-waiting");
                     }
 
+                    if (runUpsideDown) {
+                        settings_progress(&step, total, "Enabling upside-down portrait rotation");
+                        bool ok = upsidedown_apply_in_session();
+                        settings_mark_tweak_applied(kSettingsUpsideDownEnabled,
+                                                    ok && [d boolForKey:kSettingsUpsideDownEnabled]);
+                        log_user("%s Upside Down %s. Rotation Lock must be off.\n",
+                                 ok ? "[OK]" : "[WARN]",
+                                 ok ? "transaction committed across all five targets" : "failed closed or rolled back");
+                        cyanide_upload_log_milestone(ok ? @"upside-down-applied" : @"upside-down-failed");
+                    }
+
                     if (runAlkaline) {
                         settings_progress(&step, total, "Applying Alkaline");
                         settings_log_split_tweak_config(kSettingsAlkalineEnabled, d, "RUN");
@@ -10555,6 +10590,7 @@ typedef NS_ENUM(NSInteger, SettingsSection) {
     SectionAMFIBypass,
     SectionLockScreenOverlay,
     SectionMagsafe,
+    SectionUpsideDown,
     SectionCount,
 };
 
@@ -12201,6 +12237,21 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
     ];
 }
 
+- (NSArray<NSDictionary *> *)upsideDownRows
+{
+    return @[
+        @{ @"kind": @"toggle", @"key": kSettingsUpsideDownEnabled,
+           @"title": @"Enable Upside Down" },
+        @{ @"kind": @"info", @"title": @"Rotation Lock must be off",
+           @"subtitle": @"Allows the Home Screen and Lock Screen to enter upside-down portrait orientation. Turn off Rotation Lock in Control Center before testing." },
+        @{ @"kind": @"info", @"title": @"Transactional runtime patch",
+           @"subtitle": @"All five SpringBoard targets are preflighted before anything changes. Every original method is saved and verified; a partial failure immediately rolls back all changed targets." },
+        @{ @"kind": @"info", @"title": @"Session only",
+           @"subtitle": @"Disable or Clean Up restores the exact original methods. A respring is the fallback and always returns stock orientation behavior." },
+        @{ @"kind": @"button", @"title": @"View Detailed Activity Log", @"action": @"view-log" },
+    ];
+}
+
 - (void)updateSearchResultsForSearchController:(UISearchController *)searchController
 {
     NSString *query = [searchController.searchBar.text stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet] ?: @"";
@@ -12798,6 +12849,12 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
                          @"value": [NSString stringWithFormat:@"%ldpt / %lds",
                                     (long)[d integerForKey:kSettingsMagsafeSize],
                                     (long)[d integerForKey:kSettingsMagsafeDisplaySeconds]]}];
+    } else if (section == SectionUpsideDown) {
+        BOOL intent = [d boolForKey:kSettingsUpsideDownEnabled];
+        BOOL applied = settings_tweak_is_applied(kSettingsUpsideDownEnabled);
+        [out addObject:@{@"title": @"Upside Down",
+                         @"value": applied ? @"Active" : (intent ? @"Queued" : @"Off")}];
+        [out addObject:@{@"title": @"Scope", @"value": @"Home + Lock Screen"}];
     } else if (section == SectionAlkaline) {
         BOOL intent = [d boolForKey:kSettingsAlkalineEnabled];
         BOOL applied = settings_tweak_is_applied(kSettingsAlkalineEnabled);
@@ -12912,6 +12969,7 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
         case SectionAMFIBypass: return self.amfiBypassRows;
         case SectionLockScreenOverlay: return self.lockScreenOverlayRows;
         case SectionMagsafe: return self.magsafeRows;
+        case SectionUpsideDown: return self.upsideDownRows;
         default: return @[];
     }
 }
@@ -12960,6 +13018,7 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
         @{ @"title": @"Lock Screen Customizer", @"icon": @"lock.rectangle", @"color": [UIColor systemIndigoColor], @"section": @(SectionLockCustomizer), @"experimental": @YES },
         @{ @"title": @"Lock Screen Overlay", @"icon": @"sparkles.rectangle.stack.fill", @"color": [UIColor systemCyanColor], @"section": @(SectionLockScreenOverlay), @"experimental": @YES },
         @{ @"title": @"MagSafe Enabler", @"icon": @"battery.100.bolt", @"color": [UIColor systemGreenColor], @"section": @(SectionMagsafe), @"experimental": @YES },
+        @{ @"title": @"Upside Down", @"icon": @"arrow.up.and.down.circle.fill", @"color": [UIColor systemBlueColor], @"section": @(SectionUpsideDown), @"experimental": @YES },
     ];
 }
 
@@ -13047,7 +13106,7 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
             case SectionThemer: case SectionSnowBoardLite: case SectionLiveWP:
             case SectionBarmoji: case SectionMagsafe:
                 destination = RootSectionThemesAndVisuals; break;
-            case SectionPowercuff: case SectionDarkSwordTweaks: case SectionDragCoefficient:
+            case SectionPowercuff: case SectionDarkSwordTweaks: case SectionDragCoefficient: case SectionUpsideDown:
             case SectionNanoRegistry: case SectionCallRecordingSound: case SectionHideHomeBar:
             case SectionAMFIBypass:
                 destination = RootSectionSystem; break;
@@ -13290,6 +13349,9 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
     }
     if (s == SectionMagsafe) {
         return @"Displays a configurable animated battery ring in one owned, touch-through SpringBoard window whenever iOS reports charging. It never scans private windows or modifies stock views. Cable, Qi, and MagSafe all trigger it because public battery APIs do not expose the charger type.";
+    }
+    if (s == SectionUpsideDown) {
+        return @"Allows upside-down portrait on the Home Screen and Lock Screen when Rotation Lock is off. The five-method SpringBoard patch is preflighted and committed transactionally; Disable or Clean Up restores exact originals, and respring is the fallback.";
     }
     if (s == SectionFreePlacement) {
         return @"Applies a configurable staggered offset pattern to every discovered live Home Screen icon. Icons remain pressable and saved stock frames are restored on uninstall; per-icon dragging is not included yet.";
