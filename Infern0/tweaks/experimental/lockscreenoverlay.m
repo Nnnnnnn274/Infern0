@@ -198,8 +198,6 @@ static void lso_update_text(void)
     lso_set_text(s_time_label, [time stringFromDate:now]);
     lso_set_text(s_date_label, [[date stringFromDate:now] uppercaseString]);
     lso_set_text(s_status_label, @"INFERN0  •  LOCKED & LOADED");
-    [time release];
-    [date release];
 }
 
 static bool lso_already_hidden(uint64_t view)
