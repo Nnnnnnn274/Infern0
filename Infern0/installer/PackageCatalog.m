@@ -915,10 +915,10 @@ static const NSInteger kSecDarkSwordTweaks  = 13;
         snapper.settingsSection = kSecSnapper;
         snapper.unstableWarning = @"Session implementation: pinned captures live in SpringBoard memory and disappear on cleanup, respring, or reboot.";
 
-        Package *pullOver = [[Package alloc] initWithIdentifier:@"com.darksword.pullover"
-                                           name:@"PullOver"
-                               shortDescription:@"Live-icon slide-over launcher"
-                                longDescription:@"Adds a configurable slide-over launcher populated with live SpringBoard icon views. Borrowed icons stay pressable and are returned to their exact original parents and frames during reapply or cleanup. If no eligible icons are visible, the tray remains available and reports the fallback in the detailed log."
+        Package *pullOver = [[Package alloc] initWithIdentifier:@"com.darksword.vestalite"
+                                           name:@"Vesta Lite"
+                               shortDescription:@"Fast right-edge app drawer"
+                                longDescription:@"Community port of Vesta's gesture-driven app drawer. A compact right-edge handle opens a configurable, scrollable grid of installed third-party app icons. Every tile launches through a retained background action so SpringBoard remains responsive. Vesta never relocates stock Home Screen icons, performs no class-name VM scans, and cleanup removes only its own drawer and handle. Detailed logs cover catalog filtering, icon rendering, actions, geometry, and restore results."
                                         version:version
                                          author:@"Nnnnnnn274"
                                        category:@"SpringBoard"
@@ -927,7 +927,7 @@ static const NSInteger kSecDarkSwordTweaks  = 13;
                                      enabledKey:kSettingsPullOverEnabled
                                           isNew:YES];
         pullOver.settingsSection = kSecPullOver;
-        pullOver.unstableWarning = @"Session launcher: this safely hosts live icons, not arbitrary third-party app scenes. Use Dynamic Stage for floating application scenes.";
+        pullOver.unstableWarning = @"Session overlay: the drawer disappears after a respring or reboot and is recreated when infern0 applies enabled tweaks again.";
 
         Package *alkaline = [[Package alloc] initWithIdentifier:@"com.darksword.alkaline"
                                            name:@"Alkaline"
@@ -1211,6 +1211,7 @@ static const NSInteger kSecDarkSwordTweaks  = 13;
             @"com.darksword.watchlayout",
             @"com.darksword.lockcustomizer",
             @"com.darksword.lockscreenoverlay",
+            @"com.darksword.vestalite",
         ]];
         list = [list filteredArrayUsingPredicate:[NSPredicate predicateWithBlock:^BOOL(Package *package, NSDictionary *bindings) {
             (void)bindings;

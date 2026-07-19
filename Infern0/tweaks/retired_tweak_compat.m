@@ -77,10 +77,6 @@ __attribute__((used)) uintptr_t pancake_apply_in_session() { return 0; }
 __attribute__((used)) uintptr_t pancake_configure() { return 0; }
 __attribute__((used)) uintptr_t pancake_forget_remote_state() { return 0; }
 __attribute__((used)) uintptr_t pancake_stop_in_session() { return 0; }
-__attribute__((used)) uintptr_t pullover_apply_in_session() { return 0; }
-__attribute__((used)) uintptr_t pullover_configure() { return 0; }
-__attribute__((used)) uintptr_t pullover_forget_remote_state() { return 0; }
-__attribute__((used)) uintptr_t pullover_stop_in_session() { return 0; }
 __attribute__((used)) uintptr_t realcc_apply() { return 0; }
 __attribute__((used)) uintptr_t realcc_restore() { return 0; }
 __attribute__((used)) uintptr_t securecc_apply_in_session() { return 0; }

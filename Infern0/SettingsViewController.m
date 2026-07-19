@@ -1787,7 +1787,7 @@ static void settings_each_springboard_cleanup_entry(void (^block)(const Settings
         { kSettingsFreePlacementEnabled, "Free Placement Lite", NULL, settings_stop_freeplacement_registered, freeplacement_forget_remote_state, NULL, YES, YES },
         { kSettingsBlurryBadgesEnabled, "BlurryBadges", NULL, settings_stop_blurrybadges_registered, blurrybadges_forget_remote_state, NULL, YES, YES },
         { kSettingsSnapperEnabled, "Snapper", NULL, settings_stop_snapper_registered, snapper_forget_remote_state, NULL, YES, YES },
-        { kSettingsPullOverEnabled, "PullOver", NULL, settings_stop_pullover_registered, pullover_forget_remote_state, NULL, YES, YES },
+        { kSettingsPullOverEnabled, "Vesta Lite", NULL, settings_stop_pullover_registered, pullover_forget_remote_state, NULL, YES, YES },
         { kSettingsAlkalineEnabled, "Alkaline", NULL, settings_stop_alkaline_registered, alkaline_forget_remote_state, NULL, YES, YES },
         { kSettingsTweakLoaderEnabled, "TweakLoader", NULL, settings_stop_tweakloader_registered, tweakloader_forget_remote_state, NULL, YES, YES },
         { kSettingsQuickLoaderEnabled, "QuickLoader", NULL, settings_stop_quickloader_registered, NULL, NULL, YES, YES },
@@ -6912,7 +6912,7 @@ static void settings_log_split_tweak_config(NSString *masterKey, NSUserDefaults 
                  (long)[d integerForKey:kSettingsSnapperBorderWidth],
                  (long)[d integerForKey:kSettingsSnapperCornerRadius]);
     } else if ([masterKey isEqualToString:kSettingsPullOverEnabled]) {
-        log_user("[%s] PullOver config: width=%ld y=%ld maxH=%ld radius=%ld alpha=%ld%%.\n", tag,
+        log_user("[%s] Vesta Lite config: trigger=right-edge-tap width=%ld y=%ld maxH=%ld radius=%ld alpha=%ld%% appCap=36.\n", tag,
                  (long)[d integerForKey:kSettingsPullOverWidth],
                  (long)[d integerForKey:kSettingsPullOverYOffset],
                  (long)[d integerForKey:kSettingsPullOverMaxHeight],
@@ -8984,11 +8984,11 @@ void settings_register_defaults(void)
         kSettingsSnapperBorderWidth: @2,
         kSettingsSnapperCornerRadius: @12,
         kSettingsPullOverEnabled: @NO,
-        kSettingsPullOverWidth: @76,
-        kSettingsPullOverYOffset: @130,
-        kSettingsPullOverMaxHeight: @420,
-        kSettingsPullOverCornerRadius: @20,
-        kSettingsPullOverBackgroundAlphaPct: @88,
+        kSettingsPullOverWidth: @300,
+        kSettingsPullOverYOffset: @110,
+        kSettingsPullOverMaxHeight: @480,
+        kSettingsPullOverCornerRadius: @24,
+        kSettingsPullOverBackgroundAlphaPct: @90,
         kSettingsAlkalineEnabled: @NO,
         kSettingsAlkalineRed: @43,
         kSettingsAlkalineGreen: @219,
@@ -9169,7 +9169,7 @@ static void settings_log_tweak_plan_details(NSUserDefaults *d, BOOL pendingOnly)
         { kSettingsFreePlacementEnabled, "Free Placement Lite", "offsets live Home Screen icons with a reversible staggered layout" },
         { kSettingsBlurryBadgesEnabled, "BlurryBadges", "tints visible notification badges with the configured color" },
         { kSettingsSnapperEnabled, "Snapper", "shows the configured crop-frame overlay" },
-        { kSettingsPullOverEnabled, "PullOver", "shows the configured slide-over tray shell" },
+        { kSettingsPullOverEnabled, "Vesta Lite", "shows a right-edge handle that opens the app drawer" },
         { kSettingsAlkalineEnabled, "Alkaline", "tints visible battery views with the configured color" },
         { kSettingsAppSwitcherGridEnabled, "App Switcher Grid", "applies the selected deck/grid layout and fluid-animation preset to SpringBoard's live switcher settings" },
         { kSettingsGravityLiteEnabled, "Gravity Lite", "gives every Home Screen page an isolated live-icon gravity, collision, bounce, and motion-steering simulation" },
@@ -10095,12 +10095,12 @@ static void settings_run_actions_internal(BOOL pendingOnly)
                     }
 
                     if (runPullOver) {
-                        settings_progress(&step, total, "Applying PullOver");
+                        settings_progress(&step, total, "Applying Vesta Lite");
                         settings_log_split_tweak_config(kSettingsPullOverEnabled, d, "RUN");
                         bool ok = pullover_apply_in_session();
                         settings_mark_tweak_applied(kSettingsPullOverEnabled, ok && [d boolForKey:kSettingsPullOverEnabled]);
-                        printf("[SETTINGS] PullOver result=%d\n", ok);
-                        log_user("%s PullOver %s.\n", ok ? "[OK]" : "[WARN]", ok ? "tray active" : "did not start cleanly");
+                        printf("[SETTINGS] Vesta Lite result=%d\n", ok);
+                        log_user("%s Vesta Lite %s.\n", ok ? "[OK]" : "[WARN]", ok ? "drawer handle active" : "did not start cleanly");
                         cyanide_upload_log_milestone(ok ? @"pullover-applied" : @"pullover-failed");
                     }
 
@@ -11978,12 +11978,12 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
 - (NSArray<NSDictionary *> *)pulloverRows
 {
     return @[
-        @{ @"kind": @"toggle", @"key": kSettingsPullOverEnabled, @"title": @"Enable PullOver" },
-        @{ @"kind": @"slider", @"key": kSettingsPullOverWidth, @"title": @"Tray width", @"min": @52, @"max": @140, @"step": @2, @"default": @76, @"unit": @"pt" },
-        @{ @"kind": @"slider", @"key": kSettingsPullOverYOffset, @"title": @"Tray Y position", @"min": @40, @"max": @300, @"step": @5, @"default": @130, @"unit": @"pt" },
-        @{ @"kind": @"slider", @"key": kSettingsPullOverMaxHeight, @"title": @"Max height", @"min": @220, @"max": @720, @"step": @10, @"default": @420, @"unit": @"pt" },
+        @{ @"kind": @"toggle", @"key": kSettingsPullOverEnabled, @"title": @"Enable Vesta Lite" },
+        @{ @"kind": @"slider", @"key": kSettingsPullOverWidth, @"title": @"Drawer width", @"min": @240, @"max": @380, @"step": @5, @"default": @300, @"unit": @"pt" },
+        @{ @"kind": @"slider", @"key": kSettingsPullOverYOffset, @"title": @"Drawer top position", @"min": @40, @"max": @300, @"step": @5, @"default": @110, @"unit": @"pt" },
+        @{ @"kind": @"slider", @"key": kSettingsPullOverMaxHeight, @"title": @"Drawer height", @"min": @260, @"max": @720, @"step": @10, @"default": @480, @"unit": @"pt" },
         @{ @"kind": @"slider", @"key": kSettingsPullOverCornerRadius, @"title": @"Corner radius", @"min": @0, @"max": @40, @"step": @1, @"default": @20, @"unit": @"pt" },
-        @{ @"kind": @"slider", @"key": kSettingsPullOverBackgroundAlphaPct, @"title": @"Background alpha", @"min": @20, @"max": @100, @"step": @1, @"default": @88, @"unit": @"%" },
+        @{ @"kind": @"slider", @"key": kSettingsPullOverBackgroundAlphaPct, @"title": @"Background opacity", @"min": @30, @"max": @100, @"step": @1, @"default": @90, @"unit": @"%" },
     ];
 }
 
@@ -12597,7 +12597,7 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
     } else if (section == SectionPullOver) {
         BOOL intent = [d boolForKey:kSettingsPullOverEnabled];
         BOOL applied = settings_tweak_is_applied(kSettingsPullOverEnabled);
-        [out addObject:@{@"title": @"PullOver",
+        [out addObject:@{@"title": @"Vesta Lite",
                          @"value": applied ? @"Active" : (intent ? @"Queued" : @"Off")}];
         [out addObject:@{@"title": @"Tray", @"value": [NSString stringWithFormat:@"%ldpt wide / %ldpt max",
                                                        (long)[d integerForKey:kSettingsPullOverWidth],
@@ -13103,7 +13103,7 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
         return @"Selects, captures, and pins up to eight touch-through SpringBoard regions. Capture and Clear actions are available above the geometry controls.";
     }
     if (s == SectionPullOver) {
-        return @"Hosts pressable live icon views in a slide-over launcher and restores each icon to its exact original list and frame during cleanup.";
+        return @"Community-requested Vesta app drawer. Tap the red right-edge handle to open a scrollable grid of installed apps, then tap X to close it. Launch actions run off SpringBoard's main thread; stock Home Screen icons are never moved or rewritten.";
     }
     if (s == SectionAlkaline) {
         return @"Applies an Alkaline-style tint pass to visible battery views.";
