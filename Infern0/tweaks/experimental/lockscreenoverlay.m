@@ -9,6 +9,7 @@
 #import "../../LogTextView.h"
 
 #import <Foundation/Foundation.h>
+#import <UIKit/UIKit.h>
 #import <stdio.h>
 #import <string.h>
 
@@ -16,7 +17,7 @@ typedef struct { double x, y, width, height; } LSOFrame;
 
 typedef struct {
     uint64_t view;
-    double originalAlpha;
+    bool originalHidden;
 } LSOHiddenView;
 
 enum {
@@ -53,27 +54,11 @@ static uint64_t lso_safe_msg(uint64_t object, const char *selector,
     return r_msg2_main(object, selector, a0, a1, a2, a3);
 }
 
-static bool lso_get_frame(uint64_t object, const char *selector, LSOFrame *out)
-{
-    if (!r_is_objc_ptr(object) || !out || !r_responds_main(object, selector)) return false;
-    memset(out, 0, sizeof(*out));
-    return r_msg2_main_struct_ret(object, selector, out, sizeof(*out),
-                                  NULL, 0, NULL, 0, NULL, 0, NULL, 0);
-}
-
 static void lso_set_frame(uint64_t object, LSOFrame frame)
 {
     if (!r_is_objc_ptr(object) || !r_responds_main(object, "setFrame:")) return;
     r_msg2_main_raw(object, "setFrame:", &frame, sizeof(frame),
                     NULL, 0, NULL, 0, NULL, 0);
-}
-
-static bool lso_get_alpha(uint64_t object, double *out)
-{
-    if (!out || !r_is_objc_ptr(object) || !r_responds_main(object, "alpha")) return false;
-    *out = 1.0;
-    return r_msg2_main_struct_ret(object, "alpha", out, sizeof(*out),
-                                  NULL, 0, NULL, 0, NULL, 0, NULL, 0);
 }
 
 static void lso_set_double(uint64_t object, const char *selector, double value)
@@ -122,8 +107,7 @@ static bool lso_window_visible(uint64_t window)
     if (!r_is_objc_ptr(window)) return false;
     if (r_responds_main(window, "isHidden") &&
         (r_msg2_main(window, "isHidden", 0, 0, 0, 0) & 0xff)) return false;
-    double alpha = 1.0;
-    return !r_responds_main(window, "alpha") || (lso_get_alpha(window, &alpha) && alpha > 0.01);
+    return true;
 }
 
 static uint64_t lso_find_window(bool *visible)
@@ -210,11 +194,11 @@ static bool lso_already_hidden(uint64_t view)
 static void lso_hide_stock_view(uint64_t view)
 {
     if (!r_is_objc_ptr(view) || s_hidden_count >= LSO_MAX_HIDDEN || lso_already_hidden(view)) return;
-    double alpha = 1.0;
-    if (!lso_get_alpha(view, &alpha)) return;
+    if (!r_responds_main(view, "isHidden") || !r_responds_main(view, "setHidden:")) return;
+    bool hidden = (r_msg2_main(view, "isHidden", 0, 0, 0, 0) & 0xff) != 0;
     r_msg2_main(view, "retain", 0, 0, 0, 0);
-    s_hidden[s_hidden_count++] = (LSOHiddenView){ .view = view, .originalAlpha = alpha };
-    lso_set_double(view, "setAlpha:", 0.0);
+    s_hidden[s_hidden_count++] = (LSOHiddenView){ .view = view, .originalHidden = hidden };
+    r_msg2_main(view, "setHidden:", 1, 0, 0, 0);
 }
 
 static void lso_scan_and_hide(uint64_t view, int depth, bool lockContext, int *visited)
@@ -250,7 +234,8 @@ static void lso_release_hidden(bool restore)
 {
     for (int i = 0; i < s_hidden_count; i++) {
         if (!r_is_objc_ptr(s_hidden[i].view)) continue;
-        if (restore) lso_set_double(s_hidden[i].view, "setAlpha:", s_hidden[i].originalAlpha);
+        if (restore)
+            r_msg2_main(s_hidden[i].view, "setHidden:", s_hidden[i].originalHidden ? 1 : 0, 0, 0, 0);
         r_msg2_main(s_hidden[i].view, "release", 0, 0, 0, 0);
     }
     memset(s_hidden, 0, sizeof(s_hidden));
@@ -297,7 +282,7 @@ bool lockscreenoverlay_stop_in_session(void)
     s_overlay = s_time_label = s_date_label = s_status_label = s_host_window = 0;
     s_active = false;
     s_config_dirty = true;
-    log_user("[LOCKOVERLAY][RESTORE] overlayRemoved=%d stockViewsRestored=%d result=%s.\n",
+    log_user("[LOCKOVERLAY][RESTORE] overlayRemoved=%d stockHiddenStatesRestored=%d result=%s.\n",
              removed, restored, (removed || restored > 0) ? "success" : "already-stock");
     return true;
 }
@@ -327,9 +312,9 @@ bool lockscreenoverlay_apply_in_session(void)
     log_user("[LOCKOVERLAY][1/4] Locating a class-verified Cover Sheet window...\n");
     bool visible = false;
     uint64_t host = lso_find_window(&visible);
-    LSOFrame bounds = {0};
-    if (!r_is_objc_ptr(host) || !lso_get_frame(host, "bounds", &bounds) ||
-        bounds.width < 200.0 || bounds.height < 300.0) {
+    CGRect localBounds = UIScreen.mainScreen.bounds;
+    LSOFrame bounds = { 0, 0, localBounds.size.width, localBounds.size.height };
+    if (!r_is_objc_ptr(host) || bounds.width < 200.0 || bounds.height < 300.0) {
         log_user("[LOCKOVERLAY][WAIT] Cover Sheet host is unavailable; stock Lock Screen was left untouched.\n");
         return false;
     }
@@ -449,7 +434,7 @@ bool lockscreenoverlay_apply_in_session(void)
     s_host_window = host;
     s_active = true;
     s_config_dirty = false;
-    log_user("[LOCKOVERLAY][4/4] active=1 presentation=%s overlay=0x%llx host=0x%llx visited=%d hiddenStockViews=%d touches=passthrough nativeBlur=%d dimensions=%.0fx%.0f.\n",
+    log_user("[LOCKOVERLAY][4/4] active=1 presentation=%s overlay=0x%llx host=0x%llx visited=%d hiddenStockViews=%d touches=passthrough nativeBlur=%d dimensions=%.0fx%.0f vmReads=0.\n",
              visible ? "visible" : "prearmed-hidden", s_overlay, host, visited,
              s_hidden_count, r_is_objc_ptr(blurView), width, height);
     return true;

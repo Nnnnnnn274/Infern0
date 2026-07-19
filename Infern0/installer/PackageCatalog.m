@@ -850,7 +850,7 @@ static const NSInteger kSecDarkSwordTweaks  = 13;
         Package *lockScreenOverlay = [[Package alloc] initWithIdentifier:@"com.darksword.lockscreenoverlay"
                                            name:@"Lock Screen Overlay"
                                shortDescription:@"Replace the stock clock area with a glass infern0 overlay"
-                                longDescription:@"A standalone, noninteractive Cover Sheet overlay built with the same retained-overlay architecture as Watch Layout. It presents a large locale-aware clock, date, infern0 status line, configurable glass panel, and cyan, violet, red, or gold accents. The overlay must attach successfully before the stock clock, quick actions, or page dots are hidden. Cleanup removes the overlay and restores every captured stock alpha exactly. Notifications and media controls remain native and usable."
+                                longDescription:@"A standalone, noninteractive Cover Sheet overlay built with the same retained-overlay architecture as Watch Layout. It presents a large locale-aware clock, date, infern0 status line, configurable glass panel, and cyan, violet, red, or gold accents. The overlay must attach successfully before the stock clock, quick actions, or page dots are hidden. Cleanup removes the overlay and restores every captured stock hidden state exactly. Notifications and media controls remain native and usable."
                                         version:version
                                          author:@"Nnnnnnn274"
                                        category:@"Lock Screen"

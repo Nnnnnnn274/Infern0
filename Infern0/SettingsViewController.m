@@ -13088,7 +13088,7 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
         return @"Resizes and repositions the live Lock Screen clock and optionally hides quick actions or page dots. Changes are session-based, logged, and restored on uninstall.";
     }
     if (s == SectionLockScreenOverlay) {
-        return @"Independent Watch Layout-style Cover Sheet overlay. It builds a glass clock panel first, verifies attachment, and only then hides matched stock clock controls. The time is refreshed by infern0's visual loop; cleanup removes the overlay and restores every saved alpha.";
+        return @"Independent Watch Layout-style Cover Sheet overlay. It builds a glass clock panel first, verifies attachment, and only then hides matched stock clock controls. The time is refreshed by infern0's visual loop; cleanup removes the overlay and restores every saved hidden state. The engine uses no remote VM or struct-return reads.";
     }
     if (s == SectionFreePlacement) {
         return @"Applies a configurable staggered offset pattern to every discovered live Home Screen icon. Icons remain pressable and saved stock frames are restored on uninstall; per-icon dragging is not included yet.";
