@@ -4,6 +4,7 @@
 #include <dirent.h>
 #include <curl/curl.h>
 #include <cjson/cJSON.h>
+#include "fonts.h"
 
 #define FONTREPOS "fontrepos"
 
