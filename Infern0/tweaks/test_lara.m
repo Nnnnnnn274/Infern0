@@ -1,6 +1,7 @@
 #import <UIKit/UIKit.h>
-#include "../../utils/lara/sbx.h"
+#include "../../utils/lara/pe/sbx.h"
 #include "../../utils/lara/utils.h"
+#include "../../utils/lara/pe/vfs.h"
 
 @interface MainViewController : UIViewController
 @end
