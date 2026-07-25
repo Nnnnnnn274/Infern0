@@ -3,6 +3,8 @@
 #include "ds_bridge.h"
 #include "../kexploit/offsets.h"
 #include "../XPF/src/xpf.h"
+#include "../kexploit/kutils.h"
+#include "../kexploit/kexploit_opa334.h"
 #import <Foundation/Foundation.h>
 
 uint64_t pac_mask = 0;
@@ -51,6 +53,24 @@ void ds_kwrite(uint64_t address, void *buffer, uint64_t size) {
 uint64_t ds_get_our_proc() {
     uint64_t proc = proc_self();
     return proc;
+}
+
+uint64_t ds_get_our_task() {
+    uint64_t task = task_self();
+    return task;
+}
+
+uint64_t ds_kreadptr(uint64_t va) {
+    uint64_t res = kread_ptr(va);
+    return res;
+}
+
+uint64_t ds_get_kernel_base() {
+    return g_kernel_base;
+}
+
+uint64_t ds_get_kernel_slide() {
+    return g_kernel_slide;
 }
 
 static void refreshpacmask(void) {

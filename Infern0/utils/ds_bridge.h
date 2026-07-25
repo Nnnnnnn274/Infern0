@@ -14,6 +14,11 @@ void ds_kwrite16(uint64_t addr, uint16_t val);
 void ds_kwrite8(uint64_t what, uint8_t val);
 void ds_kread(uint64_t address, void *buffer, uint64_t size);
 void ds_kwrite(uint64_t address, void *buffer, uint64_t size);
+uint64_t ds_get_our_proc();
+uint64_t ds_get_our_task();
+uint64_t ds_get_kernel_base();
+uint64_t ds_get_kernel_slide();
+uint64_t ds_kreadptr(uint64_t va);
 static void refreshpacmask(void);
 
 #endif
