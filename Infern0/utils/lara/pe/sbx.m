@@ -20,8 +20,8 @@
 #include <mach/machine.h>
 
 #include "sbx.h"
-#include "utils.h"
-#include "darksword.h"
+#include "../utils.h"
+#include "../darksword.h"
 
 #define MAC_SYS_SANDBOX_EXTENSION_ISSUE 461
 
