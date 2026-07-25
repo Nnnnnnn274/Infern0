@@ -67,7 +67,7 @@ uint64_t proc_find_by_name(const char* name);
 uint64_t proc_self(void);
 uint64_t task_self(void);
 
-int crashproc(const char* name);
+int crashproc(const char* pid);
 
 #ifdef __cplusplus
 }

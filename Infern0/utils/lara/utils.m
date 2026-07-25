@@ -6,11 +6,10 @@
 //
 
 #import "utils.h"
-#import "../ds_bridge.h"
-#import "../../XPF/src/xpf.h"
-#import "../../kexploit/offsets.h"
-#import "../../kexploit/xpaci.h"
-#import "sbx.h"
+#import "darksword.h"
+#import "xpf.h"
+#import "offsets.h"
+#import "xpaci.h"
 
 #import <Foundation/Foundation.h>
 #import <mach/mach.h>
@@ -854,4 +853,3 @@ int crashproc(const char* name) {
     ds_kwrite64(state + offsetof(struct arm_saved_state64, sp), 0x1337133713371337);
     return 0;
 }
-      
