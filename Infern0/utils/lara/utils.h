@@ -68,7 +68,6 @@ uint64_t proc_self(void);
 uint64_t task_self(void);
 
 int crashproc(const char* name);
-void roooot(void);
 
 #ifdef __cplusplus
 }
