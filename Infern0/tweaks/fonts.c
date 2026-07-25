@@ -172,3 +172,82 @@ int readrepos(void)
     return 0;
 }
 
+int downloadfont(const char *fontname)
+{
+    DIR *dir = opendir(FONTREPOS);
+    if (dir == NULL)
+        return 1;
+
+    struct dirent *entry;
+
+    while ((entry = readdir(dir)) != NULL) {
+
+        if (entry->d_name[0] == '.')
+            continue;
+
+        char path[512];
+        snprintf(path, sizeof(path),
+                 "%s/%s", FONTREPOS, entry->d_name);
+
+        FILE *fp = fopen(path, "rb");
+        if (fp == NULL)
+            continue;
+
+        fseek(fp, 0, SEEK_END);
+        long size = ftell(fp);
+        rewind(fp);
+
+        char *buffer = malloc(size + 1);
+        if (buffer == NULL) {
+            fclose(fp);
+            continue;
+        }
+
+        fread(buffer, 1, size, fp);
+        buffer[size] = '\0';
+        fclose(fp);
+
+        cJSON *root = cJSON_Parse(buffer);
+        free(buffer);
+
+        if (root == NULL)
+            continue;
+
+        cJSON *fonts = cJSON_GetObjectItem(root, "fonts");
+
+        if (cJSON_IsArray(fonts)) {
+
+            int count = cJSON_GetArraySize(fonts);
+
+            for (int i = 0; i < count; i++) {
+
+                cJSON *font = cJSON_GetArrayItem(fonts, i);
+
+                cJSON *name = cJSON_GetObjectItem(font, "name");
+                cJSON *url  = cJSON_GetObjectItem(font, "url");
+
+                if (!cJSON_IsString(name) || !cJSON_IsString(url))
+                    continue;
+
+                if (strcmp(name->valuestring, fontname) == 0) {
+
+                    int result = downloadfont(
+                        url->valuestring,
+                        name->valuestring
+                    );
+
+                    cJSON_Delete(root);
+                    closedir(dir);
+
+                    return result;
+                }
+            }
+        }
+
+        cJSON_Delete(root);
+    }
+
+    closedir(dir);
+
+    return 1;
+}
