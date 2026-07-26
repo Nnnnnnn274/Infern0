@@ -384,7 +384,7 @@ private struct LaraSettingsView: View {
                     Link("Main developer: rooootdev", destination: URL(string: "https://github.com/rooootdev")!)
                 }
 
-                Section("Kernelcache Offset Grabber") {
+                Section {
                     Text(manager.offsetStatus)
                     if manager.resolvingOffsets {
                         ProgressView(value: manager.offsetProgress)
@@ -403,6 +403,8 @@ private struct LaraSettingsView: View {
                         manager.clearKernelcacheOffsets()
                     }
                     .disabled(manager.resolvingOffsets || !manager.offsetsReady)
+                } header: {
+                    Text("Kernelcache Offset Grabber")
                 } footer: {
                     Text("This uses Lara's current kernelcache resolver and bundled libgrabkernel2. The exploit stage uses Infern0's shared, non-crashing KRW bridge; it is acquired once and reused by VFS and Fonts.")
                 }
