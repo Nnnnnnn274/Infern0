@@ -27,9 +27,9 @@
 #import "exc.h"
 #import "pac.h"
 #import "thread.h"
-#import "offsets.h"
-#import "darksword.h"
-#import "utils.h"
+#import "../offsets.h"
+#import "../darksword.h"
+#import "../utils.h"
 
 extern int proc_name(int pid, void *buffer, uint32_t buffersize);
 extern int proc_pidpath(int pid, void *buffer, uint32_t buffersize);
