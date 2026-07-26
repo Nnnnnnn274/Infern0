@@ -208,12 +208,17 @@ static void rc_current_process_identity(char kernelName[64], char hostName[64], 
     hostName[0] = '\0';
     guestName[0] = '\0';
 
-    if (proc_name(getpid(), kernelName, 64) <= 0) {
+    typedef int (*rc_proc_name_fn)(int, void *, uint32_t);
+    typedef int (*rc_proc_pidpath_fn)(int, void *, uint32_t);
+    rc_proc_name_fn procName = (rc_proc_name_fn)dlsym(RTLD_DEFAULT, "proc_name");
+    rc_proc_pidpath_fn procPidPath = (rc_proc_pidpath_fn)dlsym(RTLD_DEFAULT, "proc_pidpath");
+
+    if (!procName || procName(getpid(), kernelName, 64) <= 0) {
         kernelName[0] = '\0';
     }
 
     char hostPath[PROC_PIDPATHINFO_MAXSIZE] = {0};
-    if (proc_pidpath(getpid(), hostPath, sizeof(hostPath)) > 0) {
+    if (procPidPath && procPidPath(getpid(), hostPath, sizeof(hostPath)) > 0) {
         const char *hostBase = strrchr(hostPath, '/');
         hostBase = hostBase ? hostBase + 1 : hostPath;
         if (hostBase && hostBase[0]) {
