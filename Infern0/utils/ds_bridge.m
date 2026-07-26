@@ -8,9 +8,6 @@
 #include "../kexploit/lara_compat.h"
 #import <Foundation/Foundation.h>
 
-uint64_t pac_mask = 0;
-uint64_t t1sz_boot = xpf_gett1szboot();
-
 uint64_t ds_kread64(uint64_t address) {
     return kread64(address);
 }
@@ -47,16 +44,20 @@ void ds_kread(uint64_t address, void *buffer, uint64_t size) {
     kread(address, buffer, size);
 }
 
+void ds_kreadbuf(uint64_t address, void *buffer, uint64_t size) {
+    kread(address, buffer, size);
+}
+
 void ds_kwrite(uint64_t address, void *buffer, uint64_t size) {
     kwrite(address, buffer, size);
 }
 
-uint64_t ds_get_our_proc() {
+uint64_t ds_get_our_proc(void) {
     uint64_t proc = proc_self();
     return proc;
 }
 
-uint64_t ds_get_our_task() {
+uint64_t ds_get_our_task(void) {
     uint64_t task = task_self();
     return task;
 }
@@ -66,26 +67,20 @@ uint64_t ds_kreadptr(uint64_t va) {
     return res;
 }
 
-uint64_t ds_get_kernel_base() {
+uint64_t ds_kreadsmrptr(uint64_t va) {
+    return kread_smrptr(va);
+}
+
+uint64_t ds_kallocarrdec(uint64_t pointer) {
+    return kalloc_array_decode(pointer);
+}
+
+uint64_t ds_get_kernel_base(void) {
     return g_kernel_base;
 }
 
-uint64_t ds_get_kernel_slide() {
+uint64_t ds_get_kernel_slide(void) {
     return g_kernel_slide;
-}
-
-static void refreshpacmask(void) {
-    if (t1sz_boot == 0) {
-        pac_mask = 0;
-        return;
-    }
-
-    if (t1sz_boot >= 64) {
-        pac_mask = 0;
-        return;
-    }
-
-    pac_mask = ~((1ULL << (64 - t1sz_boot)) - 1ULL);
 }
 
 cpu_subtype_t get_hw_cpufamily(void) {
@@ -95,17 +90,16 @@ cpu_subtype_t get_hw_cpufamily(void) {
     return cpuFamily;
 }
 
-bool ds_is_ready() {
+bool ds_is_ready(void) {
     bool result = infern0_lara_krw_ready();
     return result;
 }
 
-int lara_offsets_init() {
-    int res = offsets_init();
-    return res;
+void lara_offsets_init(void) {
+    offsets_init();
 }
 
-int ds_run() {
+int ds_run(void) {
     int res = kexploit_opa334();
     return res;
 }

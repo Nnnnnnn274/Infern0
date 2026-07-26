@@ -310,7 +310,7 @@ static uint64_t checkprocforpid(uint64_t candidate, pid_t pid, const char *src, 
 }
 
 uint64_t procbypid(pid_t targetpid) {
-    if (!kernel_base) {
+    if (!ds_get_kernel_base()) {
         printf("(utils) darksword not ready\n");
         return 0;
     }
@@ -362,13 +362,13 @@ uint64_t procbypid(pid_t targetpid) {
 }
 
 uint64_t ourproc(void) {
-    uint64_t proc = procbyname(Infern0);
-    if (islcruntime() || proc != NULL) {
-        if (proc != NULL) {
+    uint64_t proc = procbyname("Infern0");
+    if (islcruntime() || proc != 0) {
+        if (proc != 0) {
             return proc;
         } 
-        proc = procbyname(LiveContainer);
-        if (proc != NULL) {
+        proc = procbyname("LiveContainer");
+        if (proc != 0) {
             return proc;
         }
     }
