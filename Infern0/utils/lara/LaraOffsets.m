@@ -13,6 +13,7 @@
 #import <sys/sysctl.h>
 #import <dlfcn.h>
 
+#import "./offsets.h"
 #import "xpf.h"
 #import "libgrabkernel2.h"
 #import "utils.h"
