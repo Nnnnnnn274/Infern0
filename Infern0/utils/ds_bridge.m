@@ -7,6 +7,7 @@
 #include "../kexploit/kexploit_opa334.h"
 #include "../kexploit/lara_compat.h"
 #import <Foundation/Foundation.h>
+#include <sys/sysctl.h>
 
 uint64_t ds_kread64(uint64_t address) {
     return kread64(address);
@@ -41,15 +42,15 @@ void ds_kwrite8(uint64_t what, uint8_t val) {
 }
 
 void ds_kread(uint64_t address, void *buffer, uint64_t size) {
-    kread(address, buffer, size);
+    kreadbuf(address, buffer, size);
 }
 
 void ds_kreadbuf(uint64_t address, void *buffer, uint64_t size) {
-    kread(address, buffer, size);
+    kreadbuf(address, buffer, size);
 }
 
 void ds_kwrite(uint64_t address, void *buffer, uint64_t size) {
-    kwrite(address, buffer, size);
+    kwritebuf(address, buffer, size);
 }
 
 uint64_t ds_get_our_proc(void) {
