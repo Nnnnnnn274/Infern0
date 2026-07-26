@@ -21,5 +21,8 @@ uint64_t ds_get_kernel_slide(void);
 uint64_t ds_kreadptr(uint64_t va);
 static void refreshpacmask(void);
 cpu_subtype_t get_hw_cpufamily(void);
+bool ds_is_ready();
+int lara_offsets_init();
+int ds_run();
 
 #endif

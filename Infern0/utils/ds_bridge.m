@@ -1,10 +1,11 @@
 #include <stdio.h>
-#include "kexploit/krw.h"
+#include "../kexploit/krw.h"
 #include "ds_bridge.h"
 #include "../kexploit/offsets.h"
 #include "../XPF/src/xpf.h"
 #include "../kexploit/kutils.h"
 #include "../kexploit/kexploit_opa334.h"
+#include "../kexploit/lara_compat.h"
 #import <Foundation/Foundation.h>
 
 uint64_t pac_mask = 0;
@@ -92,4 +93,19 @@ cpu_subtype_t get_hw_cpufamily(void) {
     size_t cpuFamilySize = sizeof(cpuFamily);
     sysctlbyname("hw.cpufamily", &cpuFamily, &cpuFamilySize, NULL, 0);
     return cpuFamily;
+}
+
+bool ds_is_ready() {
+    bool result = infern0_lara_krw_ready();
+    return result;
+}
+
+int lara_offsets_init() {
+    int res = offsets_init();
+    return res;
+}
+
+int ds_run() {
+    int res = kexploit_opa334();
+    return res;
 }
