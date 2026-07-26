@@ -58,12 +58,34 @@ final class laramgr: ObservableObject {
     @Published var initializing = false
     @Published var progress = 0.0
     @Published var status = "VFS has not been initialized."
+    @Published var runningExploit = false
+    @Published var exploitProgress = 0.0
+    @Published var exploitStatus = "The selected kernel backend has not been run."
     @Published var resolvingOffsets = false
     @Published var offsetsReady = false
     @Published var offsetProgress = 0.0
     @Published var offsetStatus = "Kernelcache offsets have not been checked."
 
     private init() {
+        ds_set_log_callback { messagePointer in
+            guard let messagePointer else { return }
+            let message = String(cString: messagePointer)
+            DispatchQueue.main.async {
+                globallogger.log("(ds) \(message)")
+            }
+        }
+        ds_set_progress_callback { value in
+            DispatchQueue.main.async {
+                let manager = laramgr.shared
+                if manager.runningExploit {
+                    manager.exploitProgress = max(manager.exploitProgress, value)
+                } else if manager.resolvingOffsets {
+                    manager.offsetProgress = max(manager.offsetProgress, value * 0.40)
+                } else if manager.initializing {
+                    manager.progress = max(manager.progress, value * 0.50)
+                }
+            }
+        }
         refresh()
     }
 
@@ -82,14 +104,63 @@ final class laramgr: ObservableObject {
         refresh()
     }
 
+    func runSelectedExploit() {
+        guard !runningExploit, !resolvingOffsets, !initializing else {
+            globallogger.log("Exploit request ignored because another kernel operation is running.")
+            return
+        }
+
+        runningExploit = true
+        exploitProgress = 0
+        let backend = configureSelectedLaraBackend()
+        exploitStatus = "Preparing \(backend.rawValue) kernel backend..."
+        globallogger.log("Preparing standalone \(backend.rawValue) exploit run.")
+
+        DispatchQueue.global(qos: .userInitiated).async {
+            // Lara performs both initializers before its Run Exploit action.
+            lara_init_offsets()
+            lara_offsets_init()
+
+            let result = ds_is_ready() ? 0 : ds_run()
+            let ready = result == 0 && ds_is_ready()
+            let base = ready ? ds_get_kernel_base() : 0
+            let ourProcess = ready ? ds_get_our_proc() : 0
+            let ourTask = ready ? ds_get_our_task() : 0
+            let valid = ready && base != 0 && ourProcess != 0 && ourTask != 0
+
+            DispatchQueue.main.async {
+                self.runningExploit = false
+                self.exploitProgress = 1
+                self.dsready = valid
+                self.exploitStatus = valid
+                    ? String(format: "%@ backend ready — base 0x%llx", backend.rawValue, base)
+                    : "\(backend.rawValue) backend stopped before exposing invalid kernel objects."
+                globallogger.log(valid
+                    ? String(format: "%@ exploit ready: base=0x%llx proc=0x%llx task=0x%llx",
+                             backend.rawValue, base, ourProcess, ourTask)
+                    : "\(backend.rawValue) exploit failed validation (result \(result)).")
+            }
+        }
+    }
+
     func resolveKernelcacheOffsets() {
-        guard !resolvingOffsets else { return }
+        guard !runningExploit, !resolvingOffsets, !initializing else {
+            globallogger.log("Exploit request ignored because another initialization is running.")
+            return
+        }
+        guard ds_is_ready() else {
+            offsetsReady = false
+            offsetStatus = "Run the selected exploit successfully before fetching offsets."
+            globallogger.log("Offset Grabber: no validated kernel backend is ready.")
+            return
+        }
         resolvingOffsets = true
         offsetProgress = 0.02
         offsetStatus = "Loading Lara's device offset profile..."
         globallogger.log("Offset Grabber: loading Lara device profile.")
 
         DispatchQueue.global(qos: .userInitiated).async {
+            lara_init_offsets()
             lara_offsets_init()
             let backend = configureSelectedLaraBackend()
 
@@ -158,7 +229,15 @@ final class laramgr: ObservableObject {
     }
 
     func initializeFullVFS() {
-        guard !initializing else { return }
+        guard !runningExploit, !initializing, !resolvingOffsets else {
+            globallogger.log("VFS request ignored because another exploit operation is running.")
+            return
+        }
+        let selectedBackend = configureSelectedLaraBackend()
+        if selectedBackend == .lara && !ds_is_ready() {
+            logmsg("Run and validate the Lara exploit in Lara Settings before initializing VFS.")
+            return
+        }
         if vfs_isready() {
             refresh()
             logmsg("VFS is already ready.")
@@ -172,6 +251,7 @@ final class laramgr: ObservableObject {
 
         DispatchQueue.global(qos: .userInitiated).async {
             let backend = configureSelectedLaraBackend()
+            lara_init_offsets()
             lara_offsets_init()
 
             DispatchQueue.main.async {
@@ -565,7 +645,7 @@ private struct LaraSettingsView: View {
                         }
                     }
                     .pickerStyle(.segmented)
-                    .disabled(manager.initializing || manager.resolvingOffsets || manager.vfsready)
+                    .disabled(manager.runningExploit || manager.initializing || manager.resolvingOffsets || manager.vfsready)
                     .onChange(of: exploitBackend) { _ in
                         manager.applySelectedExploitBackend()
                     }
@@ -576,6 +656,15 @@ private struct LaraSettingsView: View {
                     .pickerStyle(.segmented)
                     NavigationLink("Modify Offsets") {
                         LaraOffsetEditorView()
+                    }
+                    Button(manager.runningExploit ? "Running Exploit..." : "Run Selected Exploit") {
+                        manager.runSelectedExploit()
+                    }
+                    .disabled(manager.runningExploit || manager.resolvingOffsets || manager.initializing)
+                    Text(manager.exploitStatus)
+                        .font(.footnote)
+                    if manager.runningExploit {
+                        ProgressView(value: manager.exploitProgress)
                     }
                     Text(exploitBackend == .lara
                         ? "Native Lara Darksword will be used by offsets, VFS, sandbox, and Fonts."
@@ -589,10 +678,10 @@ private struct LaraSettingsView: View {
                     if manager.resolvingOffsets {
                         ProgressView(value: manager.offsetProgress)
                     }
-                    Button(manager.resolvingOffsets ? "Resolving..." : "Run Exploit Once & Get Offsets") {
+                    Button(manager.resolvingOffsets ? "Resolving..." : "Get / Verify Kernelcache Offsets") {
                         manager.resolveKernelcacheOffsets()
                     }
-                    .disabled(manager.resolvingOffsets)
+                    .disabled(!manager.dsready || manager.runningExploit || manager.resolvingOffsets || manager.initializing)
 
                     NavigationLink("View Resolved Offsets") {
                         LaraOffsetSnapshotView()

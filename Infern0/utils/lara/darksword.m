@@ -1373,9 +1373,10 @@ static int pe(void) {
 static bool g_lara_native_offsets_ready = false;
 static bool g_lara_native_running = false;
 static int g_ds_backend = 0;
+static pthread_mutex_t g_ds_run_lock = PTHREAD_MUTEX_INITIALIZER;
 
 static bool ds_uses_native_backend(void) {
-    return g_lara_native_running || (g_ds_backend == 1 && g_lara_native_offsets_ready);
+    return g_lara_native_running || g_ds_backend == 1;
 }
 
 void ds_set_backend(int backend) {
@@ -1388,8 +1389,14 @@ int ds_get_backend(void) {
 }
 
 int ds_run_lara_for_offsets(void) {
+    if (pthread_mutex_trylock(&g_ds_run_lock) != 0) {
+        pe_log("native Lara Darksword is already running");
+        return EBUSY;
+    }
+
     if (g_lara_native_offsets_ready) {
         pe_log("reusing native Lara Darksword offset session");
+        pthread_mutex_unlock(&g_ds_run_lock);
         return 0;
     }
 
@@ -1402,6 +1409,7 @@ int ds_run_lara_for_offsets(void) {
     default_file_content = calloc(1, target_file_size);
     if (!default_file_content) {
         pe_log("native Lara offset session allocation failed");
+        pthread_mutex_unlock(&g_ds_run_lock);
         return -1;
     }
     for (uint64_t i = 0; i < target_file_size; i += 8)
@@ -1420,7 +1428,12 @@ int ds_run_lara_for_offsets(void) {
     g_lara_native_running = true;
     int result = pe();
     g_lara_native_running = false;
-    g_lara_native_offsets_ready = result == 0 && g_ds_ready;
+    g_lara_native_offsets_ready =
+        result == 0 &&
+        g_ds_ready &&
+        kernel_base != 0 &&
+        our_proc != 0 &&
+        our_task != 0;
 
     if (previousStashValue) {
         [defaults setObject:previousStashValue forKey:@"stashKRW"];
@@ -1431,10 +1444,15 @@ int ds_run_lara_for_offsets(void) {
     free(default_file_content);
     default_file_content = NULL;
     if (!g_lara_native_offsets_ready) {
-        pe_log("native Lara Darksword offset session failed (result=%d)", result);
+        pe_log("native Lara Darksword session failed validation "
+               "(result=%d ready=%d base=0x%llx proc=0x%llx task=0x%llx)",
+               result, g_ds_ready, kernel_base, our_proc, our_task);
+        g_ds_ready = false;
+        pthread_mutex_unlock(&g_ds_run_lock);
         return result != 0 ? result : -1;
     }
     pe_log("native Lara Darksword offset session ready");
+    pthread_mutex_unlock(&g_ds_run_lock);
     return 0;
 }
 
