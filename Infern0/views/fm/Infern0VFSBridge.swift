@@ -76,15 +76,16 @@ final class laramgr: ObservableObject {
     func refresh() {
         dsready = ds_is_ready()
         vfsready = vfs_isready()
-        // Main's Lara VFS is the access primitive used by the restored frontend.
-        // Keep the legacy selectors usable without selecting a second backend.
-        sbxready = vfsready
-        if vfsready {
-            status = "Lara VFS is ready."
+        if vfsready && sbxready {
+            status = "Lara VFS and sandbox filesystem access are ready."
+        } else if vfsready {
+            status = "Lara VFS is ready. Enable sandbox access for SBX or Hybrid mode."
+        } else if sbxready {
+            status = "Sandbox access is ready. Initialize VFS for VFS or Hybrid mode."
         } else if dsready {
-            status = "Kernel session ready. Initialize VFS to browse or change files."
+            status = "Kernel session ready. Initialize VFS and sandbox access as needed."
         } else {
-            status = "Run the shared Lara session, then initialize VFS."
+            status = "Run the shared Lara session, then initialize filesystem access."
         }
     }
 
@@ -165,6 +166,49 @@ final class laramgr: ObservableObject {
                         ? "Lara VFS is ready for the file manager and font controls."
                         : "VFS initialization failed safely (result \(result))."
                 )
+            }
+        }
+    }
+
+    func initializeSandboxAccess() {
+        guard !initializing else {
+            logmsg("A Lara operation is already running.")
+            return
+        }
+        if sbxready {
+            logmsg("Sandbox filesystem access is already active for this app session.")
+            return
+        }
+
+        initializing = true
+        progress = 0.1
+        status = "Requesting a filesystem sandbox token..."
+        globallogger.log("Starting Infern0's existing SpringBoard sandbox-token flow.")
+
+        DispatchQueue.global(qos: .userInitiated).async {
+            lara_offsets_init()
+            let sessionReady = ds_is_ready() || (ds_run() == 0 && ds_is_ready())
+            guard sessionReady else {
+                DispatchQueue.main.async {
+                    self.initializing = false
+                    self.progress = 1
+                    self.sbxready = false
+                    self.status = "Kernel session failed; sandbox access was not attempted."
+                    globallogger.log(self.status)
+                }
+                return
+            }
+
+            let result = escape_sbx_demo2()
+            DispatchQueue.main.async {
+                self.initializing = false
+                self.progress = 1
+                self.sbxready = result == 0
+                self.refresh()
+                self.status = result == 0
+                    ? "Sandbox filesystem access is active until Infern0 exits."
+                    : "Sandbox access failed safely (result \(result)). Check the detailed log."
+                globallogger.log(self.status)
             }
         }
     }
@@ -273,6 +317,7 @@ private struct LaraStatusControls: View {
         Section {
             LabeledContent("Kernel Session", value: manager.dsready ? "Ready" : "Not Ready")
             LabeledContent("VFS", value: manager.vfsready ? "Ready" : "Not Ready")
+            LabeledContent("Sandbox Access", value: manager.sbxready ? "Ready" : "Not Ready")
             Text(manager.status)
                 .font(.footnote)
                 .foregroundStyle(.secondary)
@@ -287,6 +332,10 @@ private struct LaraStatusControls: View {
                 manager.vfsready ? manager.refresh() : manager.initializeFullVFS()
             }
             .disabled(manager.initializing)
+            Button(manager.sbxready ? "Sandbox Access Active" : "Enable Sandbox Filesystem Access") {
+                manager.initializeSandboxAccess()
+            }
+            .disabled(manager.initializing || manager.sbxready)
         } header: {
             Text("Runtime Controls")
         } footer: {
@@ -322,14 +371,34 @@ private struct LaraDetailedLog: View {
 @MainActor
 private struct Infern0VFSLauncher: View {
     @ObservedObject private var manager = laramgr.shared
+    @AppStorage("selectedMethod") private var selectedMethod: method = .hybrid
+
+    private var ready: Bool {
+        switch selectedMethod {
+        case .vfs:
+            return manager.vfsready
+        case .sbx:
+            return manager.sbxready
+        case .hybrid:
+            return manager.vfsready && manager.sbxready
+        }
+    }
 
     var body: some View {
         Group {
-            if manager.vfsready {
+            if ready {
                 SantanderView()
             } else {
                 NavigationStack {
                     List {
+                        Section("Access Mode") {
+                            Picker("Mode", selection: $selectedMethod) {
+                                ForEach(method.allCases, id: \.self) {
+                                    Text($0.rawValue).tag($0)
+                                }
+                            }
+                            .pickerStyle(.segmented)
+                        }
                         LaraStatusControls(manager: manager)
                         LaraDetailedLog()
                     }
@@ -407,7 +476,7 @@ private struct LaraSettingsView: View {
                 } header: {
                     Text("File Manager")
                 } footer: {
-                    Text("VFS, SBX, and Hybrid remain available as frontend layout modes. Main's existing Lara VFS supplies file access.")
+                    Text("VFS uses Lara's kernel-backed file operations. SBX uses Infern0's existing SpringBoard-issued sandbox token. Hybrid enables both.")
                 }
 
                 Section("Logging") {
