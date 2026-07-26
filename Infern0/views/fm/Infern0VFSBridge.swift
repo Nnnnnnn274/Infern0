@@ -63,17 +63,16 @@ final class laramgr: ObservableObject {
 
         initializing = true
         progress = 0.02
-        status = "Preparing Lara offsets..."
-        globallogger.log("Preparing Lara offsets.")
+        status = "Preparing Lara compatibility offsets..."
+        globallogger.log("Preparing Lara compatibility offsets.")
 
         DispatchQueue.global(qos: .userInitiated).async {
-            lara_init_offsets()
             lara_offsets_init()
 
             DispatchQueue.main.async {
                 self.progress = 0.12
-                self.status = "Running Lara's Darksword kernel session..."
-                globallogger.log("Running Darksword.")
+                self.status = "Starting Infern0's kernel session..."
+                globallogger.log("Lara Darksword is disabled; using Infern0 KRW.")
             }
 
             var exploitOK = ds_is_ready()
@@ -82,7 +81,7 @@ final class laramgr: ObservableObject {
             }
             guard exploitOK else {
                 DispatchQueue.main.async {
-                    self.finish(success: false, message: "Darksword failed; VFS was not started.")
+                    self.finish(success: false, message: "Infern0 kernel session failed safely; VFS was not started.")
                 }
                 return
             }
@@ -90,8 +89,8 @@ final class laramgr: ObservableObject {
             DispatchQueue.main.async {
                 self.dsready = true
                 self.progress = 0.55
-                self.status = "Resolving kernel offsets..."
-                globallogger.log("Darksword ready; resolving kernel offsets.")
+                self.status = "Resolving Lara VFS offsets..."
+                globallogger.log("Infern0 KRW ready; resolving Lara VFS offsets.")
             }
 
             var offsetsOK = lara_emergencyfixfunctiontobereplacedlateronquestionmark()

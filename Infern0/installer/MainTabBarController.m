@@ -8,6 +8,7 @@
 #import "QueueReviewViewController.h"
 #import "PackageQueue.h"
 #import "HomeViewController.h"
+#import "ToolsViewController.h"
 #import "CYIconBadge.h"
 #import "../SettingsViewController.h"
 
@@ -86,6 +87,21 @@ static const CGFloat kPopupPadding = 2.0;
                                                            image:[UIImage systemImageNamed:@"house.fill"]
                                                              tag:0];
         [controllers insertObject:homeNav atIndex:0];
+    }
+
+    BOOL hasTools = NO;
+    for (UIViewController *vc in controllers) {
+        if ([vc.tabBarItem.title isEqualToString:@"Tools"]) { hasTools = YES; break; }
+    }
+    if (!hasTools) {
+        ToolsViewController *tools = [[ToolsViewController alloc] initWithStyle:UITableViewStyleInsetGrouped];
+        UINavigationController *toolsNav = [[UINavigationController alloc] initWithRootViewController:tools];
+        toolsNav.tabBarItem = [[UITabBarItem alloc] initWithTitle:@"Tools"
+                                                            image:[UIImage systemImageNamed:@"wrench.and.screwdriver.fill"]
+                                                              tag:0];
+        NSUInteger packagesIndex = [controllers indexOfObject:packages];
+        NSUInteger insertionIndex = packagesIndex == NSNotFound ? MIN((NSUInteger)2, controllers.count) : packagesIndex + 1;
+        [controllers insertObject:toolsNav atIndex:insertionIndex];
     }
 
 

@@ -315,7 +315,12 @@ static UILabel *packages_stat_label(void)
 
 - (void)refreshCatalog
 {
-    self.allPackagesSorted = [[PackageCatalog allPackages]
+    NSArray<Package *> *installablePackages = [[PackageCatalog allPackages]
+        filteredArrayUsingPredicate:[NSPredicate predicateWithBlock:^BOOL(Package *package, NSDictionary *bindings) {
+            (void)bindings;
+            return package.kind != PackageInstallKindDirectTool;
+        }]];
+    self.allPackagesSorted = [installablePackages
         sortedArrayUsingComparator:^NSComparisonResult(Package *a, Package *b) {
             return [a.name localizedCaseInsensitiveCompare:b.name];
         }];
@@ -446,7 +451,6 @@ static UILabel *packages_stat_label(void)
     NSMutableArray<Package *> *updates = [NSMutableArray array];
     NSMutableArray<Package *> *active = [NSMutableArray array];
     NSMutableArray<Package *> *recent = [NSMutableArray array];
-    NSMutableArray<Package *> *tools = [NSMutableArray array];
     NSMutableArray<Package *> *persistent = [NSMutableArray array];
     NSMutableArray<Package *> *unavailable = [NSMutableArray array];
     NSMutableArray<Package *> *regular = [NSMutableArray array];
@@ -457,7 +461,6 @@ static UILabel *packages_stat_label(void)
         else if (package_has_repo_update(pkg)) [updates addObject:pkg];
         else if (pkg.isInstalled) [active addObject:pkg];
         else if (pkg.isInstallDisabled) [unavailable addObject:pkg];
-        else if (pkg.kind == PackageInstallKindDirectTool) [tools addObject:pkg];
         else if (pkg.kind == PackageInstallKindOTA ||
                  pkg.kind == PackageInstallKindNanoRegistry ||
                  pkg.kind == PackageInstallKindCallRecordingSound ||
@@ -470,7 +473,6 @@ static UILabel *packages_stat_label(void)
     appendSection(@"Updates", updates);
     appendSection(@"Installed", active);
     appendSection(@"Recently Added", recent);
-    appendSection(@"Direct Tools", tools);
     appendSection(@"Persistent & System Changes", persistent);
     appendCategoryBuckets(regular);
     appendSection(@"Unavailable & In Development", unavailable);
