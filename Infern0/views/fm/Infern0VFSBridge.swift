@@ -67,7 +67,7 @@ final class laramgr: ObservableObject {
         globallogger.log("Preparing Lara offsets.")
 
         DispatchQueue.global(qos: .userInitiated).async {
-            init_offsets()
+            lara_init_offsets()
             lara_offsets_init()
 
             DispatchQueue.main.async {
