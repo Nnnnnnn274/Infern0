@@ -15,6 +15,26 @@ enum fmAppsDisplayMode: String, CaseIterable {
     case appName = "App Name"
 }
 
+enum logsdisplaymode: String, CaseIterable {
+    case tabs = "In Tabs"
+    case toolbar = "In Toolbar"
+    case content = "Directly in ContentView"
+}
+
+enum laraExploitBackend: String, CaseIterable {
+    case infern0 = "Infern0"
+    case lara = "Lara"
+}
+
+@discardableResult
+private func configureSelectedLaraBackend() -> laraExploitBackend {
+    let backend = laraExploitBackend(
+        rawValue: UserDefaults.standard.string(forKey: "laraExploitBackend") ?? ""
+    ) ?? .infern0
+    ds_set_backend(backend == .lara ? 1 : 0)
+    return backend
+}
+
 final class Infern0LaraLogger: ObservableObject {
     @Published var logs: [String] = []
 
@@ -48,11 +68,18 @@ final class laramgr: ObservableObject {
     }
 
     func refresh() {
+        configureSelectedLaraBackend()
         dsready = ds_is_ready()
         vfsready = vfs_isready()
         let defaults = UserDefaults.standard
         offsetsReady = defaults.object(forKey: "lara.kernprocoff") != nil &&
             defaults.object(forKey: "lara.rootvnodeoff") != nil
+    }
+
+    func applySelectedExploitBackend() {
+        let backend = configureSelectedLaraBackend()
+        globallogger.log("Selected \(backend.rawValue) kernel backend.")
+        refresh()
     }
 
     func resolveKernelcacheOffsets() {
@@ -64,11 +91,12 @@ final class laramgr: ObservableObject {
 
         DispatchQueue.global(qos: .userInitiated).async {
             lara_offsets_init()
+            let backend = configureSelectedLaraBackend()
 
             DispatchQueue.main.async {
                 self.offsetProgress = 0.12
-                self.offsetStatus = "Starting the shared Infern0 kernel session..."
-                globallogger.log("Offset Grabber: requesting shared Infern0 KRW.")
+                self.offsetStatus = "Starting \(backend.rawValue) kernel backend..."
+                globallogger.log("Offset Grabber: starting \(backend.rawValue) backend.")
             }
 
             let exploitResult = ds_is_ready() ? 0 : ds_run()
@@ -77,17 +105,16 @@ final class laramgr: ObservableObject {
                     self.resolvingOffsets = false
                     self.offsetsReady = false
                     self.offsetProgress = 1.0
-                    self.offsetStatus = "Kernel session failed safely; offsets were not changed."
-                    globallogger.log("Offset Grabber: Infern0 KRW failed safely.")
+                    self.offsetStatus = "Selected kernel backend failed; offsets were not changed."
+                    globallogger.log("Offset Grabber: selected backend failed.")
                 }
                 return
             }
 
             DispatchQueue.main.async {
-                self.dsready = true
                 self.offsetProgress = 0.42
                 self.offsetStatus = "Checking the cached Lara kernelcache..."
-                globallogger.log("Offset Grabber: checking cached kernelcache.")
+                globallogger.log("Offset Grabber: exploit completed; checking cached kernelcache.")
             }
 
             var resolved = lara_emergencyfixfunctiontobereplacedlateronquestionmark()
@@ -144,12 +171,13 @@ final class laramgr: ObservableObject {
         globallogger.log("Preparing Lara compatibility offsets.")
 
         DispatchQueue.global(qos: .userInitiated).async {
+            let backend = configureSelectedLaraBackend()
             lara_offsets_init()
 
             DispatchQueue.main.async {
                 self.progress = 0.12
-                self.status = "Starting Infern0's kernel session..."
-                globallogger.log("Lara Darksword is disabled; using Infern0 KRW.")
+                self.status = "Starting \(backend.rawValue)'s kernel session..."
+                globallogger.log("Starting \(backend.rawValue) kernel backend.")
             }
 
             var exploitOK = ds_is_ready()
@@ -286,7 +314,7 @@ final class laramgr: ObservableObject {
 @MainActor
 private struct Infern0VFSLauncher: View {
     @ObservedObject private var manager = laramgr.shared
-    @AppStorage("selectedmethod") private var selectedMethod: method = .hybrid
+    @AppStorage("selectedMethod") private var selectedMethod: method = .hybrid
 
     private var readyForSelectedMode: Bool {
         switch selectedMethod {
@@ -343,6 +371,143 @@ private struct Infern0VFSLauncher: View {
 }
 
 @MainActor
+private struct LaraOffsetEditorView: View {
+    @State private var editable: [String: String] = [:]
+    @State private var loaded = false
+    @State private var status = "Changes save when you press Done or leave a field."
+    @State private var lastFocused: String?
+    @FocusState private var focusedOffset: String?
+
+    private var names: [String] {
+        editable.keys.sorted { lhs, rhs in
+            if lhs == "t1sz_boot" { return true }
+            if rhs == "t1sz_boot" { return false }
+            return lhs.localizedCaseInsensitiveCompare(rhs) == .orderedAscending
+        }
+    }
+
+    var body: some View {
+        List {
+            Section {
+                LabeledContent("t1sz_boot") {
+                    TextField("0x0", text: binding(for: "t1sz_boot"))
+                        .multilineTextAlignment(.trailing)
+                        .monospaced()
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .focused($focusedOffset, equals: "t1sz_boot")
+                        .submitLabel(.done)
+                        .onSubmit { persist("t1sz_boot") }
+                }
+            } header: {
+                Text("Address Translation")
+            } footer: {
+                Text("This is Lara's real editable t1sz_boot value. Lara defaults it to 0x11 on A16+ and M-series iPads when it is still zero. Only change it when your device profile or Lara documentation requires it.")
+            }
+
+            Section {
+                ForEach(names.filter { $0 != "t1sz_boot" && $0 != "pac_mask" }, id: \.self) { name in
+                    LabeledContent {
+                        TextField("0x0", text: binding(for: name))
+                            .multilineTextAlignment(.trailing)
+                            .monospaced()
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .focused($focusedOffset, equals: name)
+                            .submitLabel(.done)
+                            .onSubmit { persist(name) }
+                    } label: {
+                        Text(name)
+                            .font(.system(size: 11, design: .monospaced))
+                    }
+                }
+            } header: {
+                Text("Offsets")
+            } footer: {
+                Text(status)
+            }
+
+            if let pacMask = editable["pac_mask"] {
+                Section("Calculated") {
+                    LabeledContent("pac_mask", value: pacMask)
+                        .font(.system(size: 12, design: .monospaced))
+                }
+            }
+        }
+        .navigationTitle("Offsets")
+        .onAppear(perform: load)
+        .onChange(of: focusedOffset) { current in
+            if let previous = lastFocused, previous != current {
+                persist(previous)
+            }
+            lastFocused = current
+        }
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button("Save All", action: persistAll)
+            }
+        }
+    }
+
+    private func binding(for name: String) -> Binding<String> {
+        Binding(
+            get: { editable[name, default: "0x0"] },
+            set: { editable[name] = $0 }
+        )
+    }
+
+    private func load() {
+        guard !loaded else { return }
+        lara_offsets_init()
+        guard let dictionary = alloffs() as? [String: Any] else { return }
+        editable = dictionary.reduce(into: [:]) { result, item in
+            let value = (item.value as? NSNumber)?.uint64Value ?? 0
+            result[item.key] = String(format: "0x%llx", value)
+        }
+        loaded = true
+    }
+
+    private func parsedValue(for name: String) -> UInt64? {
+        let raw = editable[name, default: ""]
+            .replacingOccurrences(of: "0x", with: "", options: .caseInsensitive)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return UInt64(raw, radix: 16)
+    }
+
+    private func persist(_ name: String) {
+        guard name != "pac_mask" else { return }
+        guard let value = parsedValue(for: name) else {
+            status = "\(name) is not valid hexadecimal and was not saved."
+            return
+        }
+        guard lara_setoffsetvalue(name, value) else {
+            status = "\(name) was rejected and was not saved."
+            return
+        }
+        status = "\(name) saved to Lara's active offset table."
+        if name == "t1sz_boot",
+           let dictionary = alloffs() as? [String: Any],
+           let mask = dictionary["pac_mask"] as? NSNumber {
+            editable["pac_mask"] = String(format: "0x%llx", mask.uint64Value)
+        }
+    }
+
+    private func persistAll() {
+        var failures: [String] = []
+        for name in names where name != "pac_mask" {
+            guard let value = parsedValue(for: name), lara_setoffsetvalue(name, value) else {
+                failures.append(name)
+                continue
+            }
+        }
+        status = failures.isEmpty
+            ? "All Lara offsets saved."
+            : "\(failures.count) invalid value(s) were not saved."
+        load()
+    }
+}
+
+@MainActor
 private struct LaraOffsetSnapshotView: View {
     private var entries: [(String, String)] {
         guard let dictionary = alloffs() as? [String: Any] else { return [] }
@@ -371,17 +536,52 @@ private struct LaraOffsetSnapshotView: View {
 @MainActor
 private struct LaraSettingsView: View {
     @ObservedObject private var manager = laramgr.shared
-    @AppStorage("selectedmethod") private var selectedMethod: method = .hybrid
+    @AppStorage("selectedMethod") private var selectedMethod: method = .hybrid
     @AppStorage("selectedFMAppsDisplayMode") private var displayMode: fmAppsDisplayMode = .appName
     @AppStorage("fmRecursiveSearch") private var recursiveSearch = false
+    @AppStorage("keepAlive") private var keepAlive = false
+    @AppStorage("stashKRW") private var stashKRW = false
+    @AppStorage("keepSpringBoardRemoteCallAliveIOS16") private var keepSpringBoardRemoteCallAlive = false
+    @AppStorage("logsdisplaymode") private var logDisplayMode: logsdisplaymode = .toolbar
+    @AppStorage("loggerNoBS") private var disableLogDividers = true
+    @AppStorage("showFMInTabs") private var showFileManagerInTabs = true
+    @AppStorage("rcDockUnlimited") private var allowUnlimitedDockIcons = false
+    @AppStorage("laraExploitBackend") private var exploitBackend: laraExploitBackend = .infern0
 
     var body: some View {
         NavigationStack {
             List {
-                Section("Lara") {
-                    Text("Lara integration settings and kernelcache offset management.")
+                Section("About") {
+                    Text("Lara").font(.title2.bold())
+                    Text("iOS Toolbox using the DarkSword kernel exploit.")
                     Link("Upstream: rooootdev/lara", destination: URL(string: "https://github.com/rooootdev/lara")!)
                     Link("Main developer: rooootdev", destination: URL(string: "https://github.com/rooootdev")!)
+                }
+
+                Section("Exploit") {
+                    Picker("Kernel Engine", selection: $exploitBackend) {
+                        ForEach(laraExploitBackend.allCases, id: \.self) {
+                            Text($0.rawValue).tag($0)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .disabled(manager.initializing || manager.resolvingOffsets || manager.vfsready)
+                    .onChange(of: exploitBackend) { _ in
+                        manager.applySelectedExploitBackend()
+                    }
+
+                    Picker("Access Method", selection: $selectedMethod) {
+                        ForEach(method.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+                    NavigationLink("Modify Offsets") {
+                        LaraOffsetEditorView()
+                    }
+                    Text(exploitBackend == .lara
+                        ? "Native Lara Darksword will be used by offsets, VFS, sandbox, and Fonts."
+                        : "Infern0's maintained KRW engine will be used by offsets, VFS, sandbox, and Fonts.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                 }
 
                 Section {
@@ -406,24 +606,34 @@ private struct LaraSettingsView: View {
                 } header: {
                     Text("Kernelcache Offset Grabber")
                 } footer: {
-                    Text("This uses Lara's current kernelcache resolver and bundled libgrabkernel2. The exploit stage uses Infern0's shared, non-crashing KRW bridge; it is acquired once and reused by VFS and Fonts.")
+                    Text("The selected global kernel engine is used for offset acquisition and all imported features. Lara's current resolver and bundled libgrabkernel2 provide the kernelcache offsets.")
                 }
 
                 Section("File Manager") {
-                    Picker("Access Mode", selection: $selectedMethod) {
-                        ForEach(method.allCases, id: \.self) { Text($0.rawValue).tag($0) }
-                    }
-                    .pickerStyle(.segmented)
-
-                    Picker("App Folder Labels", selection: $displayMode) {
+                    Picker("Display Mode", selection: $displayMode) {
                         ForEach(fmAppsDisplayMode.allCases, id: \.self) { Text($0.rawValue).tag($0) }
                     }
-                    Toggle("Recursive Search", isOn: $recursiveSearch)
+                    Toggle("Recursive Search in File Manager", isOn: $recursiveSearch)
+                    Toggle("Show File Manager in Tabs", isOn: $showFileManagerInTabs)
+                }
+
+                Section("App") {
+                    Toggle("Keep Alive", isOn: $keepAlive)
+                    Toggle("Disable Log Dividers", isOn: $disableLogDividers)
+                    Picker("Logs Display", selection: $logDisplayMode) {
+                        ForEach(logsdisplaymode.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                    }
+                }
+
+                Section("RemoteCall") {
+                    Toggle("Stash KRW primitives", isOn: $stashKRW)
+                    Toggle("Keep SpringBoard RemoteCall alive in background", isOn: $keepSpringBoardRemoteCallAlive)
+                    Toggle("Allow >10 dock icons", isOn: $allowUnlimitedDockIcons)
                 }
 
                 Section("Upstream Attribution") {
                     Text("The Lara toolbox, Santander VFS UI, offset manager, kernelcache resolver, and related integration are upstream work from Lara by rooootdev and its contributors. Infern0 does not claim these components as original work.")
-                    Text("Lara is licensed under GNU AGPL-3.0. Infern0's changes are the Tools-tab integration, shared KRW compatibility bridge, crash guards, and write verification.")
+                    Text("Lara is licensed under GNU AGPL-3.0. Infern0's changes are the Tools-tab integration, separated offset-only exploit entry point, VFS compatibility bridge, crash guards, and write verification.")
                     Link("Lara source and AGPL-3.0 license", destination: URL(string: "https://github.com/rooootdev/lara")!)
                     Link("libgrabkernel2 by Alfie CG (MIT)", destination: URL(string: "https://github.com/rooootdev/lara/blob/main/lara/licenses/LICENSE_libgrabkernel2.md")!)
                 }
@@ -435,6 +645,14 @@ private struct LaraSettingsView: View {
                     Link("AppInstalleriOS — offsets and development help", destination: URL(string: "https://github.com/AppInstalleriOSGH")!)
                     Link("lunginspector — frontend rewrite", destination: URL(string: "https://github.com/lunginspector")!)
                     Link("hxhlb — bug fixes", destination: URL(string: "https://github.com/hxhlb")!)
+                }
+
+                Section("Additional Lara Credits") {
+                    Link("jailbreak.party — dirtyZero Tweaks", destination: URL(string: "https://github.com/jailbreakdotparty")!)
+                    Link("Jurre — EditorView and improvements", destination: URL(string: "https://github.com/jurre111")!)
+                    Link("neon — Respring, zipmgr, themes, decryption", destination: URL(string: "https://github.com/neonmodder123")!)
+                    Link("Skadz — Respring method", destination: URL(string: "https://github.com/skadz108")!)
+                    Link("leminlimez — Cowabunga tweaks", destination: URL(string: "https://github.com/leminlimez")!)
                 }
 
                 Section("Detailed Lara Log") {

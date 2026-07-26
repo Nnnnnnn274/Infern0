@@ -109,7 +109,6 @@ static BOOL catalog_repo_script_requires_native_bridge(NSString *rawScript)
 static const NSInteger kSecOTA              = 3;
 static const NSInteger kSecLaraVFS          = -1000;
 static const NSInteger kSecLaraFonts        = -1001;
-static const NSInteger kSecLaraSettings     = -1002;
 static const NSInteger kSecSBC              = 4;
 static const NSInteger kSecStatBar          = 5;
 static const NSInteger kSecNSBar            = 6;
@@ -1062,7 +1061,7 @@ static const NSInteger kSecDarkSwordTweaks  = 13;
         amfiBypass.unstableWarning = @"Experimental kernel-memory test. It only patches infern0's current process and can fail on protected or unsupported layouts. Review the AMFI activity log after every run.";
 
         Package *laraVFS = [[Package alloc] initWithIdentifier:@"com.darksword.lara-vfs"
-                                           name:@"Lara VFS File Manager"
+                                           name:@"VFS File Manager"
                                shortDescription:@"Full VFS/SBX/hybrid filesystem browser"
                                 longDescription:@"Direct port of Lara's Santander file manager and VFS stack. Browse directories, search recursively, show hidden files, label app containers, preview text, plists, binary data, images, audio, and video, and import or export files. Hybrid mode also exposes copy, paste, replace, rename, create, delete, chmod, and chown when Lara's sandbox escape is ready.\n\nOpen the tool, choose VFS, SBX, or Hybrid, then initialize the full Lara kernel/VFS session. The detailed log reports every stage and never marks the browser ready unless the underlying primitive reports ready."
                                         version:version
@@ -1076,7 +1075,7 @@ static const NSInteger kSecDarkSwordTweaks  = 13;
         laraVFS.unstableWarning = @"Advanced system tool: file writes, replacement, chmod, chown, and deletion can damage iOS or user data when used on the wrong path. Prefer read-only browsing and export until the VFS session has been tested on your exact device.";
 
         Package *laraFonts = [[Package alloc] initWithIdentifier:@"com.darksword.lara-fonts"
-                                           name:@"Lara Font Manager"
+                                           name:@"Font Manager"
                                shortDescription:@"Lara font repos, imports, previews, and emoji packs"
                                 longDescription:@"Direct port of Lara's current Font Picker. It uses native URLSession and JSONDecoder rather than the fork's unfinished curl/cJSON stub. Browse Lara-compatible font repositories, preview downloaded fonts, import local font files, choose Standard, Mono, or Italic targets, and apply compatible TTC emoji packs through the shared VFS session."
                                         version:version
@@ -1089,18 +1088,6 @@ static const NSInteger kSecDarkSwordTweaks  = 13;
         laraFonts.settingsSection = kSecLaraFonts;
         laraFonts.unstableWarning = @"System font replacement is persistent until restored or overwritten. Keep a known-good font available, initialize VFS first, and only apply compatible patched fonts.";
 
-        Package *laraSettings = [[Package alloc] initWithIdentifier:@"com.darksword.lara-settings"
-                                           name:@"Lara Settings"
-                               shortDescription:@"Kernelcache offset grabber, VFS preferences, logs, and credits"
-                                longDescription:@"Settings and offset-management hub ported from Lara by rooootdev. Run Infern0's shared exploit once, obtain and verify the matching kernelcache offsets through Lara's resolver and libgrabkernel2, inspect resolved values, clear stale kernelcache data, and configure Santander file-manager behavior.\n\nThis page includes explicit upstream credits and licensing. Lara is GNU AGPL-3.0; libgrabkernel2 is by Alfie CG under the MIT license. Infern0's contribution is the integration, crash guards, and shared safe-KRW adapter."
-                                        version:version
-                                         author:@"rooootdev / Lara contributors / Infern0 integration"
-                                       category:@"System"
-                                     symbolName:@"gearshape.2.fill"
-                                           kind:PackageInstallKindDirectTool
-                                     enabledKey:nil
-                                          isNew:YES];
-        laraSettings.settingsSection = kSecLaraSettings;
 
         Package *disableAppLibrary = [[Package alloc] initWithIdentifier:@"com.darksword.disable-app-library"
                                            name:@"Disable App Library"
@@ -1192,7 +1179,6 @@ static const NSInteger kSecDarkSwordTweaks  = 13;
 
             otaBlock,
             amfiBypass,
-            laraSettings,
             laraVFS,
             laraFonts,
 
@@ -1280,7 +1266,6 @@ static const NSInteger kSecDarkSwordTweaks  = 13;
             @"com.darksword.drag-coefficient",
             @"com.darksword.ota-block",
             @"com.darksword.amfi-bypass",
-            @"com.darksword.lara-settings",
             @"com.darksword.lara-vfs",
             @"com.darksword.lara-fonts",
             @"com.darksword.disable-app-library",

@@ -9,14 +9,8 @@
 #import "PackageDetailViewController.h"
 #import "CYIconBadge.h"
 
-typedef NS_ENUM(NSInteger, ToolsScope) {
-    ToolsScopeUtilities = 0,
-    ToolsScopeLara,
-};
-
 @interface ToolsViewController ()
 @property (nonatomic, copy) NSArray<Package *> *tools;
-@property (nonatomic, strong) UISegmentedControl *scopeControl;
 @end
 
 @implementation ToolsViewController
@@ -29,17 +23,7 @@ typedef NS_ENUM(NSInteger, ToolsScope) {
     self.tableView.backgroundColor = UIColor.systemGroupedBackgroundColor;
     self.tableView.rowHeight = 74.0;
 
-    self.scopeControl = [[UISegmentedControl alloc] initWithItems:@[@"Utilities", @"Lara"]];
-    self.scopeControl.selectedSegmentIndex = ToolsScopeUtilities;
-    [self.scopeControl addTarget:self action:@selector(scopeChanged:) forControlEvents:UIControlEventValueChanged];
-    self.navigationItem.titleView = self.scopeControl;
-
     [self reloadTools];
-}
-
-- (BOOL)isLaraPackage:(Package *)package
-{
-    return [package.identifier hasPrefix:@"com.darksword.lara-"];
 }
 
 - (void)reloadTools
@@ -57,18 +41,7 @@ typedef NS_ENUM(NSInteger, ToolsScope) {
 
 - (NSArray<Package *> *)visibleTools
 {
-    BOOL wantsLara = self.scopeControl.selectedSegmentIndex == ToolsScopeLara;
-    return [self.tools filteredArrayUsingPredicate:[NSPredicate predicateWithBlock:^BOOL(Package *package, NSDictionary *bindings) {
-        (void)bindings;
-        return [self isLaraPackage:package] == wantsLara;
-    }]];
-}
-
-- (void)scopeChanged:(UISegmentedControl *)sender
-{
-    (void)sender;
-    CYSelectionHaptic();
-    [self.tableView reloadData];
+    return self.tools;
 }
 
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView
@@ -88,18 +61,14 @@ typedef NS_ENUM(NSInteger, ToolsScope) {
 {
     (void)tableView;
     (void)section;
-    return self.scopeControl.selectedSegmentIndex == ToolsScopeLara
-        ? @"Lara Tools"
-        : @"Direct Utilities";
+    return @"Direct Utilities";
 }
 
 - (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section
 {
     (void)tableView;
     (void)section;
-    return self.scopeControl.selectedSegmentIndex == ToolsScopeLara
-        ? @"Lara features share Infern0's kernel session and safe write engine. They no longer launch Lara's bundled Darksword exploit."
-        : @"These are manual utilities. They run directly and are not installed, queued, or applied as tweak packages.";
+    return @"These are native Infern0 utilities. They run directly and are not installed, queued, or applied as tweak packages.";
 }
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath

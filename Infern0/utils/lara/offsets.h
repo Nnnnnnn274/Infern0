@@ -110,6 +110,7 @@ extern "C" {
 #define VM_MAX_KERNEL_ADDRESS lara_VM_MAX_KERNEL_ADDRESS
 #define pac_mask lara_pac_mask
 #define savealloffsets lara_savealloffsets
+#define setoffsetvalue lara_setoffsetvalue
 #define verifykernoffsets lara_verifykernoffsets
 #define emergencyfixfunctiontobereplacedlateronquestionmark lara_emergencyfixfunctiontobereplacedlateronquestionmark
 #define dlkcache lara_dlkcache
@@ -211,6 +212,7 @@ extern uint64_t VM_MAX_KERNEL_ADDRESS;
 extern uint64_t pac_mask;
 
 NSDictionary *alloffs(void);
+bool setoffsetvalue(NSString *name, uint64_t value);
 
 void savealloffsets(void);
 

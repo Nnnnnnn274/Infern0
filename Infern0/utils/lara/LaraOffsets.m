@@ -354,38 +354,51 @@ bool gIsPACSupported = false;
 bool gIsA18Above = false;
 
 NSDictionary *alloffs(void) {
-    return @{
-        @"t1sz_boot": @(t1sz_boot),
-        @"smr_base": @(smr_base),
-        @"sizeof_ipc_entry": @(sizeof_ipc_entry),
-        @"pac_mask": @(pac_mask),
-        @"off_thread_t_tro": @(off_thread_t_tro),
-        @"off_thread_ro_tro_proc": @(off_thread_ro_tro_proc),
-        @"off_thread_ro_tro_task": @(off_thread_ro_tro_task),
-        @"off_thread_ctid": @(off_thread_ctid),
-        @"off_thread_options": @(off_thread_options),
-        @"off_thread_mutex_lck_mtx_data": @(off_thread_mutex_lck_mtx_data),
-        @"off_thread_machine_kstackptr": @(off_thread_machine_kstackptr),
-        @"off_thread_machine_jop_pid": @(off_thread_machine_jop_pid),
-        @"off_thread_machine_rop_pid": @(off_thread_machine_rop_pid),
-        @"off_thread_guard_exc_info_code": @(off_thread_guard_exc_info_code),
-        @"off_thread_ast": @(off_thread_ast),
-        @"off_thread_task_threads_next": @(off_thread_task_threads_next),
-        @"off_proc_p_proc_ro": @(off_proc_p_proc_ro),
-        @"off_proc_p_pid": @(off_proc_p_pid),
-        @"off_proc_p_fd": @(off_proc_p_fd),
-        @"off_proc_p_flag": @(off_proc_p_flag),
-        @"off_proc_p_textvp": @(off_proc_p_textvp),
-        @"off_proc_p_name": @(off_proc_p_name),
-        @"off_proc_ro_pr_task": @(off_proc_ro_pr_task),
-        @"off_ucred_cr_label": @(off_ucred_cr_label),
-        @"off_task_itk_space": @(off_task_itk_space),
-        @"off_task_threads_next": @(off_task_threads_next),
-        @"off_task_task_exc_guard": @(off_task_task_exc_guard),
-        @"off_vm_object_ref_count": @(off_vm_object_ref_count),
-        @"VM_MIN_KERNEL_ADDRESS": @(VM_MIN_KERNEL_ADDRESS),
-        @"VM_MAX_KERNEL_ADDRESS": @(VM_MAX_KERNEL_ADDRESS),
-    };
+    NSMutableDictionary<NSString *, NSNumber *> *result = [NSMutableDictionary dictionary];
+    for (size_t i = 0; i < sizeof(koff32entries) / sizeof(koff32entries[0]); i++) {
+        off32entry const *entry = &koff32entries[i];
+        result[[NSString stringWithUTF8String:entry->name]] = @(*entry->value);
+    }
+    for (size_t i = 0; i < sizeof(koff64entries) / sizeof(koff64entries[0]); i++) {
+        off64entry const *entry = &koff64entries[i];
+        result[[NSString stringWithUTF8String:entry->name]] = @(*entry->value);
+    }
+    result[@"t1sz_boot"] = @(t1sz_boot);
+    result[@"pac_mask"] = @(pac_mask);
+    return result;
+}
+
+bool setoffsetvalue(NSString *name, uint64_t value) {
+    if (name.length == 0 || [name isEqualToString:@"pac_mask"]) {
+        return false;
+    }
+
+    for (size_t i = 0; i < sizeof(koff32entries) / sizeof(koff32entries[0]); i++) {
+        off32entry const *entry = &koff32entries[i];
+        if ([name isEqualToString:[NSString stringWithUTF8String:entry->name]]) {
+            if (value > UINT32_MAX) return false;
+            *entry->value = (uint32_t)value;
+            savealloffsets();
+            return true;
+        }
+    }
+
+    for (size_t i = 0; i < sizeof(koff64entries) / sizeof(koff64entries[0]); i++) {
+        off64entry const *entry = &koff64entries[i];
+        if ([name isEqualToString:[NSString stringWithUTF8String:entry->name]]) {
+            *entry->value = value;
+            savealloffsets();
+            return true;
+        }
+    }
+
+    if ([name isEqualToString:@"t1sz_boot"]) {
+        t1sz_boot = value;
+        refreshpacmask();
+        savealloffsets();
+        return true;
+    }
+    return false;
 }
 
 static NSString *kcpath(void) {

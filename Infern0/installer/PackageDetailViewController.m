@@ -782,8 +782,6 @@ static UIViewController *pkgdetail_lara_tool_controller(NSString *identifier)
         className = @"LaraVFSFeatureBridge";
     } else if ([identifier isEqualToString:@"com.darksword.lara-fonts"]) {
         className = @"LaraFontFeatureBridge";
-    } else if ([identifier isEqualToString:@"com.darksword.lara-settings"]) {
-        className = @"LaraSettingsFeatureBridge";
     }
     if (!className) return nil;
     Class bridge = NSClassFromString(className);

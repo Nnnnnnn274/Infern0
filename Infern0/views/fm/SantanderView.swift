@@ -11,7 +11,7 @@ import Combine
 struct SantanderView: View {
     let startpath: String
 
-    @AppStorage("selectedmethod") private var selectedmethod: method = .hybrid
+    @AppStorage("selectedMethod") private var selectedmethod: method = .hybrid
     @ObservedObject private var mgr = laramgr.shared
     
     @State private var showsecret: Bool = false

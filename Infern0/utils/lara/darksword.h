@@ -21,6 +21,10 @@ typedef void (*ds_progress_callback_t)(double progress);
 void ds_set_log_callback(ds_log_callback_t callback);
 void ds_set_progress_callback(ds_progress_callback_t callback);
 int ds_run(void);
+int ds_run_lara_for_offsets(void);
+bool ds_lara_offsets_session_ready(void);
+void ds_set_backend(int backend); // 0 = Infern0, 1 = native Lara
+int ds_get_backend(void);
 bool ds_is_ready(void);
 bool ds_isvalid(uint64_t addr);
 

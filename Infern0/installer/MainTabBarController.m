@@ -11,10 +11,21 @@
 #import "ToolsViewController.h"
 #import "CYIconBadge.h"
 #import "../SettingsViewController.h"
+#import <objc/message.h>
 
 static const CGFloat kPopupHeight  = 56.0;
 static const CGFloat kPopupGap     = 8.0;
 static const CGFloat kPopupPadding = 2.0;
+
+static UIViewController *LaraSettingsController(void)
+{
+    Class bridge = NSClassFromString(@"LaraSettingsFeatureBridge");
+    SEL factory = NSSelectorFromString(@"makeViewController");
+    if (!bridge || ![bridge respondsToSelector:factory]) return nil;
+
+    UIViewController *(*sendFactory)(id, SEL) = (void *)objc_msgSend;
+    return sendFactory(bridge, factory);
+}
 
 @interface MainTabBarController () <UITabBarControllerDelegate>
 @property (nonatomic, strong) QueuePopupBar *popupBar;
@@ -102,6 +113,33 @@ static const CGFloat kPopupPadding = 2.0;
         NSUInteger packagesIndex = [controllers indexOfObject:packages];
         NSUInteger insertionIndex = packagesIndex == NSNotFound ? MIN((NSUInteger)2, controllers.count) : packagesIndex + 1;
         [controllers insertObject:toolsNav atIndex:insertionIndex];
+    }
+
+    BOOL hasLaraSettings = NO;
+    for (UIViewController *vc in controllers) {
+        if ([vc.tabBarItem.title isEqualToString:@"Lara Settings"]) {
+            hasLaraSettings = YES;
+            break;
+        }
+    }
+    if (!hasLaraSettings) {
+        UIViewController *laraSettings = LaraSettingsController();
+        if (laraSettings) {
+            laraSettings.tabBarItem = [[UITabBarItem alloc] initWithTitle:@"Lara Settings"
+                                                                     image:[UIImage systemImageNamed:@"gearshape.2.fill"]
+                                                                       tag:0];
+            NSUInteger toolsIndex = NSNotFound;
+            for (NSUInteger index = 0; index < controllers.count; index++) {
+                if ([controllers[index].tabBarItem.title isEqualToString:@"Tools"]) {
+                    toolsIndex = index;
+                    break;
+                }
+            }
+            NSUInteger insertionIndex = toolsIndex == NSNotFound
+                ? MIN((NSUInteger)3, controllers.count)
+                : toolsIndex + 1;
+            [controllers insertObject:laraSettings atIndex:insertionIndex];
+        }
     }
 
 
