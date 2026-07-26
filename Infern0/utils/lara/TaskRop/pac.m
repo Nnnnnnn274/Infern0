@@ -9,8 +9,8 @@
 #import "RemoteCall.h"
 #import "thread.h"
 #import "exc.h"
-#import "utils.h"
-#import "offsets.h"
+#import "../utils.h"
+#import "../offsets.h"
 
 #import <Foundation/Foundation.h>
 #import <dlfcn.h>

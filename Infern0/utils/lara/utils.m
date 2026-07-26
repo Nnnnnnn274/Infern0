@@ -562,8 +562,8 @@ uint64_t procbyname(const char *name) {
     for (size_t head_index = 0; head_index < 2; head_index++) {
         uint64_t proc = heads[head_index];
         for (int iter = 0; is_kptr(proc) && iter < 4096; iter++) {
-            char *p_name = proc_get_p_name(proc).data;
-            if(strcmp(p_name, name) == 0)
+            StringWrapper procName = proc_get_p_name(proc);
+            if(strcmp(procName.data, name) == 0)
                 return proc;
 
             uint64_t next = S(ds_kread64(proc + off_proc_p_list_le_next));
@@ -688,7 +688,8 @@ void hexdump(const void* data, size_t size) {
     
     for (i = 0; i < size; ++i) {
         if ((i % 16) == 0) {
-            printf("[0x%016llx+0x%03zx] ", &data, i);
+            printf("[0x%016llx+0x%03zx] ",
+                   (unsigned long long)(uintptr_t)data, i);
         }
 
         printf("%02X ", ((unsigned char*)data)[i]);
