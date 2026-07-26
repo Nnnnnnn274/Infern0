@@ -422,10 +422,10 @@ static void nsbar_calculate_position(NSBarPosition position,
 {
     double screenWidth = layout.screenWidth;
     if (!nsbar_valid_screen_length(screenWidth)) screenWidth = 390.0;
-    
+
     double x = 0.0;
     double y = 0.0;
-    
+
     switch (position) {
         case NSBarPositionTopLeft:
             x = kNSBarMargin;
@@ -456,7 +456,7 @@ static void nsbar_calculate_position(NSBarPosition position,
             y = kNSBarTopY;
             break;
     }
-    
+
     *outX = x;
     *outY = y;
 }
@@ -469,7 +469,7 @@ static bool nsbar_apply_overlay_layout(uint64_t win, uint64_t label, NSBarPositi
     double width = nsbar_width_for_text(text, position, layout);
     double x = 0.0;
     double y = 0.0;
-    
+
     nsbar_calculate_position(position, layout, &x, &y, width);
 
     if (nsbar_should_log_tick()) {
@@ -485,7 +485,7 @@ static bool nsbar_apply_overlay_layout(uint64_t win, uint64_t label, NSBarPositi
     if (r_is_objc_ptr(label)) {
         ok &= r_send_rect_main(label, "setFrame:", 0.0, 0.0, width, kNSBarWinH);
     }
-    
+
     return ok;
 }
 
@@ -503,11 +503,11 @@ static bool nsbar_install_overlay(NSString *text, NSBarPosition position)
     uint64_t textObj = nsbar_nsstring_utf8_fast(utf8);
     NSBAR_DEBUG_LOG("[NSBAR][DEBUG][install] textObj=0x%llx elapsed=%llums\n",
                     textObj, nsbar_elapsed_ms_since(stringStart));
-    if (!r_is_objc_ptr(textObj)) { 
-        printf("[NSBAR] overlay: NSString alloc failed\n"); 
+    if (!r_is_objc_ptr(textObj)) {
+        printf("[NSBAR] overlay: NSString alloc failed\n");
         NSBAR_DEBUG_LOG("[NSBAR][DEBUG][install] end ok=0 reason=textObj total=%llums\n",
                         nsbar_elapsed_ms_since(start));
-        return false; 
+        return false;
     }
 
     // Fast path: update existing overlay
@@ -613,49 +613,49 @@ static bool nsbar_install_overlay(NSString *text, NSBarPosition position)
         NSBAR_DEBUG_LOG("[NSBAR][DEBUG][install] keyWindow fallback windows=0x%llx count=%llu keyWin=0x%llx\n",
                         windows, count, keyWin);
     }
-    if (!r_is_objc_ptr(keyWin)) { 
-        printf("[NSBAR] overlay: keyWindow nil\n"); 
+    if (!r_is_objc_ptr(keyWin)) {
+        printf("[NSBAR] overlay: keyWindow nil\n");
         NSBAR_DEBUG_LOG("[NSBAR][DEBUG][install] end ok=0 reason=keyWindow total=%llums\n",
                         nsbar_elapsed_ms_since(start));
-        return false; 
+        return false;
     }
 
     uint64_t scene = r_msg2_main(keyWin, "windowScene", 0, 0, 0, 0);
     NSBAR_DEBUG_LOG("[NSBAR][DEBUG][install] keyWin=0x%llx scene=0x%llx elapsed=%llums\n",
                     keyWin, scene, nsbar_elapsed_ms_since(sceneStart));
-    if (!r_is_objc_ptr(scene)) { 
-        printf("[NSBAR] overlay: windowScene nil\n"); 
+    if (!r_is_objc_ptr(scene)) {
+        printf("[NSBAR] overlay: windowScene nil\n");
         NSBAR_DEBUG_LOG("[NSBAR][DEBUG][install] end ok=0 reason=windowScene total=%llums\n",
                         nsbar_elapsed_ms_since(start));
-        return false; 
+        return false;
     }
 
     // Create window
     double windowStart = nsbar_now_seconds();
     uint64_t UIWindow = r_class("UIWindow");
-    if (!r_is_objc_ptr(UIWindow)) { 
-        printf("[NSBAR] overlay: UIWindow missing\n"); 
+    if (!r_is_objc_ptr(UIWindow)) {
+        printf("[NSBAR] overlay: UIWindow missing\n");
         NSBAR_DEBUG_LOG("[NSBAR][DEBUG][install] end ok=0 reason=uiwindow total=%llums\n",
                         nsbar_elapsed_ms_since(start));
-        return false; 
+        return false;
     }
 
     uint64_t winAlloc = r_msg2_main(UIWindow, "alloc", 0, 0, 0, 0);
-    if (!r_is_objc_ptr(winAlloc)) { 
-        printf("[NSBAR] overlay: UIWindow alloc failed\n"); 
+    if (!r_is_objc_ptr(winAlloc)) {
+        printf("[NSBAR] overlay: UIWindow alloc failed\n");
         NSBAR_DEBUG_LOG("[NSBAR][DEBUG][install] end ok=0 reason=window-alloc total=%llums\n",
                         nsbar_elapsed_ms_since(start));
-        return false; 
+        return false;
     }
 
     uint64_t win = r_msg2_main(winAlloc, "initWithWindowScene:", scene, 0, 0, 0);
     NSBAR_DEBUG_LOG("[NSBAR][DEBUG][install] window alloc=0x%llx win=0x%llx elapsed=%llums\n",
                     winAlloc, win, nsbar_elapsed_ms_since(windowStart));
-    if (!r_is_objc_ptr(win)) { 
-        printf("[NSBAR] overlay: initWithWindowScene failed\n"); 
+    if (!r_is_objc_ptr(win)) {
+        printf("[NSBAR] overlay: initWithWindowScene failed\n");
         NSBAR_DEBUG_LOG("[NSBAR][DEBUG][install] end ok=0 reason=window-init total=%llums\n",
                         nsbar_elapsed_ms_since(start));
-        return false; 
+        return false;
     }
     if (nsbar_should_log_tick())
         printf("[NSBAR] overlay: window=0x%llx\n", win);
@@ -672,29 +672,29 @@ static bool nsbar_install_overlay(NSString *text, NSBarPosition position)
     // Create label
     double labelStart = nsbar_now_seconds();
     uint64_t UILabel = r_class("UILabel");
-    if (!r_is_objc_ptr(UILabel)) { 
-        printf("[NSBAR] overlay: UILabel missing\n"); 
+    if (!r_is_objc_ptr(UILabel)) {
+        printf("[NSBAR] overlay: UILabel missing\n");
         NSBAR_DEBUG_LOG("[NSBAR][DEBUG][install] end ok=0 reason=uilabel total=%llums\n",
                         nsbar_elapsed_ms_since(start));
-        return false; 
+        return false;
     }
 
     uint64_t labelAlloc = r_msg2_main(UILabel, "alloc", 0, 0, 0, 0);
-    if (!r_is_objc_ptr(labelAlloc)) { 
-        printf("[NSBAR] overlay: UILabel alloc failed\n"); 
+    if (!r_is_objc_ptr(labelAlloc)) {
+        printf("[NSBAR] overlay: UILabel alloc failed\n");
         NSBAR_DEBUG_LOG("[NSBAR][DEBUG][install] end ok=0 reason=label-alloc total=%llums\n",
                         nsbar_elapsed_ms_since(start));
-        return false; 
+        return false;
     }
 
     uint64_t label = r_msg2_main(labelAlloc, "init", 0, 0, 0, 0);
     NSBAR_DEBUG_LOG("[NSBAR][DEBUG][install] label alloc=0x%llx label=0x%llx elapsed=%llums\n",
                     labelAlloc, label, nsbar_elapsed_ms_since(labelStart));
-    if (!r_is_objc_ptr(label)) { 
-        printf("[NSBAR] overlay: UILabel init failed\n"); 
+    if (!r_is_objc_ptr(label)) {
+        printf("[NSBAR] overlay: UILabel init failed\n");
         NSBAR_DEBUG_LOG("[NSBAR][DEBUG][install] end ok=0 reason=label-init total=%llums\n",
                         nsbar_elapsed_ms_since(start));
-        return false; 
+        return false;
     }
     if (nsbar_should_log_tick())
         printf("[NSBAR] overlay: label=0x%llx\n", label);
@@ -736,7 +736,7 @@ static bool nsbar_install_overlay(NSString *text, NSBarPosition position)
     r_dlsym_call(R_TIMEOUT, "objc_setAssociatedObject", app, assocKey, win, 1, 0, 0, 0, 0);
     NSBAR_DEBUG_LOG("[NSBAR][DEBUG][install] attach/show/assoc elapsed=%llums\n",
                     nsbar_elapsed_ms_since(attachStart));
-    
+
     gNSBarOverlayWindow = win;
     gNSBarOverlayLabel = label;
     gNSBarLastPosition = position;

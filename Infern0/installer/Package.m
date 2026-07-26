@@ -7,8 +7,7 @@
 #import "PackageQueue.h"
 #import "../SettingsViewController.h"
 #import "../LogTextView.h"
-#import "../tweaks/QuickLoader.h"
-#import "../tweaks/RepoTweaks.h"
+#import "../tweaks/retired_tweak_compat.h"
 #import <math.h>
 
 @interface Package ()

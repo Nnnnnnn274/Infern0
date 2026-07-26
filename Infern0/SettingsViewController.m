@@ -27,7 +27,6 @@
 #import "tweaks/appswitchergrid.h"
 #import "tweaks/hide_home_bar.h"
 #import "tweaks/QuickLoader.h"
-#import "tweaks/RepoTweaks.h"
 #import <CoreMotion/CoreMotion.h>
 
 #import <objc/runtime.h>
@@ -981,6 +980,8 @@ NSString * const kSettingsAxonLiteEnabled = @"AxonLiteEnabled";
 NSString * const kSettingsTypeBannerEnabled = @"TypeBannerEnabled";
 NSString * const kSettingsNotificationIslandEnabled = @"NotificationIslandEnabled";
 NSString * const kSettingsAppSwitcherGridEnabled = @"AppSwitcherGridEnabled";
+static NSString * const kSettingsAppSwitcherGridLayout = @"AppSwitcherGridLayout";
+static NSString * const kSettingsAppSwitcherGridAnimation = @"AppSwitcherGridAnimation";
 NSString * const kSettingsFastLockXLiteEnabled = @"FastLockXLiteEnabled";
 static NSString * const kSettingsFastLockXLiteBlockMusic = @"FastLockXLiteBlockMusic";
 static NSString * const kSettingsFastLockXLiteBlockFlashlight = @"FastLockXLiteBlockFlashlight";
@@ -1070,6 +1071,13 @@ NSString * const kSettingsWatchLayoutEnabled = @"WatchLayoutEnabled";
 static NSString * const kSettingsWatchLayoutCompactPct = @"WatchLayoutCompactPct";
 static NSString * const kSettingsWatchLayoutScalePct = @"WatchLayoutScalePct";
 NSString * const kSettingsLockCustomizerEnabled = @"LockCustomizerEnabled";
+NSString * const kSettingsLockScreenOverlayEnabled = @"LockScreenOverlayEnabled";
+static NSString * const kSettingsLockScreenOverlayYOffset = @"LockScreenOverlayYOffset";
+static NSString * const kSettingsLockScreenOverlayWidthPct = @"LockScreenOverlayWidthPct";
+static NSString * const kSettingsLockScreenOverlayAccentStyle = @"LockScreenOverlayAccentStyle";
+static NSString * const kSettingsLockScreenOverlayGlassAlphaPct = @"LockScreenOverlayGlassAlphaPct";
+static NSString * const kSettingsLockScreenOverlayHideQuickActions = @"LockScreenOverlayHideQuickActions";
+static NSString * const kSettingsLockScreenOverlayHidePageDots = @"LockScreenOverlayHidePageDots";
 static NSString * const kSettingsLockCustomizerClockScalePct = @"LockCustomizerClockScalePct";
 static NSString * const kSettingsLockCustomizerXOffset = @"LockCustomizerXOffset";
 static NSString * const kSettingsLockCustomizerYOffset = @"LockCustomizerYOffset";
@@ -1120,21 +1128,6 @@ static NSString * const kSettingsAlkalineGreen = @"AlkalineGreen";
 static NSString * const kSettingsAlkalineBlue = @"AlkalineBlue";
 static NSString * const kSettingsAlkalineAlphaPct = @"AlkalineAlphaPct";
 NSString * const kSettingsTweakLoaderEnabled = @"TweakLoaderEnabled";
-NSString * const kSettingsScrollingDockEnabled = @"ScrollingDockEnabled";
-NSString * const kSettingsNiuBiBarEnabled = @"NiuBiBarEnabled";
-NSString * const kSettingsVolSkipEnabled = @"VolSkipEnabled";
-NSString * const kSettingsFlowLiteEnabled = @"FlowLiteEnabled";
-NSString * const kSettingsAppProfilesEnabled = @"AppProfilesEnabled";
-NSString * const kSettingsChargeFXEnabled = @"ChargeFXEnabled";
-NSString * const kSettingsRotateProEnabled = @"RotateProEnabled";
-NSString * const kSettingsKeepEyeEnabled = @"KeepEyeEnabled";
-NSString * const kSettingsLastLookEnabled = @"LastLookEnabled";
-static NSString * const kSettingsCommunityDockVisible = @"CommunityDockVisible";
-static NSString * const kSettingsCommunityBarThickness = @"CommunityBarThickness";
-static NSString * const kSettingsCommunityProfileBrightness = @"CommunityProfileBrightness";
-static NSString * const kSettingsCommunityChargeThickness = @"CommunityChargeThickness";
-static NSString * const kSettingsCommunityHUDYOffset = @"CommunityHUDYOffset";
-static NSString * const kSettingsCommunityLastLookAlpha = @"CommunityLastLookAlpha";
 
 static NSString * const kSettingsFastLockXLiteRetryInterval = @"FastLockXLiteRetryInterval";
 static NSString * const kSettingsHideHomeBarHidden = @"HideHomeBarHidden";
@@ -1191,6 +1184,16 @@ NSString * const kSettingsQuickLoaderEnabled = @"QuickLoaderEnabled";
 
 NSString * const kSettingsRepoTweaksEnabled = @"RepoTweaksEnabled";
 
+NSString * const kSettingsMagsafeEnabled = @"MagsafeEnabled";
+NSString * const kSettingsUpsideDownEnabled = @"UpsideDownEnabled";
+static NSString * const kSettingsMagsafeSize = @"MagsafeSize";
+static NSString * const kSettingsMagsafeYPosition = @"MagsafeYPosition";
+static NSString * const kSettingsMagsafeRingWidth = @"MagsafeRingWidth";
+static NSString * const kSettingsMagsafeAnimationDurationMs = @"MagsafeAnimationDurationMs";
+static NSString * const kSettingsMagsafeDisplaySeconds = @"MagsafeDisplaySeconds";
+static NSString * const kSettingsMagsafeBackgroundAlphaPct = @"MagsafeBackgroundAlphaPct";
+static NSString * const kSettingsMagsafeAccentStyle = @"MagsafeAccentStyle";
+
 // Internal gate for unfinished in-development tweaks. There is no public
 // account gate; beta packages that are ready for testing stay visible.
 NSString * const kSettingsExperimentalTweaksEnabled = @"ExperimentalTweaksEnabled";
@@ -1215,6 +1218,9 @@ static BOOL settings_cleanup_in_progress(void);
 static BOOL settings_screen_awake_cached(void);
 static BOOL settings_screen_locked_cached(void);
 static void settings_restart_gravity_motion_if_active(const char *reason);
+static void settings_install_magsafe_battery_monitor(void);
+static volatile uint64_t g_magsafe_hide_generation = 0;
+static void settings_stop_gravity_motion(void);
 
 extern int  escape_sbx_demo2(void);
 extern int  escape_sbx_demo2_in_session(void);
@@ -1301,7 +1307,15 @@ static void settings_start_gravity_motion(double magnitude, double explosionForc
 
             @synchronized (settings_rc_lock()) {
                 if (!settings_gravity_motion_can_remote_call(generation, mm)) return;
-                gravitylite_update_gravity_angle_in_session(angle, effectiveMagnitude);
+                if (!gravitylite_update_gravity_angle_in_session(angle, effectiveMagnitude) &&
+                    __sync_bool_compare_and_swap(&g_gravity_motion_stop_requested, 0, 1)) {
+                    log_user("[GRAVITY][STEERING-RECOVERY] no live physics behaviors remain; stopping the motion feed. Reapply Gravity Lite to rebuild its page state.\n");
+                    dispatch_async(dispatch_get_main_queue(), ^{
+                        if (generation == g_gravity_motion_generation &&
+                            mm == g_gravity_motion_manager)
+                            settings_stop_gravity_motion();
+                    });
+                }
             }
         }];
     } else {
@@ -1315,7 +1329,15 @@ static void settings_start_gravity_motion(double magnitude, double explosionForc
                                                      : (0.90 + fmin(tilt, 1.2) * 0.50));
             @synchronized (settings_rc_lock()) {
                 if (!settings_gravity_motion_can_remote_call(generation, mm)) return;
-                gravitylite_update_gravity_angle_in_session(angle, effectiveMagnitude);
+                if (!gravitylite_update_gravity_angle_in_session(angle, effectiveMagnitude) &&
+                    __sync_bool_compare_and_swap(&g_gravity_motion_stop_requested, 0, 1)) {
+                    log_user("[GRAVITY][STEERING-RECOVERY] no live physics behaviors remain; stopping the motion feed. Reapply Gravity Lite to rebuild its page state.\n");
+                    dispatch_async(dispatch_get_main_queue(), ^{
+                        if (generation == g_gravity_motion_generation &&
+                            mm == g_gravity_motion_manager)
+                            settings_stop_gravity_motion();
+                    });
+                }
             }
         }];
     }
@@ -1680,6 +1702,12 @@ static bool settings_stop_pullover_registered(BOOL springboardWillDie)
     return pullover_stop_in_session();
 }
 
+static bool settings_stop_lockscreenoverlay_registered(BOOL springboardWillDie)
+{
+    (void)springboardWillDie;
+    return lockscreenoverlay_stop_in_session();
+}
+
 static bool settings_stop_layout_extras_registered(BOOL springboardWillDie)
 {
     if (springboardWillDie) {
@@ -1689,18 +1717,6 @@ static bool settings_stop_layout_extras_registered(BOOL springboardWillDie)
     return darksword_layout_stop_in_session();
 }
 
-#define SETTINGS_COMMUNITY_STOP_FN(fnName, portValue) \
-static bool fnName(BOOL springboardWillDie) { (void)springboardWillDie; return communityports_stop(portValue); }
-SETTINGS_COMMUNITY_STOP_FN(settings_stop_scrollingdock_registered, CommunityPortScrollingDock)
-SETTINGS_COMMUNITY_STOP_FN(settings_stop_niubibar_registered, CommunityPortNiuBiBar)
-SETTINGS_COMMUNITY_STOP_FN(settings_stop_volskip_registered, CommunityPortVolSkip)
-SETTINGS_COMMUNITY_STOP_FN(settings_stop_flowlite_registered, CommunityPortFlow)
-SETTINGS_COMMUNITY_STOP_FN(settings_stop_appprofiles_registered, CommunityPortAppProfiles)
-SETTINGS_COMMUNITY_STOP_FN(settings_stop_chargefx_registered, CommunityPortChargeFX)
-SETTINGS_COMMUNITY_STOP_FN(settings_stop_rotatepro_registered, CommunityPortRotatePro)
-SETTINGS_COMMUNITY_STOP_FN(settings_stop_keepeye_registered, CommunityPortKeepEye)
-SETTINGS_COMMUNITY_STOP_FN(settings_stop_lastlook_registered, CommunityPortLastLook)
-#undef SETTINGS_COMMUNITY_STOP_FN
 
 static bool settings_stop_alkaline_registered(BOOL springboardWillDie)
 {
@@ -1730,6 +1746,22 @@ static bool settings_stop_repotweaks_registered(BOOL springboardWillDie)
 {
     (void)springboardWillDie;
     return repotweaks_stop_in_session();
+}
+
+static bool settings_stop_magsafe_registered(BOOL springboardWillDie)
+{
+    (void)springboardWillDie;
+    __sync_add_and_fetch(&g_magsafe_hide_generation, 1);
+    return magsafe_enabler_stop_in_session();
+}
+
+static bool settings_stop_upsidedown_registered(BOOL springboardWillDie)
+{
+    if (springboardWillDie) {
+        upsidedown_forget_remote_state();
+        return true;
+    }
+    return upsidedown_stop_in_session();
 }
 
 static void settings_each_springboard_cleanup_entry(void (^block)(const SettingsSpringBoardTweakCleanupEntry *entry))
@@ -1779,24 +1811,17 @@ static void settings_each_springboard_cleanup_entry(void (^block)(const Settings
         { kSettingsWatchLayoutEnabled, "Watch Layout", NULL, settings_stop_watchlayout_registered, watchlayout_forget_remote_state, NULL, YES, YES },
         { kSettingsAppLibraryStudioEnabled, "App Library Studio", NULL, settings_stop_applibrarystudio_registered, applibrarystudio_forget_remote_state, NULL, YES, YES },
         { kSettingsLockCustomizerEnabled, "Lock Screen Customizer", NULL, settings_stop_lockcustomizer_registered, lockcustomizer_forget_remote_state, NULL, YES, YES },
+        { kSettingsLockScreenOverlayEnabled, "Lock Screen Overlay", NULL, settings_stop_lockscreenoverlay_registered, lockscreenoverlay_forget_remote_state, NULL, YES, YES },
         { kSettingsFreePlacementEnabled, "Free Placement Lite", NULL, settings_stop_freeplacement_registered, freeplacement_forget_remote_state, NULL, YES, YES },
         { kSettingsBlurryBadgesEnabled, "BlurryBadges", NULL, settings_stop_blurrybadges_registered, blurrybadges_forget_remote_state, NULL, YES, YES },
         { kSettingsSnapperEnabled, "Snapper", NULL, settings_stop_snapper_registered, snapper_forget_remote_state, NULL, YES, YES },
-        { kSettingsPullOverEnabled, "PullOver", NULL, settings_stop_pullover_registered, pullover_forget_remote_state, NULL, YES, YES },
-        { kSettingsScrollingDockEnabled, "Scrolling Dock Lite", NULL, settings_stop_scrollingdock_registered, NULL, NULL, YES, YES },
-        { kSettingsNiuBiBarEnabled, "NiuBiBar Lite", NULL, settings_stop_niubibar_registered, NULL, NULL, YES, YES },
-        { kSettingsVolSkipEnabled, "VolSkip Lite", NULL, settings_stop_volskip_registered, NULL, NULL, YES, YES },
-        { kSettingsFlowLiteEnabled, "Flow Lite", NULL, settings_stop_flowlite_registered, NULL, NULL, YES, YES },
-        { kSettingsAppProfilesEnabled, "App Profiles Lite", NULL, settings_stop_appprofiles_registered, NULL, NULL, YES, YES },
-        { kSettingsChargeFXEnabled, "ChargeFX Lite", NULL, settings_stop_chargefx_registered, NULL, NULL, YES, YES },
-        { kSettingsRotateProEnabled, "RotatePro Lite", NULL, settings_stop_rotatepro_registered, NULL, NULL, YES, YES },
-        { kSettingsKeepEyeEnabled, "KeepEye HUD", NULL, settings_stop_keepeye_registered, NULL, NULL, YES, YES },
-        { kSettingsLastLookEnabled, "LastLook Lite", NULL, settings_stop_lastlook_registered, NULL, NULL, YES, YES },
+        { kSettingsPullOverEnabled, "Vesta Lite", NULL, settings_stop_pullover_registered, pullover_forget_remote_state, NULL, YES, YES },
         { kSettingsAlkalineEnabled, "Alkaline", NULL, settings_stop_alkaline_registered, alkaline_forget_remote_state, NULL, YES, YES },
         { kSettingsTweakLoaderEnabled, "TweakLoader", NULL, settings_stop_tweakloader_registered, tweakloader_forget_remote_state, NULL, YES, YES },
         { kSettingsQuickLoaderEnabled, "QuickLoader", NULL, settings_stop_quickloader_registered, NULL, NULL, YES, YES },
         { kSettingsRepoTweaksEnabled, "RepoTweaks", NULL, settings_stop_repotweaks_registered, NULL, NULL, YES, YES },
-        { nil, "Community Ports state", NULL, NULL, communityports_forget_remote_state, NULL, NO, NO },
+        { kSettingsMagsafeEnabled, "MagSafe Enabler", NULL, settings_stop_magsafe_registered, magsafe_enabler_forget_remote_state, NULL, YES, YES },
+        { kSettingsUpsideDownEnabled, "Upside Down", NULL, settings_stop_upsidedown_registered, upsidedown_forget_remote_state, NULL, YES, YES },
         { nil, "Kill All Apps", NULL, NULL, killallapps_forget_remote_state, NULL, NO, NO },
     };
     size_t count = sizeof(entries) / sizeof(entries[0]);
@@ -1923,8 +1948,11 @@ static const NSUInteger kAxonLiteLiveMaxTicks = 43200;
 static const int kSettingsSpringBoardRCFirstExceptionTimeoutMS = 3000;
 // TypeBanner polls imagent for typing indicators with original-thread-only
 // RemoteCall probes and opens SpringBoard only when the banner state changes.
-static const useconds_t kTypeBannerLiveIntervalUS = 1000000;
-static const useconds_t kTypeBannerLiveBackgroundIntervalUS = 1000000;
+// TypeBanner temporarily borrows imagent's original thread. Keep probes sparse
+// enough to avoid hammering a core system daemon while remaining responsive to
+// normal multi-second typing indicators.
+static const useconds_t kTypeBannerLiveIntervalUS = 5000000;
+static const useconds_t kTypeBannerLiveBackgroundIntervalUS = 5000000;
 static const useconds_t kTypeBannerInitialDaemonSettleUS = 250000;
 static const NSUInteger kTypeBannerLiveMaxTicks = 28800;
 static const useconds_t kNotificationIslandLiveIntervalUS = 750000;
@@ -2264,7 +2292,9 @@ static BOOL settings_fugap_install_allowed(void) { return cyanide_experimental_t
 static BOOL settings_modulespacing_install_allowed(void) { return cyanide_experimental_tweaks_available(); }
 static BOOL settings_sugarcane_install_allowed(void) { return cyanide_experimental_tweaks_available(); }
 static BOOL settings_betterccxi_install_allowed(void) { return cyanide_experimental_tweaks_available(); }
-static BOOL settings_magma_install_allowed(void) { return cyanide_experimental_tweaks_available(); }
+// Magma is retired: keep the symbols available for exact cleanup of an older
+// active session, but never expose or schedule a new application.
+static BOOL settings_magma_install_allowed(void) { return NO; }
 static BOOL settings_betterccicons_install_allowed(void) { return cyanide_experimental_tweaks_available(); }
 static BOOL settings_ccnoplatterdim_install_allowed(void) { return cyanide_experimental_tweaks_available(); }
 static BOOL settings_ccstatus_install_allowed(void) { return cyanide_experimental_tweaks_available(); }
@@ -5590,7 +5620,6 @@ static void settings_start_typebanner_live_loop(void)
         BOOL deferredLogged = NO;
         BOOL pausedForMessages = NO;
         RemoteCallSession *mobileSession = nil;
-        RemoteCallSession *daemonSession = nil;
 
         printf("[SETTINGS] TypeBanner live loop started interval=%uus background=%uus max=%lu\n",
                kTypeBannerLiveIntervalUS,
@@ -5632,12 +5661,6 @@ static void settings_start_typebanner_live_loop(void)
                             mobileSession = nil;
                         }
                     }
-                    if (daemonSession) {
-                        @synchronized (settings_rc_lock()) {
-                            [daemonSession abandonRemoteCall];
-                            daemonSession = nil;
-                        }
-                    }
                     settings_live_loop_sleep_interruptible(0,
                                                            intervalUS,
                                                            &g_typebanner_live_stop_requested);
@@ -5658,7 +5681,7 @@ static void settings_start_typebanner_live_loop(void)
                             g_kexploit_done &&
                             settings_typebanner_can_poll_messages()) {
                             ok = typebanner_run_once_with_cached_sessions(&mobileSession,
-                                                                          &daemonSession,
+                                                                          NULL,
                                                                           g_springboard_rc_ready != 0);
                         } else {
                             ok = true;
@@ -5701,12 +5724,6 @@ static void settings_start_typebanner_live_loop(void)
                 @synchronized (settings_rc_lock()) {
                     [mobileSession destroyRemoteCall];
                     mobileSession = nil;
-                }
-            }
-            if (daemonSession) {
-                @synchronized (settings_rc_lock()) {
-                    [daemonSession destroyRemoteCall];
-                    daemonSession = nil;
                 }
             }
 
@@ -5993,7 +6010,6 @@ static BOOL settings_visual_refresh_enabled(NSUserDefaults *d)
            [d boolForKey:kSettingsModuleSpacingEnabled] ||
            [d boolForKey:kSettingsSugarCaneEnabled] ||
            [d boolForKey:kSettingsBetterCCXIEnabled] ||
-           [d boolForKey:kSettingsMagmaEnabled] ||
            [d boolForKey:kSettingsBetterCCIconsEnabled] ||
            [d boolForKey:kSettingsCCNoPlatterDimEnabled] ||
            [d boolForKey:kSettingsCCStatusEnabled] ||
@@ -6006,11 +6022,8 @@ static BOOL settings_visual_refresh_enabled(NSUserDefaults *d)
            [d boolForKey:kSettingsWatchLayoutEnabled] ||
            [d boolForKey:kSettingsAppLibraryStudioEnabled] ||
            [d boolForKey:kSettingsLockCustomizerEnabled] ||
-           [d boolForKey:kSettingsFreePlacementEnabled] ||
-           [d boolForKey:kSettingsFlowLiteEnabled] ||
-           [d boolForKey:kSettingsAppProfilesEnabled] ||
-           [d boolForKey:kSettingsChargeFXEnabled] ||
-           [d boolForKey:kSettingsLastLookEnabled];
+           [d boolForKey:kSettingsLockScreenOverlayEnabled] ||
+           [d boolForKey:kSettingsFreePlacementEnabled];
 }
 
 static void settings_visual_refresh_mark_if_ready(NSString *key, bool ready)
@@ -6039,7 +6052,6 @@ static BOOL settings_visual_refresh_tick(NSUserDefaults *d, BOOL advanceHeavySca
                                 [d boolForKey:kSettingsFUGapEnabled] ||
                                 [d boolForKey:kSettingsModuleSpacingEnabled]; break;
             case 2: attempted = attempted || [d boolForKey:kSettingsBetterCCXIEnabled] ||
-                                [d boolForKey:kSettingsMagmaEnabled] ||
                                 [d boolForKey:kSettingsBetterCCIconsEnabled]; break;
             case 3: attempted = attempted || [d boolForKey:kSettingsCCNoPlatterDimEnabled] ||
                                 [d boolForKey:kSettingsCCStatusEnabled] ||
@@ -6048,12 +6060,9 @@ static BOOL settings_visual_refresh_tick(NSUserDefaults *d, BOOL advanceHeavySca
                                 [d boolForKey:kSettingsFreePlacementEnabled] ||
                                 [d boolForKey:kSettingsAppLibraryStudioEnabled]; break;
             case 5: attempted = attempted || [d boolForKey:kSettingsLockCustomizerEnabled] ||
+                                [d boolForKey:kSettingsLockScreenOverlayEnabled] ||
                                 [d boolForKey:kSettingsAlkalineEnabled] ||
                                 [d boolForKey:kSettingsSecureCCEnabled]; break;
-            case 6: attempted = attempted || [d boolForKey:kSettingsFlowLiteEnabled] ||
-                                [d boolForKey:kSettingsAppProfilesEnabled] ||
-                                [d boolForKey:kSettingsChargeFXEnabled] ||
-                                [d boolForKey:kSettingsLastLookEnabled]; break;
             default: break;
         }
     }
@@ -6082,8 +6091,6 @@ static BOOL settings_visual_refresh_tick(NSUserDefaults *d, BOOL advanceHeavySca
 
     if (slot == 2 && [d boolForKey:kSettingsBetterCCXIEnabled])
         settings_visual_refresh_mark_if_ready(kSettingsBetterCCXIEnabled, betterccxi_apply_in_session());
-    if (slot == 2 && [d boolForKey:kSettingsMagmaEnabled])
-        settings_visual_refresh_mark_if_ready(kSettingsMagmaEnabled, magma_apply_in_session());
     if (slot == 2 && [d boolForKey:kSettingsBetterCCIconsEnabled])
         settings_visual_refresh_mark_if_ready(kSettingsBetterCCIconsEnabled, betterccicons_apply_in_session());
 
@@ -6103,19 +6110,12 @@ static BOOL settings_visual_refresh_tick(NSUserDefaults *d, BOOL advanceHeavySca
 
     if (slot == 5 && [d boolForKey:kSettingsLockCustomizerEnabled])
         settings_visual_refresh_mark_if_ready(kSettingsLockCustomizerEnabled, lockcustomizer_apply_in_session());
+    if (slot == 5 && [d boolForKey:kSettingsLockScreenOverlayEnabled])
+        settings_visual_refresh_mark_if_ready(kSettingsLockScreenOverlayEnabled, lockscreenoverlay_apply_in_session());
     if (slot == 5 && [d boolForKey:kSettingsAlkalineEnabled])
         settings_visual_refresh_mark_if_ready(kSettingsAlkalineEnabled, alkaline_apply_in_session());
     if (slot == 5 && [d boolForKey:kSettingsSecureCCEnabled])
         settings_visual_refresh_mark_if_ready(kSettingsSecureCCEnabled, securecc_apply_in_session());
-
-    if (slot == 6 && [d boolForKey:kSettingsFlowLiteEnabled])
-        settings_visual_refresh_mark_if_ready(kSettingsFlowLiteEnabled, communityports_apply(CommunityPortFlow));
-    if (slot == 6 && [d boolForKey:kSettingsAppProfilesEnabled])
-        settings_visual_refresh_mark_if_ready(kSettingsAppProfilesEnabled, communityports_apply(CommunityPortAppProfiles));
-    if (slot == 6 && [d boolForKey:kSettingsChargeFXEnabled])
-        settings_visual_refresh_mark_if_ready(kSettingsChargeFXEnabled, communityports_apply(CommunityPortChargeFX));
-    if (slot == 6 && [d boolForKey:kSettingsLastLookEnabled])
-        settings_visual_refresh_mark_if_ready(kSettingsLastLookEnabled, communityports_apply(CommunityPortLastLook));
 
     // These are lightweight state updates and remain responsive every tick.
     if (advanceHeavyScan && [d boolForKey:kSettingsSugarCaneEnabled])
@@ -6124,7 +6124,7 @@ static BOOL settings_visual_refresh_tick(NSUserDefaults *d, BOOL advanceHeavySca
         settings_visual_refresh_mark_if_ready(kSettingsHapticCCEnabled, hapticcc_apply_in_session());
     if ([d boolForKey:kSettingsCylinderLiteEnabled])
         settings_visual_refresh_mark_if_ready(kSettingsCylinderLiteEnabled,
-                                              cylinderlite_refresh_in_session(slot == 0));
+                                              cylinderlite_refresh_in_session(false));
     return attempted;
 }
 
@@ -6774,11 +6774,11 @@ static void settings_log_pancake_config(NSUserDefaults *d, const char *prefix)
 
 static void settings_log_cylinderlite_config(NSUserDefaults *d, const char *prefix)
 {
-    log_user("[%s] Cylinder Lite config: animation=page-position-driven refresh=100ms depth=%ld perspective=%ld scanLimit=512 requestedLimit=%ld pages=all taps=preserved.\n",
+    log_user("[%s] Cylinder Lite config: engine=scalar-page-layer anchorGeometry=1 refresh=250ms depth=%ld curveDistance=%ld pageCap=%ld remoteReads=0 iconMutations=0 taps=preserved.\n",
              prefix ?: "CFG",
              (long)[d integerForKey:kSettingsCylinderLiteDepth],
              (long)[d integerForKey:kSettingsCylinderLitePerspective],
-             (long)[d integerForKey:kSettingsCylinderLiteMaxIcons]);
+             MIN(16L, MAX(3L, (long)[d integerForKey:kSettingsCylinderLiteMaxIcons] / 32L)));
 }
 
 static void settings_configure_control_center_tweaks(NSUserDefaults *d)
@@ -6816,12 +6816,6 @@ static void settings_configure_control_center_tweaks(NSUserDefaults *d)
     barmoji_configure_shared_snippets([d stringForKey:kSettingsCopypastaSnippet1].UTF8String,
                                       [d stringForKey:kSettingsCopypastaSnippet2].UTF8String,
                                       [d stringForKey:kSettingsCopypastaSnippet3].UTF8String);
-    communityports_configure((int)[d integerForKey:kSettingsCommunityDockVisible],
-                             (int)[d integerForKey:kSettingsCommunityBarThickness],
-                             (int)[d integerForKey:kSettingsCommunityProfileBrightness],
-                             (int)[d integerForKey:kSettingsCommunityChargeThickness],
-                             (int)[d integerForKey:kSettingsCommunityHUDYOffset],
-                             (int)[d integerForKey:kSettingsCommunityLastLookAlpha]);
     blurrybadges_configure((int)[d integerForKey:kSettingsBlurryBadgesRed],
                            (int)[d integerForKey:kSettingsBlurryBadgesGreen],
                            (int)[d integerForKey:kSettingsBlurryBadgesBlue],
@@ -6860,6 +6854,12 @@ static void settings_configure_control_center_tweaks(NSUserDefaults *d)
                              (int)[d integerForKey:kSettingsLockCustomizerMetalLightIntensityPct],
                              (int)[d integerForKey:kSettingsLockCustomizerMetalLightThickness],
                              (int)[d integerForKey:kSettingsLockCustomizerMetalLightStyle]);
+    lockscreenoverlay_configure((int)[d integerForKey:kSettingsLockScreenOverlayYOffset],
+                                (int)[d integerForKey:kSettingsLockScreenOverlayWidthPct],
+                                (int)[d integerForKey:kSettingsLockScreenOverlayAccentStyle],
+                                (int)[d integerForKey:kSettingsLockScreenOverlayGlassAlphaPct],
+                                [d boolForKey:kSettingsLockScreenOverlayHideQuickActions],
+                                [d boolForKey:kSettingsLockScreenOverlayHidePageDots]);
     NSInteger freeX = [d objectForKey:kSettingsFreePlacementHorizontalStep] ? [d integerForKey:kSettingsFreePlacementHorizontalStep] : 8;
     NSInteger freeY = [d objectForKey:kSettingsFreePlacementVerticalStep] ? [d integerForKey:kSettingsFreePlacementVerticalStep] : 5;
     NSInteger freeStagger = [d objectForKey:kSettingsFreePlacementStaggerPct] ? [d integerForKey:kSettingsFreePlacementStaggerPct] : 35;
@@ -6869,6 +6869,88 @@ static void settings_configure_control_center_tweaks(NSUserDefaults *d)
                                (int)[d integerForKey:kSettingsAppLibraryStudioVerticalSpacing],
                                [d boolForKey:kSettingsAppLibraryStudioHideLabels],
                                [d boolForKey:kSettingsAppLibraryStudioDisableTodayView]);
+    magsafe_enabler_configure((int)[d integerForKey:kSettingsMagsafeSize],
+                              (int)[d integerForKey:kSettingsMagsafeYPosition],
+                              (int)[d integerForKey:kSettingsMagsafeRingWidth],
+                              (int)[d integerForKey:kSettingsMagsafeAnimationDurationMs],
+                              (int)[d integerForKey:kSettingsMagsafeBackgroundAlphaPct],
+                              (int)[d integerForKey:kSettingsMagsafeAccentStyle]);
+}
+
+// Called while settings_rc_lock() is held. A generation token ensures that an
+// older delayed hide can never dismiss a newer charging animation.
+static bool settings_magsafe_show_for_current_battery_locked(NSUserDefaults *d,
+                                                               const char *reason)
+{
+    UIDevice *device = UIDevice.currentDevice;
+    UIDeviceBatteryState state = device.batteryState;
+    float level = device.batteryLevel;
+    if (state != UIDeviceBatteryStateCharging && state != UIDeviceBatteryStateFull) {
+        __sync_add_and_fetch(&g_magsafe_hide_generation, 1);
+        bool hidden = magsafe_enabler_hide();
+        log_user("[MAGSAFE][BATTERY] reason=%s state=%ld; overlay hidden result=%d.\n",
+                 reason ?: "unknown", (long)state, hidden);
+        return hidden;
+    }
+
+    settings_configure_control_center_tweaks(d);
+    bool applied = magsafe_enabler_apply_in_session();
+    bool shown = applied && magsafe_enabler_show(level >= 0.0f ? level : 0.0f);
+    uint64_t generation = __sync_add_and_fetch(&g_magsafe_hide_generation, 1);
+    NSInteger seconds = MAX(2, MIN(10, [d integerForKey:kSettingsMagsafeDisplaySeconds]));
+    log_user("[MAGSAFE][BATTERY] reason=%s state=%ld level=%.0f%% apply=%d show=%d autoHide=%lds generation=%llu.\n",
+             reason ?: "unknown", (long)state,
+             level >= 0.0f ? level * 100.0f : 0.0f,
+             applied, shown, (long)seconds, (unsigned long long)generation);
+
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(seconds * NSEC_PER_SEC)),
+                   dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
+        if (generation != g_magsafe_hide_generation) return;
+        NSUserDefaults *liveDefaults = NSUserDefaults.standardUserDefaults;
+        if (![liveDefaults boolForKey:kSettingsMagsafeEnabled]) return;
+        @synchronized (settings_rc_lock()) {
+            if (generation != g_magsafe_hide_generation ||
+                settings_cleanup_in_progress() || !g_springboard_rc_ready) return;
+            bool hidden = magsafe_enabler_hide();
+            log_user("[MAGSAFE][TIMER] generation=%llu auto-hide result=%d.\n",
+                     (unsigned long long)generation, hidden);
+        }
+    });
+    return shown;
+}
+
+static void settings_handle_magsafe_battery_change(const char *reason)
+{
+    NSUserDefaults *d = NSUserDefaults.standardUserDefaults;
+    if (![d boolForKey:kSettingsMagsafeEnabled]) return;
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+        @synchronized (settings_rc_lock()) {
+            if (settings_cleanup_in_progress() ||
+                ![d boolForKey:kSettingsMagsafeEnabled] || !g_springboard_rc_ready) return;
+            bool shown = settings_magsafe_show_for_current_battery_locked(d, reason);
+            settings_mark_tweak_applied(kSettingsMagsafeEnabled,
+                                        [d boolForKey:kSettingsMagsafeEnabled] && shown);
+        }
+        settings_notify_package_queue_changed_async();
+    });
+}
+
+static void settings_install_magsafe_battery_monitor(void)
+{
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        dispatch_async(dispatch_get_main_queue(), ^{
+            UIDevice.currentDevice.batteryMonitoringEnabled = YES;
+            [[NSNotificationCenter defaultCenter]
+                addObserverForName:UIDeviceBatteryStateDidChangeNotification
+                            object:UIDevice.currentDevice
+                             queue:NSOperationQueue.mainQueue
+                        usingBlock:^(__unused NSNotification *note) {
+                settings_handle_magsafe_battery_change("battery-state-notification");
+            }];
+            log_user("[MAGSAFE][MONITOR] Battery-state observer installed; charging source is intentionally treated as generic because public UIDevice APIs do not distinguish cable, Qi, and MagSafe.\n");
+        });
+    });
 }
 
 static void settings_log_split_tweak_config(NSString *masterKey, NSUserDefaults *d, const char *prefix)
@@ -6895,7 +6977,7 @@ static void settings_log_split_tweak_config(NSString *masterKey, NSUserDefaults 
                  (long)[d integerForKey:kSettingsBetterCCXIDepthLimit],
                  (long)[d integerForKey:kSettingsBetterCCXIModuleScalePct]);
     } else if ([masterKey isEqualToString:kSettingsMagmaEnabled]) {
-        log_user("[%s] Magma Evo config: rgba=%ld/%ld/%ld/%ld%% toggles=%d sliders=%d media=%d background=%d.\n", tag,
+        log_user("[%s] Magma 2 config: rgba=%ld/%ld/%ld/%ld%% toggles=%d sliders=%d media=%d background=%d scanCap=180 propertyCap=96.\n", tag,
                  (long)[d integerForKey:kSettingsMagmaRed],
                  (long)[d integerForKey:kSettingsMagmaGreen],
                  (long)[d integerForKey:kSettingsMagmaBlue],
@@ -6942,7 +7024,7 @@ static void settings_log_split_tweak_config(NSString *masterKey, NSUserDefaults 
                  (long)[d integerForKey:kSettingsSnapperBorderWidth],
                  (long)[d integerForKey:kSettingsSnapperCornerRadius]);
     } else if ([masterKey isEqualToString:kSettingsPullOverEnabled]) {
-        log_user("[%s] PullOver config: width=%ld y=%ld maxH=%ld radius=%ld alpha=%ld%%.\n", tag,
+        log_user("[%s] Vesta Lite config: trigger=right-edge-tap width=%ld y=%ld maxH=%ld radius=%ld alpha=%ld%% appCap=36.\n", tag,
                  (long)[d integerForKey:kSettingsPullOverWidth],
                  (long)[d integerForKey:kSettingsPullOverYOffset],
                  (long)[d integerForKey:kSettingsPullOverMaxHeight],
@@ -6958,7 +7040,7 @@ static void settings_log_split_tweak_config(NSString *masterKey, NSUserDefaults 
         log_user("[%s] Rounded Icons config: continuousRadius=%ldpt pages=all discovered.\n", tag,
                  (long)[d integerForKey:kSettingsRoundedIconsRadius]);
     } else if ([masterKey isEqualToString:kSettingsWatchLayoutEnabled]) {
-        log_user("[%s] Watch Layout config: geometry=honeycomb compact=%ld%% scale=%ld%% circular=1 stagger=half-slot dockExcluded=1 appLibraryExcluded=1 pages=all discovered.\n", tag,
+        log_user("[%s] Watch Layout config: implementation=overlay-v6 geometry=scrolling-honeycomb rows=5/4 compact=%ld%% scale=%ld%% pressable=1 systemAppsIncluded=1 dockUntouched=1 boundedReads=1.\n", tag,
                  (long)[d integerForKey:kSettingsWatchLayoutCompactPct],
                  (long)[d integerForKey:kSettingsWatchLayoutScalePct]);
     } else if ([masterKey isEqualToString:kSettingsLockCustomizerEnabled]) {
@@ -6975,6 +7057,14 @@ static void settings_log_split_tweak_config(NSString *masterKey, NSUserDefaults 
                  (long)[d integerForKey:kSettingsLockCustomizerMetalLightIntensityPct],
                  (long)[d integerForKey:kSettingsLockCustomizerMetalLightThickness],
                  (long)[d integerForKey:kSettingsLockCustomizerMetalLightStyle]);
+    } else if ([masterKey isEqualToString:kSettingsLockScreenOverlayEnabled]) {
+        log_user("[%s] Lock Screen Overlay config: engine=standalone-overlay-v1 y=%ldpt width=%ld%% accent=%ld glass=%ld%% hideQuick=%d hideDots=%d.\n", tag,
+                 (long)[d integerForKey:kSettingsLockScreenOverlayYOffset],
+                 (long)[d integerForKey:kSettingsLockScreenOverlayWidthPct],
+                 (long)[d integerForKey:kSettingsLockScreenOverlayAccentStyle],
+                 (long)[d integerForKey:kSettingsLockScreenOverlayGlassAlphaPct],
+                 [d boolForKey:kSettingsLockScreenOverlayHideQuickActions],
+                 [d boolForKey:kSettingsLockScreenOverlayHidePageDots]);
     } else if ([masterKey isEqualToString:kSettingsFreePlacementEnabled]) {
         log_user("[%s] Free Placement Lite config: horizontalStep=%ld verticalStep=%ld stagger=%ld%%; live icon taps preserved.\n", tag,
                  (long)[d integerForKey:kSettingsFreePlacementHorizontalStep],
@@ -6987,6 +7077,15 @@ static void settings_log_split_tweak_config(NSString *masterKey, NSUserDefaults 
                  (long)[d integerForKey:kSettingsAppLibraryStudioVerticalSpacing],
                  [d boolForKey:kSettingsAppLibraryStudioHideLabels],
                  [d boolForKey:kSettingsAppLibraryStudioDisableTodayView]);
+    } else if ([masterKey isEqualToString:kSettingsMagsafeEnabled]) {
+        log_user("[%s] MagSafe Enabler config: size=%ldpt y=%ldpt ring=%ldpt animation=%ldms visible=%lds background=%ld%% accent=%ld engine=owned-touch-through-window remoteReads=0 stockMutations=0.\n", tag,
+                 (long)[d integerForKey:kSettingsMagsafeSize],
+                 (long)[d integerForKey:kSettingsMagsafeYPosition],
+                 (long)[d integerForKey:kSettingsMagsafeRingWidth],
+                 (long)[d integerForKey:kSettingsMagsafeAnimationDurationMs],
+                 (long)[d integerForKey:kSettingsMagsafeDisplaySeconds],
+                 (long)[d integerForKey:kSettingsMagsafeBackgroundAlphaPct],
+                 (long)[d integerForKey:kSettingsMagsafeAccentStyle]);
     }
 }
 
@@ -7075,6 +7174,13 @@ static NSString *settings_split_tweak_master_key_for_key(NSString *key)
         [key isEqualToString:kSettingsLockCustomizerMetalLightIntensityPct] ||
         [key isEqualToString:kSettingsLockCustomizerMetalLightThickness] ||
         [key isEqualToString:kSettingsLockCustomizerMetalLightStyle]) return kSettingsLockCustomizerEnabled;
+    if ([key isEqualToString:kSettingsLockScreenOverlayEnabled] ||
+        [key isEqualToString:kSettingsLockScreenOverlayYOffset] ||
+        [key isEqualToString:kSettingsLockScreenOverlayWidthPct] ||
+        [key isEqualToString:kSettingsLockScreenOverlayAccentStyle] ||
+        [key isEqualToString:kSettingsLockScreenOverlayGlassAlphaPct] ||
+        [key isEqualToString:kSettingsLockScreenOverlayHideQuickActions] ||
+        [key isEqualToString:kSettingsLockScreenOverlayHidePageDots]) return kSettingsLockScreenOverlayEnabled;
     if ([key isEqualToString:kSettingsFreePlacementEnabled] ||
         [key isEqualToString:kSettingsFreePlacementHorizontalStep] ||
         [key isEqualToString:kSettingsFreePlacementVerticalStep] ||
@@ -7085,6 +7191,15 @@ static NSString *settings_split_tweak_master_key_for_key(NSString *key)
         [key isEqualToString:kSettingsAppLibraryStudioVerticalSpacing] ||
         [key isEqualToString:kSettingsAppLibraryStudioHideLabels] ||
         [key isEqualToString:kSettingsAppLibraryStudioDisableTodayView]) return kSettingsAppLibraryStudioEnabled;
+    if ([key isEqualToString:kSettingsMagsafeEnabled] ||
+        [key isEqualToString:kSettingsMagsafeSize] ||
+        [key isEqualToString:kSettingsMagsafeYPosition] ||
+        [key isEqualToString:kSettingsMagsafeRingWidth] ||
+        [key isEqualToString:kSettingsMagsafeAnimationDurationMs] ||
+        [key isEqualToString:kSettingsMagsafeDisplaySeconds] ||
+        [key isEqualToString:kSettingsMagsafeBackgroundAlphaPct] ||
+        [key isEqualToString:kSettingsMagsafeAccentStyle]) return kSettingsMagsafeEnabled;
+    if ([key isEqualToString:kSettingsUpsideDownEnabled]) return kSettingsUpsideDownEnabled;
     return nil;
 }
 
@@ -7100,7 +7215,44 @@ static BOOL settings_key_is_tweakloader(NSString *key)
 
 static BOOL settings_key_is_appswitchergrid(NSString *key)
 {
-    return [key isEqualToString:kSettingsAppSwitcherGridEnabled];
+    return [key isEqualToString:kSettingsAppSwitcherGridEnabled] ||
+           [key isEqualToString:kSettingsAppSwitcherGridLayout] ||
+           [key isEqualToString:kSettingsAppSwitcherGridAnimation];
+}
+
+static NSString *settings_appswitcher_layout_title(NSInteger value)
+{
+    switch (value) {
+        case AppSwitcherLayoutAutomatic: return @"Automatic";
+        case AppSwitcherLayoutDeck: return @"Classic Deck";
+        case AppSwitcherLayoutGridCompact: return @"Compact Grid";
+        case AppSwitcherLayoutGridLarge: return @"Large Grid";
+        default: return @"Balanced Grid";
+    }
+}
+
+static NSString *settings_appswitcher_animation_title(NSInteger value)
+{
+    switch (value) {
+        case AppSwitcherAnimationSnappy: return @"Snappy";
+        case AppSwitcherAnimationSmooth: return @"Smooth";
+        case AppSwitcherAnimationBouncy: return @"Bouncy";
+        default: return @"System";
+    }
+}
+
+static AppSwitcherGridConfig settings_appswitcher_config_from_defaults(NSUserDefaults *defaults)
+{
+    NSInteger layout = [defaults integerForKey:kSettingsAppSwitcherGridLayout];
+    NSInteger animation = [defaults integerForKey:kSettingsAppSwitcherGridAnimation];
+    if (layout < AppSwitcherLayoutAutomatic || layout > AppSwitcherLayoutGridLarge)
+        layout = AppSwitcherLayoutGridBalanced;
+    if (animation < AppSwitcherAnimationSystem || animation > AppSwitcherAnimationBouncy)
+        animation = AppSwitcherAnimationSystem;
+    return (AppSwitcherGridConfig) {
+        .layout = (AppSwitcherLayoutMode)layout,
+        .animation = (AppSwitcherAnimationMode)animation,
+    };
 }
 
 static BOOL settings_key_is_gravitylite(NSString *key)
@@ -7583,21 +7735,26 @@ static BOOL settings_key_affects_package_state(NSString *key)
     return [settings_rc_backed_tweak_keys() containsObject:key];
 }
 
-// Both ports save and rewrite SBIconView frames. Letting them run together
-// makes whichever stops last restore stale frames over the other layout.
+// Free Placement was retired during the catalog cleanup. Clear its old
+// preference so an upgrade cannot silently disable the rewritten Watch
+// overlay or keep scheduling a deleted implementation.
 static NSString *settings_resolve_icon_layout_conflict(NSUserDefaults *d, NSString *preferredKey)
 {
-    if (![d boolForKey:kSettingsWatchLayoutEnabled] ||
-        ![d boolForKey:kSettingsFreePlacementEnabled]) return nil;
+    (void)preferredKey;
+    if (![d boolForKey:kSettingsFreePlacementEnabled]) return nil;
 
-    NSString *disabledKey = [preferredKey isEqualToString:kSettingsFreePlacementEnabled]
-        ? kSettingsWatchLayoutEnabled
-        : kSettingsFreePlacementEnabled;
-    [d setBool:NO forKey:disabledKey];
+    [d setBool:NO forKey:kSettingsFreePlacementEnabled];
     [d synchronize];
-    log_user("[COMPAT] %s disabled because Watch Layout and Free Placement Lite both own live icon frames; preferred=%s.\n",
-             disabledKey.UTF8String, (preferredKey ?: kSettingsWatchLayoutEnabled).UTF8String);
-    return disabledKey;
+    log_user("[MIGRATION] Cleared the retired Free Placement preference; Watch Layout now owns an independent scrolling overlay.\n");
+    return kSettingsFreePlacementEnabled;
+}
+
+static void settings_retire_magma_preference(NSUserDefaults *d)
+{
+    if (![d boolForKey:kSettingsMagmaEnabled]) return;
+    [d setBool:NO forKey:kSettingsMagmaEnabled];
+    [d synchronize];
+    log_user("[MIGRATION] Disabled retired Magma; cleanup will restore any color properties still owned by its previous live session.\n");
 }
 
 static NSArray<NSString *> *settings_resolve_statusbar_conflicts(NSUserDefaults *d, NSString *preferredKey)
@@ -7620,28 +7777,6 @@ static NSArray<NSString *> *settings_resolve_statusbar_conflicts(NSUserDefaults 
     }
     if (disabled.count > 0) [d synchronize];
     return disabled;
-}
-
-static bool settings_apply_community_ports(NSUserDefaults *d);
-static BOOL settings_community_ports_should_run(NSUserDefaults *d, BOOL pendingOnly);
-
-static BOOL settings_key_is_community_port(NSString *key)
-{
-    return [key isEqualToString:kSettingsScrollingDockEnabled] ||
-           [key isEqualToString:kSettingsNiuBiBarEnabled] ||
-           [key isEqualToString:kSettingsVolSkipEnabled] ||
-           [key isEqualToString:kSettingsFlowLiteEnabled] ||
-           [key isEqualToString:kSettingsAppProfilesEnabled] ||
-           [key isEqualToString:kSettingsChargeFXEnabled] ||
-           [key isEqualToString:kSettingsRotateProEnabled] ||
-           [key isEqualToString:kSettingsKeepEyeEnabled] ||
-           [key isEqualToString:kSettingsLastLookEnabled] ||
-           [key isEqualToString:kSettingsCommunityDockVisible] ||
-           [key isEqualToString:kSettingsCommunityBarThickness] ||
-           [key isEqualToString:kSettingsCommunityProfileBrightness] ||
-           [key isEqualToString:kSettingsCommunityChargeThickness] ||
-           [key isEqualToString:kSettingsCommunityHUDYOffset] ||
-           [key isEqualToString:kSettingsCommunityLastLookAlpha];
 }
 
 static void settings_schedule_live_apply_for_key(NSString *key)
@@ -7684,21 +7819,6 @@ static void settings_schedule_live_apply_for_key(NSString *key)
                 }
             }
             settings_schedule_live_apply_for_key(key);
-            settings_notify_package_queue_changed_async();
-        });
-        return;
-    }
-    if (settings_key_is_community_port(key)) {
-        if (!g_springboard_rc_ready) {
-            if (settings_key_affects_package_state(key)) settings_mark_tweak_applied(key, NO);
-            settings_notify_package_queue_changed_async();
-            return;
-        }
-        dispatch_async(dispatch_get_global_queue(0, 0), ^{
-            @synchronized (settings_rc_lock()) {
-                if (!settings_cleanup_in_progress() && g_springboard_rc_ready)
-                    (void)settings_apply_community_ports(d);
-            }
             settings_notify_package_queue_changed_async();
         });
         return;
@@ -8234,6 +8354,14 @@ static void settings_schedule_live_apply_for_key(NSString *key)
                         freeplacement_stop_in_session();
                         settings_mark_tweak_applied(kSettingsFreePlacementEnabled, NO);
                     }
+                    if ([d boolForKey:kSettingsLockScreenOverlayEnabled] &&
+                        [d boolForKey:kSettingsLockCustomizerEnabled]) {
+                        [d setBool:NO forKey:kSettingsLockCustomizerEnabled];
+                        [d synchronize];
+                        lockcustomizer_stop_in_session();
+                        settings_mark_tweak_applied(kSettingsLockCustomizerEnabled, NO);
+                        log_user("[LOCKOVERLAY][CONFLICT] Restored and disabled the retired Lock Screen Customizer before live overlay apply.\n");
+                    }
                     settings_configure_control_center_tweaks(d);
                     settings_log_split_tweak_config(masterKey, d, "LIVE");
                     bool ok = true;
@@ -8297,9 +8425,27 @@ static void settings_schedule_live_apply_for_key(NSString *key)
                     } else if ([masterKey isEqualToString:kSettingsLockCustomizerEnabled]) {
                         ok = [d boolForKey:kSettingsLockCustomizerEnabled] ? lockcustomizer_apply_in_session() : lockcustomizer_stop_in_session();
                         settings_mark_tweak_applied(kSettingsLockCustomizerEnabled, ok && [d boolForKey:kSettingsLockCustomizerEnabled]);
+                    } else if ([masterKey isEqualToString:kSettingsLockScreenOverlayEnabled]) {
+                        ok = [d boolForKey:kSettingsLockScreenOverlayEnabled] ? lockscreenoverlay_apply_in_session() : lockscreenoverlay_stop_in_session();
+                        settings_mark_tweak_applied(kSettingsLockScreenOverlayEnabled, ok && [d boolForKey:kSettingsLockScreenOverlayEnabled]);
                     } else if ([masterKey isEqualToString:kSettingsFreePlacementEnabled]) {
                         ok = [d boolForKey:kSettingsFreePlacementEnabled] ? freeplacement_apply_in_session() : freeplacement_stop_in_session();
                         settings_mark_tweak_applied(kSettingsFreePlacementEnabled, ok && [d boolForKey:kSettingsFreePlacementEnabled]);
+                    } else if ([masterKey isEqualToString:kSettingsMagsafeEnabled]) {
+                        if ([d boolForKey:kSettingsMagsafeEnabled]) {
+                            ok = settings_magsafe_show_for_current_battery_locked(d, "live-settings");
+                        } else {
+                            __sync_add_and_fetch(&g_magsafe_hide_generation, 1);
+                            ok = magsafe_enabler_stop_in_session();
+                        }
+                        settings_mark_tweak_applied(kSettingsMagsafeEnabled,
+                                                    ok && [d boolForKey:kSettingsMagsafeEnabled]);
+                    } else if ([masterKey isEqualToString:kSettingsUpsideDownEnabled]) {
+                        ok = [d boolForKey:kSettingsUpsideDownEnabled]
+                            ? upsidedown_apply_in_session()
+                            : upsidedown_stop_in_session();
+                        settings_mark_tweak_applied(kSettingsUpsideDownEnabled,
+                                                    ok && [d boolForKey:kSettingsUpsideDownEnabled]);
                     }
                     printf("[SETTINGS] live split tweak %s owner=%s result=%d\n", key.UTF8String, masterKey.UTF8String, ok);
                 }
@@ -8353,7 +8499,8 @@ static void settings_schedule_live_apply_for_key(NSString *key)
                     if (settings_cleanup_in_progress() ||
                         ![d boolForKey:kSettingsAppSwitcherGridEnabled] ||
                         !g_springboard_rc_ready) return;
-                    bool ok = appswitchergrid_apply_in_session();
+                    AppSwitcherGridConfig config = settings_appswitcher_config_from_defaults(d);
+                    bool ok = appswitchergrid_apply_config_in_session(config);
                     settings_mark_tweak_applied(kSettingsAppSwitcherGridEnabled,
                                                 ok && [d boolForKey:kSettingsAppSwitcherGridEnabled]);
                     printf("[SETTINGS] live App Switcher Grid apply result=%d\n", ok);
@@ -8948,6 +9095,13 @@ void settings_register_defaults(void)
         kSettingsLockCustomizerMetalLightIntensityPct: @72,
         kSettingsLockCustomizerMetalLightThickness: @5,
         kSettingsLockCustomizerMetalLightStyle: @0,
+        kSettingsLockScreenOverlayEnabled: @NO,
+        kSettingsLockScreenOverlayYOffset: @0,
+        kSettingsLockScreenOverlayWidthPct: @88,
+        kSettingsLockScreenOverlayAccentStyle: @0,
+        kSettingsLockScreenOverlayGlassAlphaPct: @72,
+        kSettingsLockScreenOverlayHideQuickActions: @YES,
+        kSettingsLockScreenOverlayHidePageDots: @YES,
         kSettingsFreePlacementEnabled: @NO,
         kSettingsFreePlacementHorizontalStep: @8,
         kSettingsFreePlacementVerticalStep: @5,
@@ -8975,32 +9129,17 @@ void settings_register_defaults(void)
         kSettingsSnapperBorderWidth: @2,
         kSettingsSnapperCornerRadius: @12,
         kSettingsPullOverEnabled: @NO,
-        kSettingsPullOverWidth: @76,
-        kSettingsPullOverYOffset: @130,
-        kSettingsPullOverMaxHeight: @420,
-        kSettingsPullOverCornerRadius: @20,
-        kSettingsPullOverBackgroundAlphaPct: @88,
+        kSettingsPullOverWidth: @300,
+        kSettingsPullOverYOffset: @110,
+        kSettingsPullOverMaxHeight: @480,
+        kSettingsPullOverCornerRadius: @24,
+        kSettingsPullOverBackgroundAlphaPct: @90,
         kSettingsAlkalineEnabled: @NO,
         kSettingsAlkalineRed: @43,
         kSettingsAlkalineGreen: @219,
         kSettingsAlkalineBlue: @115,
         kSettingsAlkalineAlphaPct: @100,
         kSettingsTweakLoaderEnabled: @NO,
-        kSettingsScrollingDockEnabled: @NO,
-        kSettingsNiuBiBarEnabled: @NO,
-        kSettingsVolSkipEnabled: @NO,
-        kSettingsFlowLiteEnabled: @NO,
-        kSettingsAppProfilesEnabled: @NO,
-        kSettingsChargeFXEnabled: @NO,
-        kSettingsRotateProEnabled: @NO,
-        kSettingsKeepEyeEnabled: @NO,
-        kSettingsLastLookEnabled: @NO,
-        kSettingsCommunityDockVisible: @5,
-        kSettingsCommunityBarThickness: @5,
-        kSettingsCommunityProfileBrightness: @82,
-        kSettingsCommunityChargeThickness: @5,
-        kSettingsCommunityHUDYOffset: @58,
-        kSettingsCommunityLastLookAlpha: @92,
 
         kSettingsGravityLiteEnabled: @NO,
         kSettingsGravityLiteDockEnabled: @YES,
@@ -9046,9 +9185,20 @@ void settings_register_defaults(void)
         kSettingsLiveWPMoodTiltDegrees: @3,
 
         kSettingsAppSwitcherGridEnabled: @NO,
+        kSettingsAppSwitcherGridLayout: @(AppSwitcherLayoutGridBalanced),
+        kSettingsAppSwitcherGridAnimation: @(AppSwitcherAnimationSystem),
 
         kSettingsQuickLoaderEnabled: @NO,
         kSettingsRepoTweaksEnabled: @NO,
+        kSettingsMagsafeEnabled: @NO,
+        kSettingsMagsafeSize: @200,
+        kSettingsMagsafeYPosition: @300,
+        kSettingsMagsafeRingWidth: @12,
+        kSettingsMagsafeAnimationDurationMs: @1200,
+        kSettingsMagsafeDisplaySeconds: @5,
+        kSettingsMagsafeBackgroundAlphaPct: @82,
+        kSettingsMagsafeAccentStyle: @0,
+        kSettingsUpsideDownEnabled: @NO,
 
         kSettingsExperimentalTweaksEnabled: @YES,
 
@@ -9093,21 +9243,15 @@ void settings_register_defaults(void)
             kSettingsWatchLayoutEnabled,
             kSettingsAppLibraryStudioEnabled,
             kSettingsLockCustomizerEnabled,
+            kSettingsLockScreenOverlayEnabled,
             kSettingsFreePlacementEnabled,
             kSettingsBlurryBadgesEnabled,
             kSettingsSnapperEnabled,
             kSettingsPullOverEnabled,
             kSettingsAlkalineEnabled,
             kSettingsTweakLoaderEnabled,
-            kSettingsScrollingDockEnabled,
-            kSettingsNiuBiBarEnabled,
-            kSettingsVolSkipEnabled,
-            kSettingsFlowLiteEnabled,
-            kSettingsAppProfilesEnabled,
-            kSettingsChargeFXEnabled,
-            kSettingsRotateProEnabled,
-            kSettingsKeepEyeEnabled,
-            kSettingsLastLookEnabled,
+            kSettingsMagsafeEnabled,
+            kSettingsUpsideDownEnabled,
         ];
         for (NSString *key in privateKeys) {
             if ([defaults boolForKey:key]) {
@@ -9131,6 +9275,7 @@ void settings_register_defaults(void)
         [defaults synchronize];
     }
     settings_install_screen_awake_observers();
+    settings_install_magsafe_battery_monitor();
 }
 
 typedef struct {
@@ -9162,7 +9307,7 @@ static void settings_log_tweak_plan_details(NSUserDefaults *d, BOOL pendingOnly)
         { kSettingsModuleSpacingEnabled, "Module Corners Lite", "applies the configured Control Center module radius" },
         { kSettingsSugarCaneEnabled, "SugarCane", "adds live percentage labels to brightness and volume controls" },
         { kSettingsBetterCCXIEnabled, "BetterCCXI / Prysm Lite", "applies configurable Control Center module scale, depth, and lift" },
-        { kSettingsMagmaEnabled, "Magma Evo Lite", "colors selected Control Center toggle, slider, media, and background groups" },
+        { kSettingsMagmaEnabled, "Magma 2", "colors verified Control Center toggle, slider, media, and background properties with bounded scans and contrast-aware glyphs" },
         { kSettingsBetterCCIconsEnabled, "BetterCCIcons", "rounds visible Control Center icon and module layers" },
         { kSettingsCCNoPlatterDimEnabled, "CCNoPlatterDim", "reduces dimming on expanded Control Center platters" },
         { kSettingsCCStatusEnabled, "CC Header Lite", "adds reusable Wi-Fi/IP labels to Control Center without claiming live network values" },
@@ -9174,15 +9319,18 @@ static void settings_log_tweak_plan_details(NSUserDefaults *d, BOOL pendingOnly)
         { kSettingsCylinderLiteEnabled, "Cylinder Lite", "animates loaded home-screen pages through a live cylindrical swipe transform" },
         { kSettingsBarmojiEnabled, "Clipboard Bar Lite", "adds pressable emoji and clipboard buttons to SpringBoard; it is not injected into app keyboard processes" },
         { kSettingsRoundedIconsEnabled, "Rounded Icons", "applies a continuous corner mask to every discovered Home Screen icon" },
-        { kSettingsWatchLayoutEnabled, "Watch Layout", "reflows each Home Screen page into a staggered Apple Watch-style honeycomb of circular live icons" },
+        { kSettingsWatchLayoutEnabled, "Watch Layout", "builds one scrolling Apple Watch-style honeycomb of pressable circular app icons" },
         { kSettingsAppLibraryStudioEnabled, "App Library Studio", "resizes and spaces live App Library icons and optionally removes the leading Today View page" },
         { kSettingsLockCustomizerEnabled, "Lock Screen Customizer", "moves live Lock Screen content and adds configurable Metal Lock Light edge lighting" },
+        { kSettingsLockScreenOverlayEnabled, "Lock Screen Overlay", "replaces the stock clock area with a standalone glass overlay and restores it exactly on cleanup" },
         { kSettingsFreePlacementEnabled, "Free Placement Lite", "offsets live Home Screen icons with a reversible staggered layout" },
         { kSettingsBlurryBadgesEnabled, "BlurryBadges", "tints visible notification badges with the configured color" },
         { kSettingsSnapperEnabled, "Snapper", "shows the configured crop-frame overlay" },
-        { kSettingsPullOverEnabled, "PullOver", "shows the configured slide-over tray shell" },
+        { kSettingsPullOverEnabled, "Vesta Lite", "shows a right-edge handle that opens the app drawer" },
+        { kSettingsMagsafeEnabled, "MagSafe Enabler", "creates a touch-through charging ring and reacts to battery-state changes" },
+        { kSettingsUpsideDownEnabled, "Upside Down", "patches five SpringBoard orientation methods transactionally for upside-down portrait" },
         { kSettingsAlkalineEnabled, "Alkaline", "tints visible battery views with the configured color" },
-        { kSettingsAppSwitcherGridEnabled, "App Switcher Grid", "patches SpringBoard's app-switcher layout in memory" },
+        { kSettingsAppSwitcherGridEnabled, "App Switcher Grid", "applies the selected deck/grid layout and fluid-animation preset to SpringBoard's live switcher settings" },
         { kSettingsGravityLiteEnabled, "Gravity Lite", "gives every Home Screen page an isolated live-icon gravity, collision, bounce, and motion-steering simulation" },
         { kSettingsLayoutExtrasEnabled, "Home Layout Extras", "adds the configured padding and scaling to home and dock icons" },
         { kSettingsThemerEnabled, "Themer", "replaces app icon imagery using the selected local theme" },
@@ -9234,10 +9382,9 @@ static void settings_run_actions_internal(BOOL pendingOnly)
         BOOL runHadBlockingFailure = NO;
         NSString *runCompletionMessage = @"Run failed. Check the log for details.";
         @try {
-            // Repair preferences created by older builds that allowed both
-            // frame-owning icon layouts to be enabled together. The normal
-            // disabled-tweak cleanup below restores the displaced layout first.
+            // Remove the retired Free Placement preference left by older builds.
             settings_resolve_icon_layout_conflict(d, kSettingsWatchLayoutEnabled);
+            settings_retire_magma_preference(d);
             settings_resolve_statusbar_conflicts(d, nil);
             BOOL patchSandboxExt = [d boolForKey:kSettingsRunPatchSandboxExt];
             BOOL runPowercuff = settings_enabled_tweak_should_run(d, kSettingsPowercuffEnabled, pendingOnly);
@@ -9304,6 +9451,15 @@ static void settings_run_actions_internal(BOOL pendingOnly)
             BOOL runWatchLayout = settings_enabled_tweak_should_run(d, kSettingsWatchLayoutEnabled, springBoardPendingOnly);
             BOOL runAppLibraryStudio = settings_enabled_tweak_should_run(d, kSettingsAppLibraryStudioEnabled, springBoardPendingOnly);
             BOOL runLockCustomizer = settings_enabled_tweak_should_run(d, kSettingsLockCustomizerEnabled, springBoardPendingOnly);
+            BOOL runLockScreenOverlay = settings_enabled_tweak_should_run(d, kSettingsLockScreenOverlayEnabled, springBoardPendingOnly);
+            if ([d boolForKey:kSettingsLockScreenOverlayEnabled] &&
+                [d boolForKey:kSettingsLockCustomizerEnabled]) {
+                [d setBool:NO forKey:kSettingsLockCustomizerEnabled];
+                [d synchronize];
+                runLockCustomizer = NO;
+                settings_mark_tweak_applied(kSettingsLockCustomizerEnabled, NO);
+                log_user("[LOCKOVERLAY][CONFLICT] Disabled the retired Lock Screen Customizer so both engines cannot own the same stock clock views.\n");
+            }
             BOOL runFreePlacement = settings_enabled_tweak_should_run(d, kSettingsFreePlacementEnabled, springBoardPendingOnly);
             BOOL runBlurryBadges = settings_blurrybadges_install_allowed() && settings_enabled_tweak_should_run(d, kSettingsBlurryBadgesEnabled, springBoardPendingOnly);
             BOOL runSnapper = settings_snapper_install_allowed() && settings_enabled_tweak_should_run(d, kSettingsSnapperEnabled, springBoardPendingOnly);
@@ -9320,13 +9476,14 @@ static void settings_run_actions_internal(BOOL pendingOnly)
             BOOL runGravityLite = settings_enabled_tweak_should_run(d, kSettingsGravityLiteEnabled, springBoardPendingOnly);
             BOOL runQuickLoader = settings_enabled_tweak_should_run(d, kSettingsQuickLoaderEnabled, springBoardPendingOnly);
             BOOL runRepoTweaks = settings_enabled_tweak_should_run(d, kSettingsRepoTweaksEnabled, springBoardPendingOnly);
-            BOOL runCommunityPorts = settings_community_ports_should_run(d, springBoardPendingOnly);
+            BOOL runMagsafe = settings_enabled_tweak_should_run(d, kSettingsMagsafeEnabled, springBoardPendingOnly);
+            BOOL runUpsideDown = settings_enabled_tweak_should_run(d, kSettingsUpsideDownEnabled, springBoardPendingOnly);
             BOOL stagePausesThemerLive = settings_themer_dynamic_updates_blocked_by_stage(d);
             if (stagePausesThemerLive) {
                 settings_note_themer_stage_conflict(YES);
             }
             BOOL cleanupDisabledSpringBoardTweaks = settings_disabled_applied_springboard_cleanup_needed(d);
-            BOOL needsSpringBoardWork = runSBC || runDarkTweaks || runStatBar || runNSBar || runNiceBarLite || runRSSI || runAxonLite || runGravityLite || runLayoutExtras || runTypeBanner || runNotificationIsland || runVelvet || runCleanNC || runUnderTime || runZeppelinLite || runCleanHomeScreen || runRealCC || runCleanCC || runFUGap || runModuleSpacing || runSugarCane || runBetterCCXI || runMagma || runBetterCCIcons || runCCNoPlatterDim || runCCStatus || runHapticCC || runSecureCC || runHideLabels || runFakeClockUp || runPancake || runCylinderLite || runBarmoji || runRoundedIcons || runWatchLayout || runAppLibraryStudio || runLockCustomizer || runFreePlacement || runBlurryBadges || runSnapper || runPullOver || runAlkaline || runTweakLoader || runAppSwitcherGrid || runThemer || runSnowBoardLite || runLiveWP || runStageStrip || runFastLockXLite || runQuickLoader || runRepoTweaks || runCommunityPorts || cleanupDisabledSpringBoardTweaks;
+            BOOL needsSpringBoardWork = runSBC || runDarkTweaks || runStatBar || runNSBar || runNiceBarLite || runRSSI || runAxonLite || runGravityLite || runLayoutExtras || runTypeBanner || runNotificationIsland || runVelvet || runCleanNC || runUnderTime || runZeppelinLite || runCleanHomeScreen || runRealCC || runCleanCC || runFUGap || runModuleSpacing || runSugarCane || runBetterCCXI || runMagma || runBetterCCIcons || runCCNoPlatterDim || runCCStatus || runHapticCC || runSecureCC || runHideLabels || runFakeClockUp || runPancake || runCylinderLite || runBarmoji || runRoundedIcons || runWatchLayout || runAppLibraryStudio || runLockCustomizer || runLockScreenOverlay || runFreePlacement || runBlurryBadges || runSnapper || runPullOver || runAlkaline || runTweakLoader || runAppSwitcherGrid || runThemer || runSnowBoardLite || runLiveWP || runStageStrip || runFastLockXLite || runQuickLoader || runRepoTweaks || runMagsafe || runUpsideDown || cleanupDisabledSpringBoardTweaks;
             BOOL runSandboxEscape = [d boolForKey:kSettingsRunSandboxEscape] && (!pendingOnly || needsSpringBoardWork);
             // TypeBanner prewarms its hidden SpringBoard window during Apply
             // and reuses the open SpringBoard session for text-only updates.
@@ -9384,6 +9541,7 @@ static void settings_run_actions_internal(BOOL pendingOnly)
             if (runWatchLayout) total++;
             if (runAppLibraryStudio) total++;
             if (runLockCustomizer) total++;
+            if (runLockScreenOverlay) total++;
             if (runFreePlacement) total++;
             if (runBlurryBadges) total++;
             if (runSnapper) total++;
@@ -9395,7 +9553,8 @@ static void settings_run_actions_internal(BOOL pendingOnly)
             if (runFastLockXLite) total++;
             if (runQuickLoader) total++;
             if (runRepoTweaks) total++;
-            if (runCommunityPorts) total++;
+            if (runMagsafe) total++;
+            if (runUpsideDown) total++;
             if (cleanupDisabledSpringBoardTweaks) total++;
             NSUInteger step = 0;
             BOOL startStageStripControlLoopAfterInstall = NO;
@@ -9436,6 +9595,7 @@ static void settings_run_actions_internal(BOOL pendingOnly)
             if (runWatchLayout) [enabledTweaks addObject:@"watch-layout"];
             if (runAppLibraryStudio) [enabledTweaks addObject:@"app-library-studio"];
             if (runLockCustomizer) [enabledTweaks addObject:@"lock-customizer"];
+            if (runLockScreenOverlay) [enabledTweaks addObject:@"lock-screen-overlay"];
             if (runFreePlacement) [enabledTweaks addObject:@"free-placement"];
             if (runBlurryBadges) [enabledTweaks addObject:@"blurrybadges"];
             if (runSnapper) [enabledTweaks addObject:@"snapper"];
@@ -9454,7 +9614,8 @@ static void settings_run_actions_internal(BOOL pendingOnly)
             if (runStageStrip) [enabledTweaks addObject:@"stagestrip"];
             if (runQuickLoader) [enabledTweaks addObject:@"quickloader"];
             if (runRepoTweaks) [enabledTweaks addObject:@"repotweaks"];
-            if (runCommunityPorts) [enabledTweaks addObject:@"community-ports"];
+            if (runMagsafe) [enabledTweaks addObject:@"magsafe-enabler"];
+            if (runUpsideDown) [enabledTweaks addObject:@"upside-down"];
             if (cleanupDisabledSpringBoardTweaks) [enabledTweaks addObject:@"cleanup"];
             if (forceSpringBoardRefresh) [enabledTweaks addObject:@"springboard-refresh"];
             log_user("[PLAN] %lu stages: %s\n",
@@ -9917,12 +10078,12 @@ static void settings_run_actions_internal(BOOL pendingOnly)
                     }
 
                     if (runMagma) {
-                        settings_progress(&step, total, "Applying Magma Evo Lite");
+                        settings_progress(&step, total, "Applying Magma 2");
                         settings_log_split_tweak_config(kSettingsMagmaEnabled, d, "RUN");
                         bool ok = magma_apply_in_session();
                         settings_mark_tweak_applied(kSettingsMagmaEnabled, ok && [d boolForKey:kSettingsMagmaEnabled]);
                         printf("[SETTINGS] Magma result=%d\n", ok);
-                        log_user("%s Magma Evo Lite %s.\n", ok ? "[OK]" : "[WARN]", ok ? "selected Control Center groups colored" : "did not find Control Center views");
+                        log_user("%s Magma 2 %s.\n", ok ? "[OK]" : "[WAIT]", ok ? "safe Control Center targets colored" : "is waiting for Control Center to open");
                         cyanide_upload_log_milestone(ok ? @"magma-applied" : @"magma-failed");
                     }
 
@@ -10035,11 +10196,11 @@ static void settings_run_actions_internal(BOOL pendingOnly)
                     }
 
                     if (runWatchLayout) {
-                        settings_progress(&step, total, "Applying Watch Layout to all pages");
+                        settings_progress(&step, total, "Building the Watch Layout honeycomb");
                         settings_log_split_tweak_config(kSettingsWatchLayoutEnabled, d, "RUN");
                         bool ok = watchlayout_apply_in_session();
                         settings_mark_tweak_applied(kSettingsWatchLayoutEnabled, ok && [d boolForKey:kSettingsWatchLayoutEnabled]);
-                        log_user("%s Watch Layout %s.\n", ok ? "[OK]" : "[WARN]", ok ? "active with a pressable staggered honeycomb" : "found no eligible Home Screen icon views");
+                        log_user("%s Watch Layout %s.\n", ok ? "[OK]" : "[WARN]", ok ? "active with a pressable scrolling 5/4 honeycomb" : "could not build a safe pressable overlay; stock Home Screen remains visible");
                     }
 
                     if (runAppLibraryStudio) {
@@ -10058,6 +10219,16 @@ static void settings_run_actions_internal(BOOL pendingOnly)
                         bool ok = lockcustomizer_apply_in_session();
                         settings_mark_tweak_applied(kSettingsLockCustomizerEnabled, ok && [d boolForKey:kSettingsLockCustomizerEnabled]);
                         log_user("%s Lock Screen Customizer %s.\n", ok ? "[OK]" : "[WARN]", ok ? "applied to matched live views" : "found no supported Lock Screen views yet");
+                    }
+
+                    if (runLockScreenOverlay) {
+                        settings_progress(&step, total, "Building Lock Screen Overlay");
+                        settings_log_split_tweak_config(kSettingsLockScreenOverlayEnabled, d, "RUN");
+                        bool ok = lockscreenoverlay_apply_in_session();
+                        settings_mark_tweak_applied(kSettingsLockScreenOverlayEnabled,
+                                                    ok && [d boolForKey:kSettingsLockScreenOverlayEnabled]);
+                        log_user("%s Lock Screen Overlay %s.\n", ok ? "[OK]" : "[WAIT]",
+                                 ok ? "attached and stock clock views hidden" : "is waiting for a class-verified Cover Sheet host");
                     }
 
                     if (runFreePlacement) {
@@ -10089,21 +10260,35 @@ static void settings_run_actions_internal(BOOL pendingOnly)
                     }
 
                     if (runPullOver) {
-                        settings_progress(&step, total, "Applying PullOver");
+                        settings_progress(&step, total, "Applying Vesta Lite");
                         settings_log_split_tweak_config(kSettingsPullOverEnabled, d, "RUN");
                         bool ok = pullover_apply_in_session();
                         settings_mark_tweak_applied(kSettingsPullOverEnabled, ok && [d boolForKey:kSettingsPullOverEnabled]);
-                        printf("[SETTINGS] PullOver result=%d\n", ok);
-                        log_user("%s PullOver %s.\n", ok ? "[OK]" : "[WARN]", ok ? "tray active" : "did not start cleanly");
+                        printf("[SETTINGS] Vesta Lite result=%d\n", ok);
+                        log_user("%s Vesta Lite %s.\n", ok ? "[OK]" : "[WARN]", ok ? "drawer handle active" : "did not start cleanly");
                         cyanide_upload_log_milestone(ok ? @"pullover-applied" : @"pullover-failed");
                     }
 
-                    if (runCommunityPorts) {
-                        settings_progress(&step, total, "Applying Community Ports");
-                        bool ok = settings_apply_community_ports(d);
-                        printf("[SETTINGS] Community Ports result=%d\n", ok);
-                        log_user("%s Community Ports batch %s.\n", ok ? "[OK]" : "[WARN]", ok ? "applied enabled ports" : "found no applicable enabled port");
-                        cyanide_upload_log_milestone(ok ? @"community-ports-applied" : @"community-ports-warning");
+                    if (runMagsafe) {
+                        settings_progress(&step, total, "Arming MagSafe charging overlay");
+                        settings_log_split_tweak_config(kSettingsMagsafeEnabled, d, "RUN");
+                        bool ok = settings_magsafe_show_for_current_battery_locked(d, "apply-run");
+                        settings_mark_tweak_applied(kSettingsMagsafeEnabled,
+                                                    ok && [d boolForKey:kSettingsMagsafeEnabled]);
+                        log_user("%s MagSafe Enabler %s.\n", ok ? "[OK]" : "[WAIT]",
+                                 ok ? "armed; overlay synchronized with the current battery state" : "could not arm the session overlay");
+                        cyanide_upload_log_milestone(ok ? @"magsafe-applied" : @"magsafe-waiting");
+                    }
+
+                    if (runUpsideDown) {
+                        settings_progress(&step, total, "Enabling upside-down portrait rotation");
+                        bool ok = upsidedown_apply_in_session();
+                        settings_mark_tweak_applied(kSettingsUpsideDownEnabled,
+                                                    ok && [d boolForKey:kSettingsUpsideDownEnabled]);
+                        log_user("%s Upside Down %s. Rotation Lock must be off.\n",
+                                 ok ? "[OK]" : "[WARN]",
+                                 ok ? "transaction committed across all five targets" : "failed closed or rolled back");
+                        cyanide_upload_log_milestone(ok ? @"upside-down-applied" : @"upside-down-failed");
                     }
 
                     if (runAlkaline) {
@@ -10127,7 +10312,8 @@ static void settings_run_actions_internal(BOOL pendingOnly)
 
                     if (runAppSwitcherGrid) {
                         settings_progress(&step, total, "Enabling App Switcher Grid");
-                        bool ok = appswitchergrid_apply_in_session();
+                        AppSwitcherGridConfig config = settings_appswitcher_config_from_defaults(d);
+                        bool ok = appswitchergrid_apply_config_in_session(config);
                         settings_mark_tweak_applied(kSettingsAppSwitcherGridEnabled,
                                                     ok && [d boolForKey:kSettingsAppSwitcherGridEnabled]);
                         printf("[SETTINGS] App Switcher Grid result=%d\n", ok);
@@ -10401,7 +10587,10 @@ typedef NS_ENUM(NSInteger, SettingsSection) {
     SectionFreePlacement,
     SectionCopypastaLite,
     SectionAppLibraryStudio,
-    SectionCommunityPorts,
+    SectionAMFIBypass,
+    SectionLockScreenOverlay,
+    SectionMagsafe,
+    SectionUpsideDown,
     SectionCount,
 };
 
@@ -11597,8 +11786,8 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
 {
     return @[
         @{ @"kind": @"button",
-           @"title": @"Test: Poll Daemon & Show Banner",
-           @"subtitle": @"Runs the live imagent detection path once. Banner shows the result; the [TYPEBANNER] log lines explain what was/wasn't found.",
+           @"title": @"Test Banner Rendering",
+           @"subtitle": @"Shows and hides a demo banner using short SpringBoard sessions. It does not probe the Messages daemon.",
            @"action": @"typebanner-test" },
     ];
 }
@@ -11720,16 +11909,17 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
 - (NSArray<NSDictionary *> *)magmaRows
 {
     return @[
-        @{ @"kind": @"toggle", @"key": kSettingsMagmaEnabled, @"title": @"Enable Magma" },
+        @{ @"kind": @"toggle", @"key": kSettingsMagmaEnabled, @"title": @"Enable Magma 2" },
         @{ @"kind": @"slider", @"key": kSettingsMagmaRed, @"title": @"Red", @"min": @0, @"max": @255, @"step": @1, @"default": @255 },
         @{ @"kind": @"slider", @"key": kSettingsMagmaGreen, @"title": @"Green", @"min": @0, @"max": @255, @"step": @1, @"default": @71 },
         @{ @"kind": @"slider", @"key": kSettingsMagmaBlue, @"title": @"Blue", @"min": @0, @"max": @255, @"step": @1, @"default": @20 },
         @{ @"kind": @"slider", @"key": kSettingsMagmaAlphaPct, @"title": @"Tint alpha", @"min": @5, @"max": @100, @"step": @1, @"default": @100, @"unit": @"%" },
-        @{ @"kind": @"toggle", @"key": kSettingsMagmaColorToggles, @"title": @"Color toggles and glyphs" },
-        @{ @"kind": @"toggle", @"key": kSettingsMagmaColorSliders, @"title": @"Color brightness and volume sliders" },
-        @{ @"kind": @"toggle", @"key": kSettingsMagmaColorMedia, @"title": @"Color media controls" },
-        @{ @"kind": @"toggle", @"key": kSettingsMagmaColorBackground, @"title": @"Color module backgrounds" },
-        @{ @"kind": @"info", @"title": @"Magma Evo Lite", @"subtitle": @"Each Control Center group can be colored independently. All discovered SpringBoard windows are scanned and changes are session-only." },
+        @{ @"kind": @"toggle", @"key": kSettingsMagmaColorToggles, @"title": @"Toggle accents and glyphs" },
+        @{ @"kind": @"toggle", @"key": kSettingsMagmaColorSliders, @"title": @"Brightness and volume fills" },
+        @{ @"kind": @"toggle", @"key": kSettingsMagmaColorMedia, @"title": @"Media buttons and labels" },
+        @{ @"kind": @"toggle", @"key": kSettingsMagmaColorBackground, @"title": @"Module background tint (Beta)" },
+        @{ @"kind": @"info", @"title": @"Magma 2 Safety Model", @"subtitle": @"Only the visible Control Center window is scanned. Magma 2 recognizes specialized color properties, caps each pass at 180 views and 96 properties, and never changes controllers, gestures, layouts, slider values, or material recipes." },
+        @{ @"kind": @"info", @"title": @"Contrast-aware glyphs", @"subtitle": @"Selected glyphs automatically use a light or dark foreground based on your accent color so controls remain readable." },
         @{ @"kind": @"button", @"title": @"View Detailed Activity Log", @"action": @"view-log" },
     ];
 }
@@ -11808,10 +11998,10 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
 {
     return @[
         @{ @"kind": @"toggle", @"key": kSettingsCylinderLiteEnabled, @"title": @"Enable Cylinder Lite" },
-        @{ @"kind": @"info", @"title": @"Live page animation", @"subtitle": @"Transforms follow each page's window position while swiping. Centered pages return to their captured stock transform and newly loaded pages join automatically." },
-        @{ @"kind": @"slider", @"key": kSettingsCylinderLiteDepth, @"title": @"Icon depth", @"min": @-80, @"max": @0, @"step": @1, @"default": @-10, @"unit": @"z" },
-        @{ @"kind": @"slider", @"key": kSettingsCylinderLitePerspective, @"title": @"Perspective distance", @"min": @250, @"max": @1600, @"step": @25, @"default": @650 },
-        @{ @"kind": @"info", @"title": @"Coverage", @"subtitle": @"Scans up to 512 live icons across every discovered Home Screen page and preserves icon interaction." },
+        @{ @"kind": @"info", @"title": @"Safer page animation", @"subtitle": @"Cylinder snapshots loaded pages once when Run starts, transforms each page as one layer, and reads only one anchor page per refresh. It never scans or mutates individual icon objects." },
+        @{ @"kind": @"slider", @"key": kSettingsCylinderLiteDepth, @"title": @"Page depth", @"min": @-80, @"max": @0, @"step": @1, @"default": @-10, @"unit": @"z" },
+        @{ @"kind": @"slider", @"key": kSettingsCylinderLitePerspective, @"title": @"Curve distance", @"min": @250, @"max": @1600, @"step": @25, @"default": @650 },
+        @{ @"kind": @"info", @"title": @"VM safety", @"subtitle": @"Automatic view-tree rediscovery is disabled. Two transport failures open a circuit breaker and stop further remote calls. Run again to rebuild the snapshot; Dock and App Library stay untouched." },
         @{ @"kind": @"button", @"title": @"View Detailed Activity Log", @"action": @"view-log" },
     ];
 }
@@ -11846,10 +12036,30 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
         @{ @"kind": @"toggle", @"key": kSettingsWatchLayoutEnabled, @"title": @"Enable Watch Layout" },
         @{ @"kind": @"slider", @"key": kSettingsWatchLayoutCompactPct, @"title": @"Honeycomb compactness", @"min": @60, @"max": @100, @"step": @1, @"default": @82, @"unit": @"%" },
         @{ @"kind": @"slider", @"key": kSettingsWatchLayoutScalePct, @"title": @"Circular icon size", @"min": @60, @"max": @110, @"step": @1, @"default": @88, @"unit": @"%" },
-        @{ @"kind": @"info", @"title": @"Beehive geometry", @"subtitle": @"Preserves each page's stock icon order, compresses vertical spacing using the hex-grid ratio, and offsets alternating rows by half a slot." },
-        @{ @"kind": @"info", @"title": @"Visible bounds", @"subtitle": @"Final honeycomb frames are clamped to their page bounds so edge icons cannot disappear off-screen." },
-        @{ @"kind": @"info", @"title": @"Interaction", @"subtitle": @"Uses live SBIconViews instead of snapshots, so every honeycomb icon still launches normally. Dock and App Library icons stay untouched." },
-        @{ @"kind": @"info", @"title": @"Layout safety", @"subtitle": @"Watch Layout and Free Placement are mutually exclusive because both own the same live icon frames. Enabling either one cleanly disables the other." },
+        @{ @"kind": @"info", @"title": @"Beehive geometry", @"subtitle": @"Creates a vertically scrolling grid with alternating rows of five and four circular icons. It is one continuous Watch-style surface instead of separate Home Screen pages." },
+        @{ @"kind": @"info", @"title": @"Interaction", @"subtitle": @"Uses native SBIconViews when available and gives every tile a dedicated launch action, so icons remain pressable. System apps are included; the Dock stays stock." },
+        @{ @"kind": @"info", @"title": @"Session safety", @"subtitle": @"The stock Home Screen lists are hidden, never rewritten. Disabling restores their original visibility. Failed discovery stops after a small read budget and waits 30 seconds before retrying." },
+        @{ @"kind": @"button", @"title": @"View Detailed Activity Log", @"action": @"view-log" },
+    ];
+}
+
+- (NSArray<NSDictionary *> *)amfiBypassRows
+{
+    return @[
+        @{ @"kind": @"info",
+           @"title": @"Current-process test",
+           @"subtitle": @"Attempts the existing AMFI OSEntitlements state patch on infern0 itself. The effect is temporary and ends when infern0 exits." },
+        @{ @"kind": @"info",
+           @"title": @"Verified result",
+           @"subtitle": @"Success is shown only when valid, platform, and transmuted flags all read back as enabled. Protected-memory rejection is a failure." },
+        @{ @"kind": @"button",
+           @"title": @"Run AMFI Bypass Test",
+           @"subtitle": @"Acquires kernel primitives, patches infern0, then verifies the result.",
+           @"action": @"amfi-run" },
+        @{ @"kind": @"button",
+           @"title": @"Dump Current AMFI State",
+           @"subtitle": @"Read-only diagnostic dump for the current infern0 process.",
+           @"action": @"amfi-dump" },
         @{ @"kind": @"button", @"title": @"View Detailed Activity Log", @"action": @"view-log" },
     ];
 }
@@ -11957,12 +12167,88 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
 - (NSArray<NSDictionary *> *)pulloverRows
 {
     return @[
-        @{ @"kind": @"toggle", @"key": kSettingsPullOverEnabled, @"title": @"Enable PullOver" },
-        @{ @"kind": @"slider", @"key": kSettingsPullOverWidth, @"title": @"Tray width", @"min": @52, @"max": @140, @"step": @2, @"default": @76, @"unit": @"pt" },
-        @{ @"kind": @"slider", @"key": kSettingsPullOverYOffset, @"title": @"Tray Y position", @"min": @40, @"max": @300, @"step": @5, @"default": @130, @"unit": @"pt" },
-        @{ @"kind": @"slider", @"key": kSettingsPullOverMaxHeight, @"title": @"Max height", @"min": @220, @"max": @720, @"step": @10, @"default": @420, @"unit": @"pt" },
+        @{ @"kind": @"toggle", @"key": kSettingsPullOverEnabled, @"title": @"Enable Vesta Lite" },
+        @{ @"kind": @"slider", @"key": kSettingsPullOverWidth, @"title": @"Drawer width", @"min": @240, @"max": @380, @"step": @5, @"default": @300, @"unit": @"pt" },
+        @{ @"kind": @"slider", @"key": kSettingsPullOverYOffset, @"title": @"Drawer top position", @"min": @40, @"max": @300, @"step": @5, @"default": @110, @"unit": @"pt" },
+        @{ @"kind": @"slider", @"key": kSettingsPullOverMaxHeight, @"title": @"Drawer height", @"min": @260, @"max": @720, @"step": @10, @"default": @480, @"unit": @"pt" },
         @{ @"kind": @"slider", @"key": kSettingsPullOverCornerRadius, @"title": @"Corner radius", @"min": @0, @"max": @40, @"step": @1, @"default": @20, @"unit": @"pt" },
-        @{ @"kind": @"slider", @"key": kSettingsPullOverBackgroundAlphaPct, @"title": @"Background alpha", @"min": @20, @"max": @100, @"step": @1, @"default": @88, @"unit": @"%" },
+        @{ @"kind": @"slider", @"key": kSettingsPullOverBackgroundAlphaPct, @"title": @"Background opacity", @"min": @30, @"max": @100, @"step": @1, @"default": @90, @"unit": @"%" },
+    ];
+}
+
+- (NSArray<NSDictionary *> *)lockScreenOverlayRows
+{
+    return @[
+        @{ @"kind": @"toggle", @"key": kSettingsLockScreenOverlayEnabled,
+           @"title": @"Enable Lock Screen Overlay" },
+        @{ @"kind": @"info", @"title": @"Standalone overlay engine",
+           @"subtitle": @"Uses the Watch Layout approach: a separately retained, noninteractive UIKit overlay is attached to the verified Cover Sheet window. Stock views are hidden only after attachment succeeds." },
+        @{ @"kind": @"slider", @"key": kSettingsLockScreenOverlayYOffset,
+           @"title": @"Vertical position", @"min": @-180, @"max": @260,
+           @"step": @1, @"default": @0, @"unit": @"pt" },
+        @{ @"kind": @"slider", @"key": kSettingsLockScreenOverlayWidthPct,
+           @"title": @"Panel width", @"min": @68, @"max": @96,
+           @"step": @1, @"default": @88, @"unit": @"%" },
+        @{ @"kind": @"stepper", @"key": kSettingsLockScreenOverlayAccentStyle,
+           @"title": @"Accent (0 cyan, 1 violet, 2 red, 3 gold)",
+           @"min": @0, @"max": @3, @"default": @0 },
+        @{ @"kind": @"slider", @"key": kSettingsLockScreenOverlayGlassAlphaPct,
+           @"title": @"Glass darkness", @"min": @25, @"max": @95,
+           @"step": @1, @"default": @72, @"unit": @"%" },
+        @{ @"kind": @"toggle", @"key": kSettingsLockScreenOverlayHideQuickActions,
+           @"title": @"Hide camera and flashlight" },
+        @{ @"kind": @"toggle", @"key": kSettingsLockScreenOverlayHidePageDots,
+           @"title": @"Hide page dots" },
+        @{ @"kind": @"button", @"title": @"View Detailed Activity Log", @"action": @"view-log" },
+    ];
+}
+
+- (NSArray<NSDictionary *> *)magsafeRows
+{
+    return @[
+        @{ @"kind": @"toggle", @"key": kSettingsMagsafeEnabled,
+           @"title": @"Enable MagSafe Enabler" },
+        @{ @"kind": @"slider", @"key": kSettingsMagsafeSize,
+           @"title": @"Ring size", @"min": @150, @"max": @280,
+           @"step": @2, @"default": @200, @"unit": @"pt" },
+        @{ @"kind": @"slider", @"key": kSettingsMagsafeYPosition,
+           @"title": @"Vertical position", @"min": @80, @"max": @620,
+           @"step": @5, @"default": @300, @"unit": @"pt" },
+        @{ @"kind": @"slider", @"key": kSettingsMagsafeRingWidth,
+           @"title": @"Ring thickness", @"min": @4, @"max": @26,
+           @"step": @1, @"default": @12, @"unit": @"pt" },
+        @{ @"kind": @"slider", @"key": kSettingsMagsafeAnimationDurationMs,
+           @"title": @"Animation duration", @"min": @350, @"max": @3000,
+           @"step": @50, @"default": @1200, @"unit": @"ms" },
+        @{ @"kind": @"slider", @"key": kSettingsMagsafeDisplaySeconds,
+           @"title": @"Visible duration", @"min": @2, @"max": @10,
+           @"step": @1, @"default": @5, @"unit": @"sec" },
+        @{ @"kind": @"slider", @"key": kSettingsMagsafeBackgroundAlphaPct,
+           @"title": @"Background opacity", @"min": @20, @"max": @100,
+           @"step": @1, @"default": @82, @"unit": @"%" },
+        @{ @"kind": @"stepper", @"key": kSettingsMagsafeAccentStyle,
+           @"title": @"Accent (0 auto, 1 cyan, 2 violet, 3 orange)",
+           @"min": @0, @"max": @3, @"default": @0 },
+        @{ @"kind": @"info", @"title": @"Charging trigger",
+           @"subtitle": @"Shows whenever iOS reports charging or full. Public iOS APIs do not identify whether the source is MagSafe, Qi, or a cable, so all charger types use the animation." },
+        @{ @"kind": @"info", @"title": @"Session-safe overlay",
+           @"subtitle": @"Creates one owned, touch-through SpringBoard window. It does not scan private windows, hide stock views, or leave persistent layout changes." },
+        @{ @"kind": @"button", @"title": @"View Detailed Activity Log", @"action": @"view-log" },
+    ];
+}
+
+- (NSArray<NSDictionary *> *)upsideDownRows
+{
+    return @[
+        @{ @"kind": @"toggle", @"key": kSettingsUpsideDownEnabled,
+           @"title": @"Enable Upside Down" },
+        @{ @"kind": @"info", @"title": @"Rotation Lock must be off",
+           @"subtitle": @"Allows the Home Screen and Lock Screen to enter upside-down portrait orientation. Turn off Rotation Lock in Control Center before testing." },
+        @{ @"kind": @"info", @"title": @"Transactional runtime patch",
+           @"subtitle": @"All five SpringBoard targets are preflighted before anything changes. Every original method is saved and verified; a partial failure immediately rolls back all changed targets." },
+        @{ @"kind": @"info", @"title": @"Session only",
+           @"subtitle": @"Disable or Clean Up restores the exact original methods. A respring is the fallback and always returns stock orientation behavior." },
+        @{ @"kind": @"button", @"title": @"View Detailed Activity Log", @"action": @"view-log" },
     ];
 }
 
@@ -11982,83 +12268,6 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
     } else {
         self.tableView.backgroundView = nil;
     }
-}
-
-typedef struct {
-    __unsafe_unretained NSString *key;
-    CommunityPort port;
-    const char *name;
-} SettingsCommunityPortEntry;
-
-static void settings_each_community_port(void (^block)(const SettingsCommunityPortEntry *entry))
-{
-    if (!block) return;
-    const SettingsCommunityPortEntry entries[] = {
-        { kSettingsScrollingDockEnabled, CommunityPortScrollingDock, "Scrolling Dock Lite" },
-        { kSettingsNiuBiBarEnabled, CommunityPortNiuBiBar, "NiuBiBar Lite" },
-        { kSettingsVolSkipEnabled, CommunityPortVolSkip, "VolSkip Lite" },
-        { kSettingsFlowLiteEnabled, CommunityPortFlow, "Flow Lite" },
-        { kSettingsAppProfilesEnabled, CommunityPortAppProfiles, "App Profiles Lite" },
-        { kSettingsChargeFXEnabled, CommunityPortChargeFX, "ChargeFX Lite" },
-        { kSettingsRotateProEnabled, CommunityPortRotatePro, "RotatePro Lite" },
-        { kSettingsKeepEyeEnabled, CommunityPortKeepEye, "KeepEye HUD" },
-        { kSettingsLastLookEnabled, CommunityPortLastLook, "LastLook Lite" },
-    };
-    for (size_t i = 0; i < sizeof(entries) / sizeof(entries[0]); i++) block(&entries[i]);
-}
-
-static BOOL settings_community_ports_should_run(NSUserDefaults *d, BOOL pendingOnly)
-{
-    __block BOOL shouldRun = NO;
-    settings_each_community_port(^(const SettingsCommunityPortEntry *entry) {
-        if (!shouldRun && settings_enabled_tweak_should_run(d, entry->key, pendingOnly)) shouldRun = YES;
-    });
-    return shouldRun;
-}
-
-static bool settings_apply_community_ports(NSUserDefaults *d)
-{
-    if ([d boolForKey:kSettingsScrollingDockEnabled] &&
-        [d boolForKey:kSettingsGravityLiteDockEnabled]) {
-        [d setBool:NO forKey:kSettingsGravityLiteDockEnabled];
-        [d synchronize];
-        log_user("[COMPAT] Gravity Lite dock physics disabled because Scrolling Dock Lite owns the same live dock icon views. Home-screen page physics remains available.\n");
-    }
-    settings_configure_control_center_tweaks(d);
-    __block int enabled = 0, applied = 0, failed = 0;
-    settings_each_community_port(^(const SettingsCommunityPortEntry *entry) {
-        BOOL on = [d boolForKey:entry->key];
-        bool ok = on ? communityports_apply(entry->port) : communityports_stop(entry->port);
-        settings_mark_tweak_applied(entry->key, ok && on);
-        if (on) { enabled++; if (ok) applied++; else failed++; }
-        log_user("[COMMUNITYPORTS][%s] enabled=%d result=%s.\n", entry->name, on, ok ? "success" : "failed");
-    });
-    log_user("[COMMUNITYPORTS][SUMMARY] enabled=%d applied=%d failed=%d.\n", enabled, applied, failed);
-    return enabled > 0 && applied > 0;
-}
-
-- (NSArray<NSDictionary *> *)communityPortsRows
-{
-    return @[
-        @{ @"kind": @"info", @"title": @"Community Ports", @"subtitle": @"Nine independent live-session ports plus the completed Snapper package. Every port restores owned views during cleanup and reports exact matches/actions in the activity log." },
-        @{ @"kind": @"toggle", @"key": kSettingsScrollingDockEnabled, @"title": @"Scrolling Dock Lite" },
-        @{ @"kind": @"stepper", @"key": kSettingsCommunityDockVisible, @"title": @"Visible dock icons", @"min": @3, @"max": @8, @"default": @5 },
-        @{ @"kind": @"toggle", @"key": kSettingsNiuBiBarEnabled, @"title": @"NiuBiBar Lite" },
-        @{ @"kind": @"slider", @"key": kSettingsCommunityBarThickness, @"title": @"Home-bar border thickness", @"min": @1, @"max": @10, @"step": @1, @"default": @5, @"unit": @"pt" },
-        @{ @"kind": @"toggle", @"key": kSettingsVolSkipEnabled, @"title": @"VolSkip Lite media palette" },
-        @{ @"kind": @"toggle", @"key": kSettingsFlowLiteEnabled, @"title": @"Flow Lite music canvas" },
-        @{ @"kind": @"toggle", @"key": kSettingsAppProfilesEnabled, @"title": @"App Profiles Lite" },
-        @{ @"kind": @"slider", @"key": kSettingsCommunityProfileBrightness, @"title": @"Default profile brightness", @"min": @20, @"max": @100, @"step": @1, @"default": @82, @"unit": @"%" },
-        @{ @"kind": @"toggle", @"key": kSettingsChargeFXEnabled, @"title": @"ChargeFX Lite" },
-        @{ @"kind": @"slider", @"key": kSettingsCommunityChargeThickness, @"title": @"Charging edge thickness", @"min": @1, @"max": @14, @"step": @1, @"default": @5, @"unit": @"pt" },
-        @{ @"kind": @"toggle", @"key": kSettingsRotateProEnabled, @"title": @"RotatePro Lite" },
-        @{ @"kind": @"toggle", @"key": kSettingsKeepEyeEnabled, @"title": @"KeepEye HUD" },
-        @{ @"kind": @"slider", @"key": kSettingsCommunityHUDYOffset, @"title": @"KeepEye Y position", @"min": @28, @"max": @220, @"step": @2, @"default": @58, @"unit": @"pt" },
-        @{ @"kind": @"toggle", @"key": kSettingsLastLookEnabled, @"title": @"LastLook Lite" },
-        @{ @"kind": @"slider", @"key": kSettingsCommunityLastLookAlpha, @"title": @"Notification preview opacity", @"min": @20, @"max": @100, @"step": @1, @"default": @92, @"unit": @"%" },
-        @{ @"kind": @"info", @"title": @"Capability boundary", @"subtitle": @"VolSkip uses a pressable media palette because hardware-button interception needs injection. PullOver hosts pressable icons; Dynamic Stage remains the app-scene host." },
-        @{ @"kind": @"button", @"title": @"View Detailed Activity Log", @"action": @"view-log" },
-    ];
 }
 
 - (NSArray<NSDictionary *> *)alkalineRows
@@ -12375,16 +12584,32 @@ static bool settings_apply_community_ports(NSUserDefaults *d)
 - (NSArray<NSDictionary *> *)appSwitcherGridRows
 {
     BOOL applied = settings_tweak_is_applied(kSettingsAppSwitcherGridEnabled);
+    NSUserDefaults *defaults = NSUserDefaults.standardUserDefaults;
+    NSString *layout = settings_appswitcher_layout_title([defaults integerForKey:kSettingsAppSwitcherGridLayout]);
+    NSString *animation = settings_appswitcher_animation_title([defaults integerForKey:kSettingsAppSwitcherGridAnimation]);
     return @[
         @{ @"kind": @"info",
-           @"title": applied ? @"Current Style: Grid" : @"Current Style: Stock",
-           @"subtitle": @"This is a runtime SpringBoard method patch. It does not write system files; respring restores the stock app switcher." },
+           @"title": applied ? [NSString stringWithFormat:@"Active: %@", layout] : @"Current Style: Stock",
+           @"subtitle": applied
+               ? [NSString stringWithFormat:@"%@ animation is active. All changes are session-only and reversible.", animation]
+               : @"Choose a layout and animation, then enable this tweak and run Apply." },
+        @{ @"kind": @"button",
+           @"title": @"Switcher Layout",
+           @"subtitle": layout,
+           @"action": @"appswitchergrid-layout" },
+        @{ @"kind": @"button",
+           @"title": @"Animation Feel",
+           @"subtitle": animation,
+           @"action": @"appswitchergrid-animation" },
         @{ @"kind": @"info",
-           @"title": @"Session note",
-           @"subtitle": @"If you respring after Hide Home Bar, run App Switcher Grid again because respring resets this live SpringBoard patch." },
+           @"title": @"How it works",
+           @"subtitle": @"Automatic follows the device default, Deck shows stacked cards, and the three Grid modes change card scale and spacing. Animation presets tune SpringBoard's real switcher springs—no overlay animation is faked." },
+        @{ @"kind": @"button",
+           @"title": @"View Detailed Activity Log",
+           @"action": @"view-log" },
         @{ @"kind": @"button",
            @"title": @"Restore Stock Switcher",
-           @"subtitle": @"Restores the original switcher style in the active SpringBoard session when available.",
+           @"subtitle": @"Restores the original style, grid values, and animation springs in the active session.",
            @"action": @"appswitchergrid-restore",
            @"destructive": @YES },
     ];
@@ -12470,7 +12695,11 @@ static bool settings_apply_community_ports(NSUserDefaults *d)
         [out addObject:@{@"title": @"Cellular (dBm)",   @"value": [d boolForKey:kSettingsRSSIDisplayCell] ? @"On" : @"Off"}];
     } else if (section == SectionAppSwitcherGrid) {
         [out addObject:@{@"title": @"Switcher style",
-                         @"value": settings_tweak_is_applied(kSettingsAppSwitcherGridEnabled) ? @"Grid" : @"Stock"}];
+                         @"value": settings_tweak_is_applied(kSettingsAppSwitcherGridEnabled)
+                             ? settings_appswitcher_layout_title([d integerForKey:kSettingsAppSwitcherGridLayout])
+                             : @"Stock"}];
+        [out addObject:@{@"title": @"Animation",
+                         @"value": settings_appswitcher_animation_title([d integerForKey:kSettingsAppSwitcherGridAnimation])}];
     } else if (section == SectionFastLockXLite) {
         BOOL alwaysOnIntent = [d boolForKey:kSettingsFastLockXLiteEnabled];
         BOOL alwaysOnApplied = settings_tweak_is_applied(kSettingsFastLockXLiteEnabled);
@@ -12528,7 +12757,7 @@ static bool settings_apply_community_ports(NSUserDefaults *d)
         addSimpleSummary(@"BetterCCXI", kSettingsBetterCCXIEnabled);
         [out addObject:@{@"title": @"Lift", @"value": [@([d integerForKey:kSettingsBetterCCXIZLift]) stringValue]}];
     } else if (section == SectionMagma) {
-        addSimpleSummary(@"Magma", kSettingsMagmaEnabled);
+        addSimpleSummary(@"Magma 2", kSettingsMagmaEnabled);
         [out addObject:@{@"title": @"RGB", @"value": [NSString stringWithFormat:@"%ld/%ld/%ld",
                                                        (long)[d integerForKey:kSettingsMagmaRed],
                                                        (long)[d integerForKey:kSettingsMagmaGreen],
@@ -12606,11 +12835,26 @@ static bool settings_apply_community_ports(NSUserDefaults *d)
     } else if (section == SectionPullOver) {
         BOOL intent = [d boolForKey:kSettingsPullOverEnabled];
         BOOL applied = settings_tweak_is_applied(kSettingsPullOverEnabled);
-        [out addObject:@{@"title": @"PullOver",
+        [out addObject:@{@"title": @"Vesta Lite",
                          @"value": applied ? @"Active" : (intent ? @"Queued" : @"Off")}];
         [out addObject:@{@"title": @"Tray", @"value": [NSString stringWithFormat:@"%ldpt wide / %ldpt max",
                                                        (long)[d integerForKey:kSettingsPullOverWidth],
                                                        (long)[d integerForKey:kSettingsPullOverMaxHeight]]}];
+    } else if (section == SectionMagsafe) {
+        BOOL intent = [d boolForKey:kSettingsMagsafeEnabled];
+        BOOL applied = settings_tweak_is_applied(kSettingsMagsafeEnabled);
+        [out addObject:@{@"title": @"MagSafe Enabler",
+                         @"value": applied ? @"Armed" : (intent ? @"Queued" : @"Off")}];
+        [out addObject:@{@"title": @"Ring",
+                         @"value": [NSString stringWithFormat:@"%ldpt / %lds",
+                                    (long)[d integerForKey:kSettingsMagsafeSize],
+                                    (long)[d integerForKey:kSettingsMagsafeDisplaySeconds]]}];
+    } else if (section == SectionUpsideDown) {
+        BOOL intent = [d boolForKey:kSettingsUpsideDownEnabled];
+        BOOL applied = settings_tweak_is_applied(kSettingsUpsideDownEnabled);
+        [out addObject:@{@"title": @"Upside Down",
+                         @"value": applied ? @"Active" : (intent ? @"Queued" : @"Off")}];
+        [out addObject:@{@"title": @"Scope", @"value": @"Home + Lock Screen"}];
     } else if (section == SectionAlkaline) {
         BOOL intent = [d boolForKey:kSettingsAlkalineEnabled];
         BOOL applied = settings_tweak_is_applied(kSettingsAlkalineEnabled);
@@ -12722,7 +12966,10 @@ static bool settings_apply_community_ports(NSUserDefaults *d)
         case SectionFreePlacement: return cyanide_experimental_tweaks_available() ? self.freePlacementRows : @[];
         case SectionCopypastaLite: return self.copypastaLiteRows;
         case SectionAppLibraryStudio: return cyanide_experimental_tweaks_available() ? self.appLibraryStudioRows : @[];
-        case SectionCommunityPorts: return cyanide_experimental_tweaks_available() ? self.communityPortsRows : @[];
+        case SectionAMFIBypass: return self.amfiBypassRows;
+        case SectionLockScreenOverlay: return self.lockScreenOverlayRows;
+        case SectionMagsafe: return self.magsafeRows;
+        case SectionUpsideDown: return self.upsideDownRows;
         default: return @[];
     }
 }
@@ -12737,68 +12984,41 @@ static bool settings_apply_community_ports(NSUserDefaults *d)
 {
     return @[
         @{ @"title": @"Launch Options",     @"icon": @"bolt.fill",                          @"color": [UIColor systemRedColor],    @"section": @(SectionLaunch) },
-        @{ @"title": @"SBCustomizer",       @"icon": @"square.grid.3x3.fill",                @"color": [UIColor systemRedColor],   @"section": @(SectionSBC) },
-        @{ @"title": @"StatBar",            @"icon": @"thermometer.medium",                  @"color": [UIColor systemRedColor],    @"section": @(SectionStatBar) },
-        @{ @"title": @"NSBar",              @"icon": @"network",                             @"color": [UIColor systemRedColor],   @"section": @(SectionNSBar) },
-        @{ @"title": @"NiceBar Lite",       @"icon": @"textformat.size",                     @"color": [UIColor systemTealColor],   @"section": @(SectionNiceBarLite) },
+        @{ @"title": @"SBCustomizer",       @"icon": @"square.grid.3x3.fill",               @"color": [UIColor systemRedColor],    @"section": @(SectionSBC) },
+        @{ @"title": @"StatBar",            @"icon": @"thermometer.medium",                 @"color": [UIColor systemRedColor],    @"section": @(SectionStatBar) },
+        @{ @"title": @"NSBar",              @"icon": @"network",                            @"color": [UIColor systemRedColor],    @"section": @(SectionNSBar) },
+        @{ @"title": @"NiceBar Lite",       @"icon": @"textformat.size",                    @"color": [UIColor systemTealColor],   @"section": @(SectionNiceBarLite) },
 #if CYANIDE_EXPERIMENTAL_TWEAKS_AVAILABLE
-        @{ @"title": @"Signal Display",     @"icon": @"antenna.radiowaves.left.and.right",   @"color": [UIColor systemRedColor],   @"section": @(SectionRSSI), @"indev": @YES },
+        @{ @"title": @"Signal Display",     @"icon": @"antenna.radiowaves.left.and.right",  @"color": [UIColor systemRedColor],    @"section": @(SectionRSSI), @"indev": @YES },
 #endif
-        @{ @"title": @"Axon Lite",          @"icon": @"bell.badge.fill",                     @"color": [UIColor systemRedColor],    @"section": @(SectionAxonLite) },
+        @{ @"title": @"Axon Lite",          @"icon": @"bell.badge.fill",                    @"color": [UIColor systemRedColor],    @"section": @(SectionAxonLite) },
 #if CYANIDE_EXPERIMENTAL_TWEAKS_AVAILABLE
-        @{ @"title": @"TypeBanner",         @"icon": @"ellipsis.bubble.fill",                @"color": [UIColor systemTealColor],   @"section": @(SectionTypeBanner), @"indev": @YES },
-        @{ @"title": @"Notification Island", @"icon": @"bell.and.waves.left.and.right.fill",  @"color": [UIColor systemOrangeColor], @"section": @(SectionNotificationIsland), @"indev": @YES },
+        @{ @"title": @"TypeBanner",         @"icon": @"ellipsis.bubble.fill",               @"color": [UIColor systemTealColor],   @"section": @(SectionTypeBanner), @"indev": @YES },
+        @{ @"title": @"Notification Island", @"icon": @"bell.and.waves.left.and.right.fill", @"color": [UIColor systemOrangeColor], @"section": @(SectionNotificationIsland), @"indev": @YES },
         @{ @"title": @"IPA Decryptor (Beta)", @"icon": @"lock.open.fill",                    @"color": [UIColor systemPurpleColor], @"section": @(SectionIPADecryptor), @"indev": @YES },
-        @{ @"title": @"FastLockX Lite",     @"icon": @"lock.open.fill",                      @"color": [UIColor systemGreenColor],  @"section": @(SectionFastLockXLite) },
-        @{ @"title": @"CleanNC",            @"icon": @"rectangle.3.group.fill",              @"color": [UIColor systemPurpleColor], @"section": @(SectionCleanNC) },
-        @{ @"title": @"Date Under Time Lite", @"icon": @"clock.fill",                       @"color": [UIColor systemRedColor],   @"section": @(SectionUnderTime) },
-        @{ @"title": @"Zeppelin Lite",      @"icon": @"textformat.alt",                      @"color": [UIColor systemOrangeColor], @"section": @(SectionZeppelinLite) },
-        @{ @"title": @"CleanHomeScreen",    @"icon": @"square.dashed",                       @"color": [UIColor systemGreenColor],  @"section": @(SectionCleanHomeScreen) },
-        @{ @"title": @"RealCC",             @"icon": @"wifi.slash",                          @"color": [UIColor systemRedColor],    @"section": @(SectionRealCC) },
-        @{ @"title": @"CleanCC",            @"icon": @"square.stack.3d.down.right.fill",      @"color": [UIColor systemTealColor],   @"section": @(SectionCleanCC) },
-        @{ @"title": @"FUGap",              @"icon": @"arrow.up.to.line.compact",             @"color": [UIColor systemRedColor],   @"section": @(SectionFUGap) },
-        @{ @"title": @"Module Corners Lite", @"icon": @"rectangle.grid.2x2",                @"color": [UIColor systemIndigoColor], @"section": @(SectionModuleSpacing) },
-        @{ @"title": @"SugarCane",          @"icon": @"percent",                              @"color": [UIColor systemYellowColor], @"section": @(SectionSugarCane) },
-        @{ @"title": @"BetterCCXI / Prysm Lite", @"icon": @"rectangle.grid.3x2.fill",         @"color": [UIColor systemPurpleColor], @"section": @(SectionBetterCCXI) },
-        @{ @"title": @"Magma Evo Lite",     @"icon": @"flame.fill",                           @"color": [UIColor systemOrangeColor], @"section": @(SectionMagma) },
-        @{ @"title": @"BetterCCIcons",      @"icon": @"circle.grid.2x2.fill",                @"color": [UIColor systemOrangeColor],   @"section": @(SectionBetterCCIcons) },
-        @{ @"title": @"CCNoPlatterDim",     @"icon": @"sun.max.fill",                         @"color": [UIColor systemGreenColor],  @"section": @(SectionCCNoPlatterDim) },
-        @{ @"title": @"CC Header Lite",     @"icon": @"info.circle.fill",                     @"color": [UIColor systemRedColor],   @"section": @(SectionCCStatus) },
-        @{ @"title": @"HapticCC",           @"icon": @"waveform.path",                        @"color": [UIColor systemPinkColor],   @"section": @(SectionHapticCC) },
-        @{ @"title": @"SecureCC",           @"icon": @"lock.shield.fill",                     @"color": [UIColor systemRedColor],    @"section": @(SectionSecureCC) },
-        @{ @"title": @"HideLabels",         @"icon": @"eye.slash",                           @"color": [UIColor systemGrayColor],   @"section": @(SectionHideLabels) },
-        @{ @"title": @"Animation Speed Lite", @"icon": @"forward.fill",                       @"color": [UIColor systemYellowColor], @"section": @(SectionFakeClockUp) },
-        @{ @"title": @"Pancake Lite",       @"icon": @"hand.point.left.fill",                @"color": [UIColor systemIndigoColor], @"section": @(SectionPancake) },
+        @{ @"title": @"FastLockX Lite",     @"icon": @"lock.open.fill",                     @"color": [UIColor systemGreenColor],  @"section": @(SectionFastLockXLite) },
         @{ @"title": @"Cylinder Lite",      @"icon": @"perspective",                         @"color": [UIColor systemTealColor],   @"section": @(SectionCylinderLite) },
         @{ @"title": @"Clipboard Bar Lite", @"icon": @"face.smiling.fill",                   @"color": [UIColor systemPinkColor],   @"section": @(SectionBarmoji) },
-        @{ @"title": @"BlurryBadges",       @"icon": @"app.badge.fill",                      @"color": [UIColor systemRedColor],   @"section": @(SectionBlurryBadges) },
-        @{ @"title": @"Snapper",            @"icon": @"crop",                                @"color": [UIColor systemOrangeColor],   @"section": @(SectionSnapper) },
-        @{ @"title": @"PullOver",           @"icon": @"sidebar.right",                       @"color": [UIColor systemIndigoColor], @"section": @(SectionPullOver) },
-        @{ @"title": @"Alkaline",           @"icon": @"battery.100.bolt",                    @"color": [UIColor systemGreenColor],  @"section": @(SectionAlkaline) },
-        @{ @"title": @"TweakLoader",        @"icon": @"arrow.down.circle.dotted",            @"color": [UIColor systemOrangeColor], @"section": @(SectionTweakLoader) },
-        @{ @"title": @"Velvet + Edge Glow", @"icon": @"rectangle.3.group.fill",              @"color": [UIColor systemPurpleColor], @"section": @(SectionVelvet), @"indev": @YES },
 #endif
         @{ @"title": @"Gravity Lite",       @"icon": @"arrow.down.circle.fill",              @"color": [UIColor systemGreenColor],  @"section": @(SectionGravityLite) },
         @{ @"title": @"App Switcher Grid",  @"icon": @"square.grid.2x2.fill",                @"color": [UIColor systemOrangeColor], @"section": @(SectionAppSwitcherGrid) },
         @{ @"title": @"Location Simulator", @"icon": @"location.fill",                       @"color": [UIColor systemGreenColor],  @"section": @(SectionLocationSim) },
-        @{ @"title": @"SnowBoard Lite",     @"icon": @"square.stack.3d.up.fill",             @"color": [UIColor systemOrangeColor],   @"section": @(SectionSnowBoardLite) },
+        @{ @"title": @"SnowBoard Lite",     @"icon": @"square.stack.3d.up.fill",             @"color": [UIColor systemOrangeColor], @"section": @(SectionSnowBoardLite) },
         @{ @"title": @"LiveWP",             @"icon": @"play.rectangle.fill",                 @"color": [UIColor systemPurpleColor], @"section": @(SectionLiveWP) },
         @{ @"title": @"QuickLoader",        @"icon": @"bolt.fill",                           @"color": [UIColor systemYellowColor], @"section": @(SectionQuickLoader) },
-        @{ @"title": @"RepoTweaks",         @"icon": @"tray.and.arrow.down.fill",            @"color": [UIColor systemRedColor],   @"section": @(SectionRepoTweaks) },
         @{ @"title": @"Powercuff",          @"icon": @"bolt.slash.fill",                     @"color": [UIColor systemOrangeColor], @"section": @(SectionPowercuff) },
         @{ @"title": @"SpringBoard Tweaks", @"icon": @"apps.iphone",                         @"color": [UIColor systemIndigoColor], @"section": @(SectionDarkSwordTweaks) },
         @{ @"title": @"Drag Coefficient",   @"icon": @"dial.medium.fill",                    @"color": [UIColor systemIndigoColor], @"section": @(SectionDragCoefficient) },
         @{ @"title": @"Home Layout Extras", @"icon": @"square.dashed.inset.filled",          @"color": [UIColor systemPurpleColor], @"section": @(SectionLayoutExtras) },
+        @{ @"title": @"Infern0 Themer",     @"icon": @"paintpalette.fill",                   @"color": [UIColor systemPurpleColor], @"section": @(SectionThemer) },
 #if CYANIDE_EXPERIMENTAL_TWEAKS_AVAILABLE
         @{ @"title": @"MilkyWay Lite / Dynamic Stage", @"icon": @"sidebar.left", @"color": [UIColor systemBlueColor], @"section": @(SectionStageStrip), @"indev": @YES },
 #endif
-        @{ @"title": @"Rounded Icons", @"icon": @"app.fill", @"color": [UIColor systemBlueColor], @"section": @(SectionRoundedIcons) },
         @{ @"title": @"Watch Layout", @"icon": @"circle.grid.3x3.fill", @"color": [UIColor systemGreenColor], @"section": @(SectionWatchLayout) },
         @{ @"title": @"Lock Screen Customizer", @"icon": @"lock.rectangle", @"color": [UIColor systemIndigoColor], @"section": @(SectionLockCustomizer), @"experimental": @YES },
-        @{ @"title": @"Free Placement Lite", @"icon": @"move.3d", @"color": [UIColor systemPinkColor], @"section": @(SectionFreePlacement), @"experimental": @YES },
-        @{ @"title": @"Copypasta Lite", @"icon": @"doc.on.clipboard", @"color": [UIColor systemTealColor], @"section": @(SectionCopypastaLite) },
-        @{ @"title": @"App Library Studio", @"icon": @"square.grid.3x3.square", @"color": [UIColor systemBlueColor], @"section": @(SectionAppLibraryStudio), @"experimental": @YES },
-        @{ @"title": @"Community Ports", @"icon": @"sparkles", @"color": [UIColor systemOrangeColor], @"section": @(SectionCommunityPorts), @"experimental": @YES },
+        @{ @"title": @"Lock Screen Overlay", @"icon": @"sparkles.rectangle.stack.fill", @"color": [UIColor systemCyanColor], @"section": @(SectionLockScreenOverlay), @"experimental": @YES },
+        @{ @"title": @"MagSafe Enabler", @"icon": @"battery.100.bolt", @"color": [UIColor systemGreenColor], @"section": @(SectionMagsafe), @"experimental": @YES },
+        @{ @"title": @"Upside Down", @"icon": @"arrow.up.and.down.circle.fill", @"color": [UIColor systemBlueColor], @"section": @(SectionUpsideDown), @"experimental": @YES },
     ];
 }
 
@@ -12806,10 +13026,10 @@ static bool settings_apply_community_ports(NSUserDefaults *d)
 {
     return @[
         @{ @"title": @"OTA Updates",       @"icon": @"icloud.slash.fill",    @"color": [UIColor systemGrayColor],   @"section": @(SectionOTA) },
-        @{ @"title": @"IPA Decryptor (Beta)", @"icon": @"lock.open.fill",    @"color": [UIColor systemGreenColor],  @"section": @(SectionIPADecryptor) },
         @{ @"title": @"Watch Pairing",     @"icon": @"applewatch.radiowaves.left.and.right", @"color": [UIColor systemPurpleColor], @"section": @(SectionNanoRegistry) },
         @{ @"title": @"Call Recording Sound", @"icon": @"speaker.slash.fill", @"color": [UIColor systemOrangeColor], @"section": @(SectionCallRecordingSound) },
         @{ @"title": @"Hide Home Bar", @"icon": @"line.3.horizontal", @"color": [UIColor systemGrayColor], @"section": @(SectionHideHomeBar) },
+        @{ @"title": @"AMFI Bypass Test", @"icon": @"checkmark.shield.fill", @"color": [UIColor systemRedColor], @"section": @(SectionAMFIBypass) },
     ];
 }
 
@@ -12868,7 +13088,7 @@ static bool settings_apply_community_ports(NSUserDefaults *d)
             case SectionAppLibraryStudio: case SectionCylinderLite: case SectionHideLabels:
             case SectionCleanHomeScreen: case SectionBlurryBadges:
                 destination = RootSectionHomeScreen; break;
-            case SectionLockCustomizer: case SectionFastLockXLite: case SectionAxonLite:
+            case SectionLockCustomizer: case SectionLockScreenOverlay: case SectionFastLockXLite: case SectionAxonLite:
             case SectionVelvet: case SectionCleanNC: case SectionTypeBanner:
             case SectionNotificationIsland: case SectionUnderTime:
                 destination = RootSectionLockAndNotifications; break;
@@ -12884,10 +13104,11 @@ static bool settings_apply_community_ports(NSUserDefaults *d)
             case SectionStageStrip:
                 destination = RootSectionMultitasking; break;
             case SectionThemer: case SectionSnowBoardLite: case SectionLiveWP:
-            case SectionBarmoji:
+            case SectionBarmoji: case SectionMagsafe:
                 destination = RootSectionThemesAndVisuals; break;
-            case SectionPowercuff: case SectionDarkSwordTweaks: case SectionDragCoefficient:
+            case SectionPowercuff: case SectionDarkSwordTweaks: case SectionDragCoefficient: case SectionUpsideDown:
             case SectionNanoRegistry: case SectionCallRecordingSound: case SectionHideHomeBar:
+            case SectionAMFIBypass:
                 destination = RootSectionSystem; break;
             default:
                 destination = RootSectionUtilities; break;
@@ -13039,6 +13260,9 @@ static bool settings_apply_community_ports(NSUserDefaults *d)
     if (s == SectionHideHomeBar) {
         return @"Persistent MaterialKit asset edit. Apply or restore it by itself, then respring. The log records the target path, write result, and pending-respring state.";
     }
+    if (s == SectionAMFIBypass) {
+        return @"Manual current-process test. It acquires kernel primitives, attempts the existing AMFI OSEntitlements flag patch on infern0, and verifies the flags by reading them back. Nothing is installed and the effect ends when infern0 exits.";
+    }
     if (s == SectionTypeBanner) {
         return @"Partial TypeMillennium port. Detection runs against imagent using original-thread RemoteCall probes, while SpringBoard renders a prewarmed banner window.";
     }
@@ -13079,7 +13303,7 @@ static bool settings_apply_community_ports(NSUserDefaults *d)
         return @"Prysm-ish session treatment for module scale, depth, and lift without persistent Control Center preference rewrites.";
     }
     if (s == SectionMagma) {
-        return @"Granular session-only coloring for Control Center toggles, sliders, media controls, and module backgrounds.";
+        return @"Bounded, contrast-aware session coloring for verified Control Center toggle, slider, media, and background properties.";
     }
     if (s == SectionBetterCCIcons) {
         return @"Rounds visible Control Center module/icon layers for a softer icon style.";
@@ -13106,7 +13330,7 @@ static bool settings_apply_community_ports(NSUserDefaults *d)
         return @"Uses the current navigation controller's native interactive edge-back recognizer. Touch limits are configurable, and disabling Pancake restores the recognizer's exact prior values.";
     }
     if (s == SectionCylinderLite) {
-        return @"Applies perspective depth to every discovered Home Screen page. It keeps each live SBIconView interactive so icons continue to open normally.";
+        return @"Applies a low-traffic cylindrical transform to loaded Home Screen page layers. Individual icon objects are never scanned or mutated, so taps keep their stock behavior.";
     }
     if (s == SectionBarmoji) {
         return @"Adds eight real emoji buttons and three clipboard slots near the bottom of SpringBoard. Pressing one copies its text to the system pasteboard; app-keyboard injection is intentionally outside this Lite port.";
@@ -13115,10 +13339,19 @@ static bool settings_apply_community_ports(NSUserDefaults *d)
         return @"Applies smooth continuous corners to every discovered Home Screen icon without requiring a theme. Live icon views remain tappable.";
     }
     if (s == SectionWatchLayout) {
-        return @"Compacts every discovered Home Screen page into a circular Apple Watch-style layout. Refreshes use saved stock frames, so the layout does not keep shrinking and can be restored.";
+        return @"Creates one vertically scrolling Apple Watch-style beehive with alternating five- and four-icon rows. Pressable native icons sit above untouched stock pages, which are restored when the tweak stops.";
     }
     if (s == SectionLockCustomizer) {
         return @"Resizes and repositions the live Lock Screen clock and optionally hides quick actions or page dots. Changes are session-based, logged, and restored on uninstall.";
+    }
+    if (s == SectionLockScreenOverlay) {
+        return @"Independent Watch Layout-style Cover Sheet overlay. It builds a glass clock panel first, verifies attachment, and only then hides matched stock clock controls. The time is refreshed by infern0's visual loop; cleanup removes the overlay and restores every saved hidden state. The engine uses no remote VM or struct-return reads.";
+    }
+    if (s == SectionMagsafe) {
+        return @"Displays a configurable animated battery ring in one owned, touch-through SpringBoard window whenever iOS reports charging. It never scans private windows or modifies stock views. Cable, Qi, and MagSafe all trigger it because public battery APIs do not expose the charger type.";
+    }
+    if (s == SectionUpsideDown) {
+        return @"Allows upside-down portrait on the Home Screen and Lock Screen when Rotation Lock is off. The five-method SpringBoard patch is preflighted and committed transactionally; Disable or Clean Up restores exact originals, and respring is the fallback.";
     }
     if (s == SectionFreePlacement) {
         return @"Applies a configurable staggered offset pattern to every discovered live Home Screen icon. Icons remain pressable and saved stock frames are restored on uninstall; per-icon dragging is not included yet.";
@@ -13133,7 +13366,7 @@ static bool settings_apply_community_ports(NSUserDefaults *d)
         return @"Selects, captures, and pins up to eight touch-through SpringBoard regions. Capture and Clear actions are available above the geometry controls.";
     }
     if (s == SectionPullOver) {
-        return @"Hosts pressable live icon views in a slide-over launcher and restores each icon to its exact original list and frame during cleanup.";
+        return @"Community-requested Vesta app drawer. Tap the red right-edge handle to open a scrollable grid of installed apps, then tap X to close it. Launch actions run off SpringBoard's main thread; stock Home Screen icons are never moved or rewritten.";
     }
     if (s == SectionAlkaline) {
         return @"Applies an Alkaline-style tint pass to visible battery views.";
@@ -15739,6 +15972,50 @@ void cyanide_present_contact(UIViewController *host)
     [self presentViewController:nav animated:YES completion:completion];
 }
 
+- (void)runAMFIBypassAction:(NSString *)action
+{
+    BOOL dumpOnly = [action isEqualToString:@"amfi-dump"];
+    __weak typeof(self) weakSelf = self;
+    dispatch_block_t startAction = ^{
+        dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+            BOOL actionLockAcquired = settings_try_claim_actions_lock(
+                dumpOnly ? "AMFI state dump" : "AMFI bypass test",
+                "[AMFI] Another infern0 action is already running.");
+            if (!actionLockAcquired) return;
+
+            @try {
+                log_user("[AMFI][UI] %s requested from Packages > AMFI Bypass Test.\n",
+                         dumpOnly ? "Read-only state dump" : "Verified bypass test");
+                if (!settings_ensure_kexploit()) {
+                    log_user("[AMFI][FAIL] Kernel primitives were not acquired; no AMFI state was touched.\n");
+                    return;
+                }
+                log_user("[AMFI][KRW] Kernel read/write session is ready.\n");
+
+                if (dumpOnly) {
+                    log_user("[AMFI][DUMP] Beginning current-process AMFI diagnostic dump.\n");
+                    amfi_dump_self();
+                    log_user("[AMFI][DUMP] Diagnostic dump finished.\n");
+                } else {
+                    bool ok = amfi_patch_self();
+                    log_user("[AMFI][RESULT] Current-process bypass test %s.\n",
+                             ok ? "PASSED verification" : "FAILED verification");
+                }
+            } @finally {
+                settings_release_actions_lock();
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    __strong typeof(weakSelf) strongSelf = weakSelf;
+                    [strongSelf.tableView reloadData];
+                    [[NSNotificationCenter defaultCenter]
+                        postNotificationName:kSettingsActionsDidCompleteNotification
+                                      object:nil];
+                });
+            }
+        });
+    };
+    [self presentActivityLogWithCompletion:startAction];
+}
+
 - (void)toggleChanged:(UISwitch *)sender
 {
     if (!settings_device_supported()) {
@@ -16883,6 +17160,41 @@ void cyanide_present_contact(UIViewController *host)
     settings_present_controller(editor, self);
 }
 
+- (void)presentAppSwitcherPresetPickerForKey:(NSString *)key
+{
+    BOOL layoutPicker = [key isEqualToString:kSettingsAppSwitcherGridLayout];
+    NSArray<NSString *> *titles = layoutPicker
+        ? @[@"Automatic", @"Classic Deck", @"Compact Grid", @"Balanced Grid", @"Large Grid"]
+        : @[@"System", @"Snappy", @"Smooth", @"Bouncy"];
+    UIAlertController *picker = [UIAlertController
+        alertControllerWithTitle:layoutPicker ? @"Switcher Layout" : @"Animation Feel"
+                       message:layoutPicker
+                           ? @"Grid presets use different card scales and spacing."
+                           : @"These presets tune SpringBoard's switcher spring response and damping."
+                preferredStyle:UIAlertControllerStyleActionSheet];
+    __weak typeof(self) weakSelf = self;
+    [titles enumerateObjectsUsingBlock:^(NSString *title, NSUInteger index, __unused BOOL *stop) {
+        [picker addAction:[UIAlertAction actionWithTitle:title
+                                                  style:UIAlertActionStyleDefault
+                                                handler:^(__unused UIAlertAction *action) {
+            NSUserDefaults *defaults = NSUserDefaults.standardUserDefaults;
+            [defaults setInteger:(NSInteger)index forKey:key];
+            [defaults synchronize];
+            settings_note_package_configuration_changed(key);
+            settings_schedule_live_apply_for_key(key);
+            log_user("[ASG] Selected %s: %s.\n",
+                     layoutPicker ? "layout" : "animation", title.UTF8String);
+            __strong typeof(weakSelf) strongSelf = weakSelf;
+            [strongSelf reloadSectionOrAll:SectionAppSwitcherGrid];
+            [strongSelf presentApplyLogIfRunning];
+        }]];
+    }];
+    [picker addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
+    picker.popoverPresentationController.sourceView = self.view;
+    picker.popoverPresentationController.sourceRect = self.view.bounds;
+    settings_present_controller(picker, self);
+}
+
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath
 {
     [tableView deselectRowAtIndexPath:indexPath animated:YES];
@@ -17098,6 +17410,33 @@ void cyanide_present_contact(UIViewController *host)
         return;
     }
 
+    if (indexPath.section == SectionAMFIBypass) {
+        NSDictionary *row = [self rowsForSection:indexPath.section][indexPath.row];
+        if (![row[@"kind"] isEqualToString:@"button"]) return;
+        NSString *action = row[@"action"];
+        if ([action isEqualToString:@"amfi-dump"]) {
+            [self runAMFIBypassAction:action];
+            return;
+        }
+        if ([action isEqualToString:@"amfi-run"]) {
+            UIAlertController *alert = [UIAlertController
+                alertControllerWithTitle:@"Run AMFI Bypass Test?"
+                                 message:@"This experimental test writes to infern0's current kernel-backed AMFI state, then reads it back for verification. It is temporary and may fail on protected or unsupported layouts."
+                          preferredStyle:UIAlertControllerStyleAlert];
+            [alert addAction:[UIAlertAction actionWithTitle:@"Cancel"
+                                                       style:UIAlertActionStyleCancel
+                                                     handler:nil]];
+            __weak typeof(self) weakSelf = self;
+            [alert addAction:[UIAlertAction actionWithTitle:@"Run Test"
+                                                       style:UIAlertActionStyleDestructive
+                                                     handler:^(__unused UIAlertAction *selected) {
+                [weakSelf runAMFIBypassAction:@"amfi-run"];
+            }]];
+            settings_present_controller(alert, self);
+        }
+        return;
+    }
+
     if (indexPath.section == SectionNanoRegistry) {
         NSDictionary *row = [self rowsForSection:indexPath.section][indexPath.row];
         if (![row[@"kind"] isEqualToString:@"button"]) return;
@@ -17292,48 +17631,8 @@ void cyanide_present_contact(UIViewController *host)
                         }
                     }
 
-                    log_user("[TYPEBANNER] Test: polling imagent for typing indicators…\n");
-                    NSString *detected = nil;
-                    @synchronized (settings_rc_lock()) {
-                        RemoteCallSession *daemonSession = [[RemoteCallSession alloc] initWithProcess:@"imagent"
-                                                                                   useMigFilterBypass:NO
-                                                                              firstExceptionTimeoutMS:TYPEBANNER_RC_MOBILESMS_FIRST_EXCEPTION_TIMEOUT_MS
-                                                                                    originalThreadOnly:YES];
-                        if (!daemonSession) {
-                            RemoteCallInitFailure failure = remote_call_last_init_failure();
-                            uint32_t pid = remote_call_last_init_failure_pid();
-                            if (failure == RemoteCallInitFailureProcessMissing) {
-                                log_user("[TYPEBANNER] imagent is not running.\n");
-                            } else if (failure == RemoteCallInitFailureFirstExceptionTimeout && pid != 0) {
-                                log_user("[TYPEBANNER] imagent pid=%u did not answer the original-thread bootstrap this tick.\n",
-                                         pid);
-                            } else if (pid != 0) {
-                                log_user("[TYPEBANNER] imagent RemoteCall init failed: %s (pid=%u)\n",
-                                         remote_call_init_failure_description(failure), pid);
-                            } else {
-                                log_user("[TYPEBANNER] imagent RemoteCall init failed: %s\n",
-                                         remote_call_init_failure_description(failure));
-                            }
-                        } else {
-                            @try {
-                                detected = typebanner_poll_in_imagent_remote_session(daemonSession);
-                            } @catch (NSException *e) {
-                                log_user("[TYPEBANNER] imagent poll threw: %s\n", e.reason.UTF8String);
-                            }
-                            if (detected.length == 0) {
-                                log_user("[TYPEBANNER] No daemon typing indicator detected on this poll.\n");
-                            }
-                            [daemonSession destroyRemoteCall];
-                        }
-                    }
-
-                    if (detected.length > 0) {
-                        log_user("[TYPEBANNER] Detected typing: %s. Showing banner.\n",
-                                 detected.UTF8String);
-                    } else {
-                        log_user("[TYPEBANNER] Showing a one-shot demo banner so you can confirm the SpringBoard render path.\n");
-                    }
-
+                    log_user("[TYPEBANNER] Render test: showing a demo without probing imagent.\n");
+                    BOOL shown = NO;
                     @synchronized (settings_rc_lock()) {
                         RemoteCallSession *springboardSession = [[RemoteCallSession alloc] initWithProcess:@"SpringBoard"
                                                                                          useMigFilterBypass:NO
@@ -17343,15 +17642,36 @@ void cyanide_present_contact(UIViewController *host)
                         } else {
                             bool ok = false;
                             @try {
-                                NSString *label = detected.length > 0 ? detected : @"TypeBanner demo";
-                                ok = typebanner_show_in_springboard_remote_session(springboardSession, label);
+                                ok = typebanner_show_in_springboard_remote_session(springboardSession,
+                                                                                   @"TypeBanner demo");
                             } @catch (NSException *e) {
                                 log_user("[TYPEBANNER] SpringBoard show threw: %s\n", e.reason.UTF8String);
                             }
-                            log_user("[TYPEBANNER] show=%d. Banner auto-hides in 5s.\n", ok);
-                            sleep(5);
-                            @try { typebanner_hide_in_springboard_remote_session(springboardSession); } @catch (NSException *e) {}
+                            shown = ok;
                             [springboardSession destroyRemoteCall];
+                        }
+                    }
+                    log_user("[TYPEBANNER] render show=%d. Banner auto-hides in 5s.\n", shown);
+
+                    // Do not hold the global RemoteCall lock or a live session
+                    // while the demo is visible.
+                    if (shown) sleep(5);
+
+                    @synchronized (settings_rc_lock()) {
+                        RemoteCallSession *springboardSession = [[RemoteCallSession alloc] initWithProcess:@"SpringBoard"
+                                                                                         useMigFilterBypass:NO
+                                                                                    firstExceptionTimeoutMS:TYPEBANNER_RC_FIRST_EXCEPTION_TIMEOUT_MS];
+                        if (springboardSession) {
+                            bool hidden = false;
+                            @try {
+                                hidden = typebanner_hide_in_springboard_remote_session(springboardSession);
+                            } @catch (NSException *e) {
+                                log_user("[TYPEBANNER] SpringBoard hide threw: %s\n", e.reason.UTF8String);
+                            }
+                            [springboardSession destroyRemoteCall];
+                            log_user("[TYPEBANNER] render hide=%d.\n", hidden);
+                        } else {
+                            log_user("[TYPEBANNER] SpringBoard not reachable for demo cleanup; cleanup or respring will remove the overlay.\n");
                         }
                     }
 
@@ -17561,6 +17881,14 @@ void cyanide_present_contact(UIViewController *host)
         NSDictionary *row = [self rowsForSection:indexPath.section][indexPath.row];
         if (![row[@"kind"] isEqualToString:@"button"]) return;
         NSString *action = row[@"action"];
+        if ([action isEqualToString:@"appswitchergrid-layout"]) {
+            [self presentAppSwitcherPresetPickerForKey:kSettingsAppSwitcherGridLayout];
+            return;
+        }
+        if ([action isEqualToString:@"appswitchergrid-animation"]) {
+            [self presentAppSwitcherPresetPickerForKey:kSettingsAppSwitcherGridAnimation];
+            return;
+        }
         if ([action isEqualToString:@"appswitchergrid-restore"]) {
             NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
             [d setBool:NO forKey:kSettingsAppSwitcherGridEnabled];

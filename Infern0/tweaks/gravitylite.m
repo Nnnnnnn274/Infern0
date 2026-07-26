@@ -41,8 +41,6 @@ typedef struct {
 
 static uint64_t s_gravity_ptrs[64];
 static volatile int s_gravity_ptr_count = 0;
-static GravityLiteConfig s_gravity_config = {0};
-static volatile uint32_t s_gravity_refresh_tick = 0;
 static const uint64_t kGravityLiteOverlayTag = 0x47524156ULL; // "GRAV"
 static const double kGravityLiteSnapshotScale = 1.22;
 
@@ -236,6 +234,20 @@ static void gl_set_double(uint64_t obj, const char *selName, double value)
     r_msg2_main_raw(obj, selName,
                     &value, sizeof(value),
                     NULL, 0, NULL, 0, NULL, 0);
+}
+
+// The motion callback runs many times per second, so a behavior invalidated by
+// a SpringBoard page rebuild must not remain in its raw-address cache.  Unlike
+// the general setter above, this reports the RemoteCall result so the caller
+// can evict a dead behavior after the first failed access.
+static bool gl_set_double_checked(uint64_t obj, const char *selName, double value)
+{
+    if (!r_is_objc_ptr(obj) || !selName) return false;
+    if (!r_responds_main(obj, selName) || !remote_call_current_success()) return false;
+    r_msg2_main_raw(obj, selName,
+                    &value, sizeof(value),
+                    NULL, 0, NULL, 0, NULL, 0);
+    return remote_call_current_success();
 }
 
 static void gl_set_bool(uint64_t obj, const char *selName, bool value)
@@ -901,6 +913,23 @@ static uint64_t gl_current_root_list_view(uint64_t ctrl, uint64_t mgr)
     return list;
 }
 
+// Deliberately narrow resolver from the known-good reference implementation.
+// Avoid walking root-folder arrays or application windows: on some iOS builds
+// those collections contain short-lived objects that fail RemoteCall reads.
+static uint64_t gl_current_root_list_view_safe(uint64_t ctrl)
+{
+    uint64_t list = 0;
+    if (gl_safe_msg(ctrl, "hasOpenFolder", 0, 0, 0, 0))
+        list = gl_safe_msg(ctrl, "currentFolderIconList", 0, 0, 0, 0);
+    if (!r_is_objc_ptr(list))
+        list = gl_safe_msg(ctrl, "currentRootIconList", 0, 0, 0, 0);
+    if (!r_is_objc_ptr(list))
+        list = gl_safe_msg(ctrl, "currentRootIconListView", 0, 0, 0, 0);
+    if (!r_is_objc_ptr(list))
+        list = gl_safe_msg(ctrl, "currentIconListView", 0, 0, 0, 0);
+    return list;
+}
+
 // Several recent SpringBoard builds leave currentRootIconListView pointing at
 // one recycled page even after the user scrolls. Resolve the actually centered
 // page from live geometry and use the private selector only as a tie-breaker.
@@ -1490,17 +1519,12 @@ static bool gl_build_group_ios26_per_icon(uint64_t groups,
         gl_set_double(gravity, "setAngle:", M_PI_2);
         gl_set_double(gravity, "setMagnitude:", config.magnitude);
         r_msg2_main(animator, "addBehavior:", gravity, 0, 0, 0);
-        int n = __atomic_load_n(&s_gravity_ptr_count, __ATOMIC_RELAXED);
-        if (n < 64) {
-            s_gravity_ptrs[n] = gravity;
-            __atomic_store_n(&s_gravity_ptr_count, n + 1, __ATOMIC_SEQ_CST);
-        }
-        gl_release(gravity);
     }
 
     uint64_t group = gl_new_remote("NSMutableDictionary");
     if (r_is_objc_ptr(group)) {
         gl_dict_set(group, "animator", animator);
+        if (r_is_objc_ptr(gravity)) gl_dict_set(group, "gravity", gravity);
         gl_dict_set(group, "icons", icons);
         gl_dict_set(group, "snapshots", icons);
         gl_dict_set(group, "liveItems", liveItems);
@@ -1511,9 +1535,18 @@ static bool gl_build_group_ios26_per_icon(uint64_t groups,
         gl_dict_set(group, "overlay", overlay);
         gl_array_add(groups, group);
         gl_release(group);
+        if (r_is_objc_ptr(gravity)) {
+            int n = __atomic_load_n(&s_gravity_ptr_count, __ATOMIC_RELAXED);
+            if (n < 64) {
+                s_gravity_ptrs[n] = gravity;
+                __atomic_store_n(&s_gravity_ptr_count, n + 1, __ATOMIC_SEQ_CST);
+            }
+            gl_release(gravity);
+        }
     } else {
         gl_restore_live_items(liveItems, liveParents, liveFrames);
         r_msg2_main(overlay, "removeFromSuperview", 0, 0, 0, 0);
+        if (r_is_objc_ptr(gravity)) gl_release(gravity);
         gl_release(animator);
         gl_release(overlay);
         gl_release(icons);
@@ -1716,17 +1749,12 @@ static bool gl_build_group(uint64_t groups,
         gl_set_double(gravity, "setAngle:", M_PI_2);
         gl_set_double(gravity, "setMagnitude:", config.magnitude);
         r_msg2_main(animator, "addBehavior:", gravity, 0, 0, 0);
-        int n = __atomic_load_n(&s_gravity_ptr_count, __ATOMIC_RELAXED);
-        if (n < 64) {
-            s_gravity_ptrs[n] = gravity;
-            __atomic_store_n(&s_gravity_ptr_count, n + 1, __ATOMIC_SEQ_CST);
-        }
-        gl_release(gravity);
     }
 
     uint64_t group = gl_new_remote("NSMutableDictionary");
     if (r_is_objc_ptr(group)) {
         gl_dict_set(group, "animator", animator);
+        if (r_is_objc_ptr(gravity)) gl_dict_set(group, "gravity", gravity);
         gl_dict_set(group, "snapshots", snapshots);
         gl_dict_set(group, "liveItems", liveItems);
         gl_dict_set(group, "liveParents", liveParents);
@@ -1735,11 +1763,20 @@ static bool gl_build_group(uint64_t groups,
         gl_dict_set(group, "overlay", overlay);
         gl_array_add(groups, group);
         gl_release(group);
+        if (r_is_objc_ptr(gravity)) {
+            int n = __atomic_load_n(&s_gravity_ptr_count, __ATOMIC_RELAXED);
+            if (n < 64) {
+                s_gravity_ptrs[n] = gravity;
+                __atomic_store_n(&s_gravity_ptr_count, n + 1, __ATOMIC_SEQ_CST);
+            }
+            gl_release(gravity);
+        }
     } else {
         gl_restore_live_items(liveItems, liveParents, liveFrames);
         gl_set_double(listView, "setAlpha:", 1.0);
         gl_layout_list_view(listView);
         r_msg2_main(overlay, "removeFromSuperview", 0, 0, 0, 0);
+        if (r_is_objc_ptr(gravity)) gl_release(gravity);
         gl_release(animator);
         gl_release(overlay);
         gl_release(snapshots);
@@ -1766,67 +1803,9 @@ static bool gl_build_group(uint64_t groups,
     return true;
 }
 
-static bool gl_groups_contains_list(uint64_t groups, uint64_t listView)
-{
-    uint64_t count = gl_array_count(groups);
-    if (count > 64) count = 64;
-    for (uint64_t i = 0; i < count; i++) {
-        uint64_t group = gl_array_object(groups, i);
-        if (gl_dict_get(group, "listView") == listView) return true;
-    }
-    return false;
-}
-
-static int gl_refresh_lazy_page_groups(uint64_t ctrl,
-                                       uint64_t mgr,
-                                       uint64_t groups,
-                                       uint64_t iconViewCls,
-                                       GravityLiteConfig config)
-{
-    if (!r_is_objc_ptr(groups) || !r_is_objc_ptr(iconViewCls)) return 0;
-    int added = 0;
-    uint64_t currentPage = gl_visible_root_list_view(ctrl, mgr, iconViewCls);
-    bool homePageVisible = r_is_objc_ptr(currentPage) &&
-                           gl_view_has_visible_window_rect(currentPage);
-
-    // Never synchronously probe every offscreen page. SpringBoard only makes a
-    // page's live icon geometry reliable while that page is current; capture it
-    // once on arrival and retain its independent animator for later revisits.
-    if (homePageVisible && !gl_groups_contains_list(groups, currentPage)) {
-        if (gl_build_group(groups, currentPage, iconViewCls, config, false, false, true)) {
-            added++;
-            log_user("[GRAVITY][LIVE-REFRESH] type=home-page list=0x%llx trigger=became-current result=attached.\n",
-                     currentPage);
-        }
-    }
-
-    // The App Library is scanned only after the Home page leaves the visible
-    // window. This avoids a large class-tree walk during initial Apply.
-    if (!homePageVisible) {
-        uint64_t libraryRoots[8] = {0};
-        int libraryCount = gl_collect_library_roots(libraryRoots, 8);
-        for (int i = 0; i < libraryCount; i++) {
-            if (gl_groups_contains_list(groups, libraryRoots[i]) ||
-                !gl_view_has_visible_window_rect(libraryRoots[i])) continue;
-            if (gl_build_group(groups, libraryRoots[i], iconViewCls, config, false, true, true)) {
-                added++;
-                log_user("[GRAVITY][LIVE-REFRESH] type=app-library root=0x%llx trigger=home-page-hidden result=attached.\n",
-                         libraryRoots[i]);
-            }
-        }
-    }
-    if (added > 0) {
-        log_user("[GRAVITY][LIVE-REFRESH] newlyAttachedGroups=%d totalGroups=%llu.\n",
-                 added, gl_array_count(groups));
-    }
-    return added;
-}
-
 bool gravitylite_stop_in_session(void)
 {
     __atomic_store_n(&s_gravity_ptr_count, 0, __ATOMIC_SEQ_CST);
-    __atomic_store_n(&s_gravity_refresh_tick, 0, __ATOMIC_SEQ_CST);
-    memset(&s_gravity_config, 0, sizeof(s_gravity_config));
     memset(s_gravity_ptrs, 0, sizeof(s_gravity_ptrs));
 
     uint64_t ctrl = gl_icon_controller();
@@ -1923,8 +1902,6 @@ bool gravitylite_apply_in_session(GravityLiteConfig config)
     (void)gravitylite_stop_in_session();
     __atomic_store_n(&s_gravity_ptr_count, 0, __ATOMIC_SEQ_CST);
     memset(s_gravity_ptrs, 0, sizeof(s_gravity_ptrs));
-    s_gravity_config = config;
-    __atomic_store_n(&s_gravity_refresh_tick, 0, __ATOMIC_SEQ_CST);
 
     uint64_t iconViewCls = r_class("SBIconView");
     if (!r_is_objc_ptr(iconViewCls)) {
@@ -1964,36 +1941,32 @@ bool gravitylite_apply_in_session(GravityLiteConfig config)
             return false;
         }
 
-        enum { LV_CAP = 64 };
         uint64_t dockListView = gl_dock_list_view(ctrl, mgr);
-        uint64_t listViews[LV_CAP] = {0};
-        int count = gl_collect_home_page_list_views(ctrl, mgr, iconViewCls,
-                                                    listViews, LV_CAP);
-        uint64_t currentPage = gl_visible_root_list_view(ctrl, mgr, iconViewCls);
-        int currentIndex = -1;
-        for (int i = 0; i < count; i++) {
-            if (listViews[i] == currentPage) currentIndex = i;
-            else log_user("[GRAVITY][PAGE %d/%d] list=0x%llx result=deferred-offscreen; captureWhenCurrent=1.\n",
-                          i + 1, count, listViews[i]);
-        }
-
+        log_user("[GRAVITY][PAGE-RESOLVE] mode=safe-current-page broadDiscovery=disabled windowTreeScan=disabled appLibraryScan=disabled.\n");
+        uint64_t currentPage = gl_current_root_list_view_safe(ctrl);
         if (r_is_objc_ptr(currentPage)) {
-            printf("[GRAVITY] Capturing current home screen page %d/%d...\n",
-                   currentIndex >= 0 ? currentIndex + 1 : 1,
-                   count > 0 ? count : 1);
-            log_user("[GRAVITY][PAGE %d/%d] list=0x%llx capture=starting ownership=isolated visibility=current.\n",
-                     currentIndex >= 0 ? currentIndex + 1 : 1,
-                     count > 0 ? count : 1, currentPage);
+            printf("[GRAVITY] Capturing current home screen page...\n");
+            log_user("[GRAVITY][PAGE] list=0x%llx capture=starting ownership=isolated resolver=SBIconController-current.\n",
+                     currentPage);
             if (gl_build_group(groups, currentPage, iconViewCls, config, false, false, true)) {
                 built++;
                 homeBuilt = true;
-                log_user("[GRAVITY][PAGE %d/%d] list=0x%llx overlay=page-child animator=page-local collisionBounds=page-local result=active; deferredPagesAttachOnVisit=1.\n",
-                         currentIndex >= 0 ? currentIndex + 1 : 1,
-                         count > 0 ? count : 1, currentPage);
+                log_user("[GRAVITY][PAGE] list=0x%llx overlay=page-child animator=page-local collisionBounds=page-local result=active.\n",
+                         currentPage);
+            } else {
+                log_user("[GRAVITY][PAGE][WARN] list=0x%llx result=capture-failed; pageRestored=1.\n",
+                         currentPage);
             }
+        } else {
+            log_user("[GRAVITY][PAGE][ERROR] safe current-page resolver returned no valid object; action=abort-before-mutation.\n");
         }
 
-        log_user("[GRAVITY][LIBRARY] initialScan=deferred lazyRefreshArmed=1 trigger=home-page-hidden result=waiting-for-library-page.\n");
+        if (!homeBuilt) {
+            gl_release(groups);
+            gl_release(state);
+            printf("[GRAVITY] Current page could not be captured safely; dock was not modified.\n");
+            return false;
+        }
 
         if (r_is_objc_ptr(dockListView) && config.includeDock) {
             printf("[GRAVITY] Capturing dock icons...\n");
@@ -2012,8 +1985,7 @@ bool gravitylite_apply_in_session(GravityLiteConfig config)
         if (built <= 0) {
             gl_release(groups);
             gl_release(state);
-            printf("[GRAVITY] No icon groups could be captured from %d discovered page(s).\n",
-                   count);
+            printf("[GRAVITY] Current page could not be captured safely.\n");
             return false;
         }
 
@@ -2021,10 +1993,9 @@ bool gravitylite_apply_in_session(GravityLiteConfig config)
         gl_dict_set(state, "groups", groups);
         gl_set_state(ctrl, state);
         printf("[GRAVITY] Physics started — groups=%d home=%d dock=%d visiblePages=%d\n",
-               built, homeBuilt, dockBuilt, count);
-        log_user("[GRAVITY][APPLY] completed discoveredPages=%d activeGroups=%d activeHomePages=%d deferredHomePages=%d dockRequested=%d dockActive=%d gravityBehaviors=%d pageIsolation=1 lazyPageAttach=1 result=success.\n",
-                 count, built, homeBuilt ? 1 : 0,
-                 count - (homeBuilt ? 1 : 0), config.includeDock, dockBuilt,
+               built, homeBuilt, dockBuilt, 1);
+        log_user("[GRAVITY][APPLY] activeGroups=%d activeHomePages=%d dockRequested=%d dockActive=%d gravityBehaviors=%d safeCurrentPageOnly=1 broadDiscovery=0 appLibraryScan=0 staleObjectRetries=0 result=success.\n",
+                 built, homeBuilt ? 1 : 0, config.includeDock, dockBuilt,
                  __atomic_load_n(&s_gravity_ptr_count, __ATOMIC_SEQ_CST));
         printf("[WARN] TO STOP GRAVITY: USE APP SWITCHER TO RETURN TO CYANIDE AND DEACTIVATE.\n");
 
@@ -2143,38 +2114,33 @@ bool gravitylite_explosion_in_session(double force)
 
 bool gravitylite_update_gravity_angle_in_session(double angle, double magnitude)
 {
-    uint32_t refreshTick = __atomic_add_fetch(&s_gravity_refresh_tick, 1, __ATOMIC_SEQ_CST);
-    if ((refreshTick % 100U) == 0U) {
-        uint64_t ctrl = gl_icon_controller();
-        uint64_t state = r_is_objc_ptr(ctrl) ? gl_get_state(ctrl) : 0;
-        uint64_t groups = r_is_objc_ptr(state) ? gl_dict_get(state, "groups") : 0;
-        uint64_t iconViewCls = r_class("SBIconView");
-        if (r_is_objc_ptr(groups) && r_is_objc_ptr(iconViewCls)) {
-            gl_refresh_lazy_page_groups(ctrl, gl_icon_manager(ctrl), groups,
-                                        iconViewCls, s_gravity_config);
-        }
-    }
-
     int count = __atomic_load_n(&s_gravity_ptr_count, __ATOMIC_SEQ_CST);
     if (count <= 0) return false;
     uint32_t oldSettle = r_settle_us(0);
+    int kept = 0;
+    int evicted = 0;
     for (int i = 0; i < count; i++) {
         uint64_t gb = s_gravity_ptrs[i];
-        if (!r_is_objc_ptr(gb)) continue;
-        gl_set_double(gb, "setAngle:", angle);
-        gl_set_double(gb, "setMagnitude:", magnitude);
+        if (!r_is_objc_ptr(gb) ||
+            !gl_set_double_checked(gb, "setAngle:", angle) ||
+            !gl_set_double_checked(gb, "setMagnitude:", magnitude)) {
+            evicted++;
+            continue;
+        }
+        s_gravity_ptrs[kept++] = gb;
     }
+    for (int i = kept; i < count; i++) s_gravity_ptrs[i] = 0;
+    __atomic_store_n(&s_gravity_ptr_count, kept, __ATOMIC_SEQ_CST);
     r_settle_us(oldSettle);
-    if ((refreshTick % 100U) == 0U)
-        log_user("[GRAVITY][STEERING] angle=%.4f magnitude=%.2f groups=%d discoveryTick=%u result=updated.\n",
-                 angle, magnitude, count, refreshTick);
-    return true;
+    if (evicted > 0) {
+        log_user("[GRAVITY][STEERING-RECOVERY] evictedStaleBehaviors=%d remainingGroups=%d action=stopped-retrying-invalid-vm-object.\n",
+                 evicted, kept);
+    }
+    return kept > 0;
 }
 
 void gravitylite_forget_remote_state(void)
 {
     __atomic_store_n(&s_gravity_ptr_count, 0, __ATOMIC_SEQ_CST);
-    __atomic_store_n(&s_gravity_refresh_tick, 0, __ATOMIC_SEQ_CST);
     memset(s_gravity_ptrs, 0, sizeof(s_gravity_ptrs));
-    memset(&s_gravity_config, 0, sizeof(s_gravity_config));
 }

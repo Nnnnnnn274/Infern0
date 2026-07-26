@@ -5,7 +5,7 @@
 
 #import "PackageCatalog.h"
 #import "../SettingsViewController.h"
-#import "../tweaks/RepoTweaks.h"
+#import "../tweaks/retired_tweak_compat.h"
 #import "../tweaks/experimental_tweaks.h"
 
 @interface Package ()
@@ -107,6 +107,9 @@ static BOOL catalog_repo_script_requires_native_bridge(NSString *rawScript)
 // (kept in sync — must match the underlying section indices used for the
 // detail-mode SettingsViewController push).
 static const NSInteger kSecOTA              = 3;
+static const NSInteger kSecLaraVFS          = -1000;
+static const NSInteger kSecLaraFonts        = -1001;
+static const NSInteger kSecLaraSettings     = -1002;
 static const NSInteger kSecSBC              = 4;
 static const NSInteger kSecStatBar          = 5;
 static const NSInteger kSecNSBar            = 6;
@@ -119,6 +122,7 @@ static const NSInteger kSecPowercuff        = 12;
 static const NSInteger kSecDragCoefficient  = 14;
 static const NSInteger kSecLayoutExtras     = 15;
 static const NSInteger kSecNanoRegistry     = 16;
+static const NSInteger kSecThemer           = 17;
 static const NSInteger kSecSnowBoardLite    = 18;
 static const NSInteger kSecLiveWP           = 19;
 static const NSInteger kSecLocationSim      = 20;
@@ -164,29 +168,11 @@ static const NSInteger kSecLockCustomizer   = 59;
 static const NSInteger kSecFreePlacement    = 60;
 static const NSInteger kSecCopypastaLite    = 61;
 static const NSInteger kSecAppLibraryStudio = 62;
-static const NSInteger kSecCommunityPorts   = 63;
+static const NSInteger kSecAMFIBypass       = 63;
+static const NSInteger kSecLockScreenOverlay = 64;
+static const NSInteger kSecMagsafe          = 65;
+static const NSInteger kSecUpsideDown       = 66;
 static const NSInteger kSecDarkSwordTweaks  = 13;
-
-static Package *catalog_community_port(NSString *identifier, NSString *name,
-                                       NSString *summary, NSString *details,
-                                       NSString *symbol, NSString *key,
-                                       NSString *category, NSString *version)
-{
-    Package *package = [[Package alloc] initWithIdentifier:identifier
-                                                      name:name
-                                          shortDescription:summary
-                                           longDescription:details
-                                                   version:version
-                                                    author:@"Nnnnnnn274"
-                                                  category:category
-                                                symbolName:symbol
-                                                      kind:PackageInstallKindToggle
-                                                enabledKey:key
-                                                     isNew:YES];
-    package.settingsSection = kSecCommunityPorts;
-    package.unstableWarning = @"Live-session port: cleanup, respring, reboot, or closing infern0 removes the active runtime changes.";
-    return package;
-}
 
 + (NSArray<Package *> *)allPackages
 {
@@ -320,7 +306,7 @@ static Package *catalog_community_port(NSString *identifier, NSString *name,
                                      enabledKey:kSettingsTypeBannerEnabled
                                           isNew:NO];
         typeBanner.settingsSection = kSecTypeBanner;
-        typeBanner.unstableWarning = @"⚠️ Beta: Keeps an original-thread imagent RemoteCall session for live polling and may occasionally miss indicators.";
+        typeBanner.unstableWarning = @"Beta: Uses a short-lived imagent probe every five seconds and restores the daemon thread after every poll. Disable it and report the [TYPEBANNER] log if a probe or restore fails.";
 
         Package *notificationIsland = [[Package alloc] initWithIdentifier:@"com.darksword.notificationisland"
                                            name:@"Notification Island"
@@ -420,6 +406,20 @@ static Package *catalog_community_port(NSString *identifier, NSString *name,
                                           isNew:NO];
         liveWP.settingsSection = kSecLiveWP;
 
+        Package *themer = [[Package alloc] initWithIdentifier:@"com.darksword.themer"
+                                             name:@"Infern0 Themer"
+                                 shortDescription:@"Per-bundle icon theme engine"
+                                  longDescription:@"Replaces stock app icons with a selected local icon theme. Choose a theme in Settings before applying. Changes are session-based and may need re-applying after SpringBoard restarts."
+                                          version:version
+                                           author:@"zeroxjf"
+                                         category:@"Beta"
+                                       symbolName:@"paintpalette.fill"
+                                             kind:PackageInstallKindToggle
+                                       enabledKey:kSettingsThemerEnabled
+                                            isNew:NO];
+        themer.experimental = NO;
+        themer.settingsSection = kSecThemer;
+
         Package *layoutExtras = [[Package alloc] initWithIdentifier:@"com.darksword.layoutextras"
                                            name:@"Home Layout Extras"
                                shortDescription:@"Extra home/dock padding and per-icon scaling"
@@ -461,8 +461,8 @@ static Package *catalog_community_port(NSString *identifier, NSString *name,
 
         Package *appSwitcherGrid = [[Package alloc] initWithIdentifier:@"com.darksword.appswitchergrid"
                                            name:@"App Switcher Grid"
-                               shortDescription:@"Grid-style app switcher"
-                                longDescription:@"Applies a runtime SpringBoard method patch that makes the app switcher use grid/deck style.\n\nThis does not write system files. A respring restores the stock app switcher. If you respring after Hide Home Bar, run App Switcher Grid again because respring resets this live SpringBoard patch.\n\nPorted from d1y/cyanide-ios."
+                               shortDescription:@"Deck and multi-size Grid switcher with spring animations"
+                                longDescription:@"Changes SpringBoard's live app-switcher settings without writing system files. Choose Automatic, Classic Deck, Compact Grid, Balanced Grid, or Large Grid, then pair it with System, Snappy, Smooth, or Bouncy switcher animations.\n\nThe tweak captures the original layout, spacing, scale, response, and damping values before changing them, so Restore Stock Switcher can put the active session back exactly. A respring also restores stock behavior.\n\nInspired by d1y/cyanide-ios, iPadSwitcher, and NewGridSwitcherBig."
                                         version:version
                                          author:@"rooootdev"
                                        category:@"SpringBoard"
@@ -471,7 +471,11 @@ static Package *catalog_community_port(NSString *identifier, NSString *name,
                                      enabledKey:kSettingsAppSwitcherGridEnabled
                                           isNew:NO];
         appSwitcherGrid.settingsSection = kSecAppSwitcherGrid;
-        appSwitcherGrid.unstableWarning = @"Beta: patches SpringBoard runtime methods in memory. Respring restores stock, but unsupported builds may glitch the app switcher or crash SpringBoard. Re-run after any respring.";
+        appSwitcherGrid.knownIssues = @[
+            @"SpringBoard may cache an already-open switcher. Close it fully and reopen it after changing a layout preset.",
+            @"Animation presets gracefully fall back to System when the current iOS build does not expose compatible fluid-animation settings.",
+        ];
+        appSwitcherGrid.unstableWarning = @"Beta: changes private SpringBoard switcher settings in memory. Unsupported iOS builds are rejected before mutation; Restore Stock Switcher or a respring returns to stock.";
 
         Package *quickLoader = [[Package alloc] initWithIdentifier:@"com.darksword.quickloader"
                                            name:@"QuickLoader"
@@ -660,9 +664,9 @@ static Package *catalog_community_port(NSString *identifier, NSString *name,
         betterCCXI.settingsSection = kSecBetterCCXI;
 
         Package *magma = [[Package alloc] initWithIdentifier:@"com.darksword.magma"
-                                           name:@"Magma Evo Lite"
-                               shortDescription:@"Tint Control Center glyphs"
-                                longDescription:@"Granular live-session Control Center color customization. Toggle glyphs, brightness and volume sliders, media controls, and module backgrounds can be enabled independently, with configurable RGBA tint and detailed logs."
+                                           name:@"Magma 2"
+                               shortDescription:@"Safe, contrast-aware Control Center colors"
+                                longDescription:@"A rewritten live-session Control Center color customizer. Magma 2 colors verified toggle accents, contrast-aware selected glyphs, brightness and volume fills, media controls, and optional module backgrounds.\n\nUnlike the retired implementation, it scans only the visible Control Center window, recognizes specialized color properties, and enforces strict view, depth, child, and property limits. It never mutates controllers, gesture handling, layout geometry, slider values, or material recipes. Every owned property is captured for exact restoration, with detailed per-pass logs."
                                         version:version
                                          author:@"Nnnnnnn274"
                                        category:@"Control Center"
@@ -671,6 +675,11 @@ static Package *catalog_community_port(NSString *identifier, NSString *name,
                                      enabledKey:kSettingsMagmaEnabled
                                           isNew:YES];
         magma.settingsSection = kSecMagma;
+        magma.unstableWarning = @"Beta: module background tinting is the broadest visual option and remains off by default. Toggle, slider, and media coloring use narrower verified targets.";
+        magma.knownIssues = @[
+            @"Open Control Center after applying; Magma 2 waits without mutation while Control Center is closed.",
+            @"Apple may replace some media-control classes between iOS releases. Unsupported media leaves are skipped and reported in the detailed log.",
+        ];
 
         Package *betterCCIcons = [[Package alloc] initWithIdentifier:@"com.darksword.betterccicons"
                                            name:@"BetterCCIcons"
@@ -778,8 +787,8 @@ static Package *catalog_community_port(NSString *identifier, NSString *name,
 
         Package *cylinderLite = [[Package alloc] initWithIdentifier:@"com.darksword.cylinderlite"
                                            name:@"Cylinder Lite"
-                               shortDescription:@"Live cylindrical page-swipe animations"
-                                longDescription:@"Tracks each loaded Home Screen page in its window coordinate space and continuously updates pressable live icon layers while you swipe. Centered pages settle at their captured stock transforms; incoming and outgoing pages rotate around a configurable cylindrical perspective. Newly loaded pages are discovered by the visual refresh loop, while Dock and App Library lists remain untouched."
+                               shortDescription:@"Low-traffic cylindrical page-swipe animations"
+                                longDescription:@"Transforms loaded Home Screen pages as whole layers instead of scanning and mutating hundreds of individual icons. A one-time baseline records page positions; steady-state refreshes read one scalar anchor position and derive the shared scroll offset for every page. Rotation and depth use scalar Core Animation key paths with no remote memory reads or CATransform3D buffers. Centered pages settle at stock identity, icon taps keep their native behavior, and non-paging Dock and App Library lists remain untouched. A two-failure circuit breaker stops calls if the transport becomes unhealthy."
                                         version:version
                                          author:@"zeroxjf"
                                        category:@"Home Screen"
@@ -819,9 +828,9 @@ static Package *catalog_community_port(NSString *identifier, NSString *name,
         Package *watchLayout = [[Package alloc] initWithIdentifier:@"com.darksword.watchlayout"
                                            name:@"Watch Layout"
                                shortDescription:@"Staggered Apple Watch-style beehive icon grid"
-                                longDescription:@"Reflows each discovered Home Screen page into a true Apple Watch-style honeycomb: circular live icons, hex-ratio vertical spacing, and alternating half-slot row offsets. Compactness and icon scale are configurable. Dock and App Library icons are excluded, taps remain live, stock frames are saved for restoration, and detailed logs report each page's geometry and cleanup. Watch Layout is mutually exclusive with Free Placement Lite because both own the same icon frames."
+                                longDescription:@"Replaces the page grid for the current SpringBoard session with a vertically scrolling Apple Watch-style honeycomb. It builds alternating five- and four-icon rows from native SBIconViews, keeps every tile pressable, includes system apps, and leaves the Dock untouched. Compactness and icon size are configurable. The stock page views are hidden rather than rewritten, then restored when the tweak stops. App discovery is bounded, repeated failures back off for 30 seconds, and detailed logs report catalog, geometry, interaction, fallback, and cleanup results."
                                         version:version
-                                         author:@"zeroxjf"
+                                         author:@"hxhlb + infern0"
                                        category:@"Home Screen"
                                      symbolName:@"circle.grid.3x3.fill"
                                            kind:PackageInstallKindToggle
@@ -841,6 +850,49 @@ static Package *catalog_community_port(NSString *identifier, NSString *name,
                                      enabledKey:kSettingsLockCustomizerEnabled
                                           isNew:YES];
         lockCustomizer.settingsSection = kSecLockCustomizer;
+        lockCustomizer.installDisabledReason = @"Retired: the original live-view customizer is not stable enough for new installs. Use Lock Screen Overlay instead.";
+
+        Package *lockScreenOverlay = [[Package alloc] initWithIdentifier:@"com.darksword.lockscreenoverlay"
+                                           name:@"Lock Screen Overlay"
+                               shortDescription:@"Replace the stock clock area with a glass infern0 overlay"
+                                longDescription:@"A standalone, noninteractive Cover Sheet overlay built with the same retained-overlay architecture as Watch Layout. It presents a large locale-aware clock, date, infern0 status line, configurable glass panel, and cyan, violet, red, or gold accents. The overlay must attach successfully before the stock clock, quick actions, or page dots are hidden. Cleanup removes the overlay and restores every captured stock hidden state exactly. Notifications and media controls remain native and usable."
+                                        version:version
+                                         author:@"Nnnnnnn274"
+                                       category:@"Lock Screen"
+                                     symbolName:@"sparkles.rectangle.stack.fill"
+                                           kind:PackageInstallKindToggle
+                                     enabledKey:kSettingsLockScreenOverlayEnabled
+                                          isNew:YES];
+        lockScreenOverlay.settingsSection = kSecLockScreenOverlay;
+        lockScreenOverlay.unstableWarning = @"Beta: Cover Sheet class names can differ by iOS build. If the verified host is unavailable, the tweak fails closed and leaves the stock Lock Screen visible.";
+
+        Package *magsafe = [[Package alloc] initWithIdentifier:@"com.darksword.magsafe"
+                                           name:@"MagSafe Enabler"
+                               shortDescription:@"Animated charging ring on charger connection"
+                                longDescription:@"Community port of MagSafe Enabler by Iggy05, based on MinePlayer16's cyanide implementation and rewritten for infern0. When iOS reports a charging or full battery state, it presents an animated circular battery ring in a dedicated touch-through SpringBoard window, then hides it after the configured duration. Ring size, position, thickness, animation speed, opacity, and accent are adjustable. The rewrite avoids private-window scanning and never changes stock SpringBoard views. Detailed logs cover configuration, battery events, creation, presentation, timed hiding, and cleanup."
+                                        version:version
+                                         author:@"Iggy05 + MinePlayer16 + infern0"
+                                       category:@"Themes"
+                                     symbolName:@"battery.100.bolt"
+                                           kind:PackageInstallKindToggle
+                                     enabledKey:kSettingsMagsafeEnabled
+                                          isNew:YES];
+        magsafe.settingsSection = kSecMagsafe;
+        magsafe.unstableWarning = @"Session overlay: infern0 must remain alive to observe later charger changes. iOS public battery APIs cannot distinguish MagSafe, Qi, and cable charging, so every charging source triggers it.";
+
+        Package *upsideDown = [[Package alloc] initWithIdentifier:@"com.darksword.upsidedown"
+                                           name:@"Upside Down"
+                               shortDescription:@"Allow upside-down portrait on Home and Lock Screen"
+                                longDescription:@"Community port of lara/Banana's Upside Down implementation from hxhlb/cyanide. It allows SpringBoard's Home Screen and Lock Screen to rotate into upside-down portrait while Rotation Lock is disabled. infern0 preflights all five private orientation methods before changing anything, stores and verifies every exact original implementation, checks every replacement, and rolls the entire transaction back if a single target fails. Disable or Clean Up restores stock behavior with per-target activity logs; a respring is the final fallback. No system files are written."
+                                        version:version
+                                         author:@"lara / Banana + hxhlb + infern0"
+                                       category:@"SpringBoard"
+                                     symbolName:@"arrow.up.and.down.circle.fill"
+                                           kind:PackageInstallKindToggle
+                                     enabledKey:kSettingsUpsideDownEnabled
+                                          isNew:YES];
+        upsideDown.settingsSection = kSecUpsideDown;
+        upsideDown.unstableWarning = @"Experimental session patch: private SpringBoard orientation methods vary by iOS build. The implementation fails closed or rolls back on mismatch, but incorrect rotation or a SpringBoard respring remains possible.";
 
         Package *freePlacement = [[Package alloc] initWithIdentifier:@"com.darksword.freeplacementlite"
                                            name:@"Free Placement Lite"
@@ -896,10 +948,10 @@ static Package *catalog_community_port(NSString *identifier, NSString *name,
         snapper.settingsSection = kSecSnapper;
         snapper.unstableWarning = @"Session implementation: pinned captures live in SpringBoard memory and disappear on cleanup, respring, or reboot.";
 
-        Package *pullOver = [[Package alloc] initWithIdentifier:@"com.darksword.pullover"
-                                           name:@"PullOver"
-                               shortDescription:@"Live-icon slide-over launcher"
-                                longDescription:@"Adds a configurable slide-over launcher populated with live SpringBoard icon views. Borrowed icons stay pressable and are returned to their exact original parents and frames during reapply or cleanup. If no eligible icons are visible, the tray remains available and reports the fallback in the detailed log."
+        Package *pullOver = [[Package alloc] initWithIdentifier:@"com.darksword.vestalite"
+                                           name:@"Vesta Lite"
+                               shortDescription:@"Fast right-edge app drawer"
+                                longDescription:@"Community port of Vesta's gesture-driven app drawer. A compact right-edge handle opens a configurable, scrollable grid of installed third-party app icons. Every tile launches through a retained background action so SpringBoard remains responsive. Vesta never relocates stock Home Screen icons, performs no class-name VM scans, and cleanup removes only its own drawer and handle. Detailed logs cover catalog filtering, icon rendering, actions, geometry, and restore results."
                                         version:version
                                          author:@"Nnnnnnn274"
                                        category:@"SpringBoard"
@@ -908,7 +960,7 @@ static Package *catalog_community_port(NSString *identifier, NSString *name,
                                      enabledKey:kSettingsPullOverEnabled
                                           isNew:YES];
         pullOver.settingsSection = kSecPullOver;
-        pullOver.unstableWarning = @"Session launcher: this safely hosts live icons, not arbitrary third-party app scenes. Use Dynamic Stage for floating application scenes.";
+        pullOver.unstableWarning = @"Session overlay: the drawer disappears after a respring or reboot and is recreated when infern0 applies enabled tweaks again.";
 
         Package *alkaline = [[Package alloc] initWithIdentifier:@"com.darksword.alkaline"
                                            name:@"Alkaline"
@@ -936,15 +988,6 @@ static Package *catalog_community_port(NSString *identifier, NSString *name,
                                           isNew:NO];
         tweakLoader.settingsSection = kSecTweakLoader;
 
-        Package *scrollingDock = catalog_community_port(@"com.darksword.scrollingdock", @"Scrolling Dock Lite", @"Scrollable pressable dock icons", @"Moves live dock icon views into a horizontal UIScrollView, preserves taps, exposes three to eight visible slots, and restores every icon to its original parent and frame during cleanup.", @"dock.rectangle", kSettingsScrollingDockEnabled, @"Home Screen", version);
-        Package *niuBiBar = catalog_community_port(@"com.darksword.niubibarlite", @"NiuBiBar Lite", @"Pressable home-bar actions", @"Adds a compact home-indicator palette with native Lock and Spotlight actions when their SpringBoard selectors are available. Unsupported actions are logged instead of silently failing.", @"line.3.horizontal", kSettingsNiuBiBarEnabled, @"SpringBoard", version);
-        Package *volSkip = catalog_community_port(@"com.darksword.volskiplite", @"VolSkip Lite", @"Floating media skip palette", @"Provides pressable previous, play, and next controls backed by the system music player. Hardware-volume interception is intentionally not claimed because that requires process injection.", @"forward.end.fill", kSettingsVolSkipEnabled, @"Utilities", version);
-        Package *flowLite = catalog_community_port(@"com.darksword.flowlite", @"Flow Lite", @"Lock-screen music canvas", @"Finds live Now Playing, MediaControls, and artwork views, then applies a larger rounded music-canvas treatment with reversible geometry and detailed match logs.", @"music.note.list", kSettingsFlowLiteEnabled, @"Lock Screen", version);
-        Package *appProfiles = catalog_community_port(@"com.darksword.appprofileslite", @"App Profiles Lite", @"Foreground-aware brightness profiles", @"Reads SpringBoard's frontmost application and applies category profiles: full brightness for Camera, a navigation profile for Maps, and a configurable default for other apps.", @"slider.horizontal.3", kSettingsAppProfilesEnabled, @"Utilities", version);
-        Package *chargeFX = catalog_community_port(@"com.darksword.chargefxlite", @"ChargeFX Lite", @"Charging edge animation surface", @"Shows a touch-through green edge treatment while UIDevice reports charging or full state. Thickness is configurable and every battery-state decision is logged.", @"bolt.circle.fill", kSettingsChargeFXEnabled, @"Lock Screen", version);
-        Package *rotatePro = catalog_community_port(@"com.darksword.rotateprolite", @"RotatePro Lite", @"Floating orientation control", @"Adds a floating Rotate button that requests landscape orientation through UIDevice's live orientation selector when the running iOS build exposes it.", @"rotate.right.fill", kSettingsRotateProEnabled, @"Utilities", version);
-        Package *keepEye = catalog_community_port(@"com.darksword.keepeyelite", @"KeepEye HUD", @"CPU and battery-state HUD", @"Displays active CPU count, charging state, and RemoteCall session state in a compact touch-through HUD refreshed by infern0's visual loop.", @"gauge.with.dots.needle.67percent", kSettingsKeepEyeEnabled, @"Status Bar", version);
-        Package *lastLook = catalog_community_port(@"com.darksword.lastlooklite", @"LastLook Lite", @"OLED notification preview styling", @"Styles visible Notification, ShortLook, and platter views with compact scaling, rounded borders, and configurable opacity, then restores identity geometry during cleanup.", @"bell.and.waves.left.and.right", kSettingsLastLookEnabled, @"Lock Screen", version);
 #endif
 
         Package *nanoRegistry = [[Package alloc] initWithIdentifier:@"com.darksword.nanoregistry"
@@ -1004,6 +1047,61 @@ static Package *catalog_community_port(NSString *identifier, NSString *name,
         otaBlock.settingsSection = kSecOTA;
         otaBlock.unstableWarning = @"Warning: persistent system-file edit. This package modifies launchd disabled.plist to change OTA job state across reboot. Disable or re-enable OTA updates at your own risk.";
 
+        Package *amfiBypass = [[Package alloc] initWithIdentifier:@"com.darksword.amfi-bypass"
+                                           name:@"AMFI Bypass Test"
+                               shortDescription:@"Run and verify the existing AMFI process-state patch"
+                                longDescription:@"Exposes infern0's existing AMFI bypass backend as a manual Packages-tab test. The tool acquires kernel primitives, resolves infern0's own AMFI OSEntitlements state, attempts the runtime flag patch, reads the state back, and reports the exact result in the activity log.\n\nThis is not a persistent install: it affects only the current infern0 process and ends when the app exits. A rejected PPL/SPTM write is reported as failure instead of success."
+                                        version:version
+                                         author:@"zeroxjf"
+                                       category:@"System"
+                                     symbolName:@"checkmark.shield.fill"
+                                           kind:PackageInstallKindDirectTool
+                                     enabledKey:nil
+                                          isNew:YES];
+        amfiBypass.settingsSection = kSecAMFIBypass;
+        amfiBypass.unstableWarning = @"Experimental kernel-memory test. It only patches infern0's current process and can fail on protected or unsupported layouts. Review the AMFI activity log after every run.";
+
+        Package *laraVFS = [[Package alloc] initWithIdentifier:@"com.darksword.lara-vfs"
+                                           name:@"Lara VFS File Manager"
+                               shortDescription:@"Full VFS/SBX/hybrid filesystem browser"
+                                longDescription:@"Direct port of Lara's Santander file manager and VFS stack. Browse directories, search recursively, show hidden files, label app containers, preview text, plists, binary data, images, audio, and video, and import or export files. Hybrid mode also exposes copy, paste, replace, rename, create, delete, chmod, and chown when Lara's sandbox escape is ready.\n\nOpen the tool, choose VFS, SBX, or Hybrid, then initialize the full Lara kernel/VFS session. The detailed log reports every stage and never marks the browser ready unless the underlying primitive reports ready."
+                                        version:version
+                                         author:@"rooootdev / lunginspector / infern0"
+                                       category:@"System"
+                                     symbolName:@"externaldrive.fill"
+                                           kind:PackageInstallKindDirectTool
+                                     enabledKey:nil
+                                          isNew:YES];
+        laraVFS.settingsSection = kSecLaraVFS;
+        laraVFS.unstableWarning = @"Advanced system tool: file writes, replacement, chmod, chown, and deletion can damage iOS or user data when used on the wrong path. Prefer read-only browsing and export until the VFS session has been tested on your exact device.";
+
+        Package *laraFonts = [[Package alloc] initWithIdentifier:@"com.darksword.lara-fonts"
+                                           name:@"Lara Font Manager"
+                               shortDescription:@"Lara font repos, imports, previews, and emoji packs"
+                                longDescription:@"Direct port of Lara's current Font Picker. It uses native URLSession and JSONDecoder rather than the fork's unfinished curl/cJSON stub. Browse Lara-compatible font repositories, preview downloaded fonts, import local font files, choose Standard, Mono, or Italic targets, and apply compatible TTC emoji packs through the shared VFS session."
+                                        version:version
+                                         author:@"rooootdev / ruter / infern0"
+                                       category:@"Theming"
+                                     symbolName:@"textformat"
+                                           kind:PackageInstallKindDirectTool
+                                     enabledKey:nil
+                                          isNew:YES];
+        laraFonts.settingsSection = kSecLaraFonts;
+        laraFonts.unstableWarning = @"System font replacement is persistent until restored or overwritten. Keep a known-good font available, initialize VFS first, and only apply compatible patched fonts.";
+
+        Package *laraSettings = [[Package alloc] initWithIdentifier:@"com.darksword.lara-settings"
+                                           name:@"Lara Settings"
+                               shortDescription:@"Kernelcache offset grabber, VFS preferences, logs, and credits"
+                                longDescription:@"Settings and offset-management hub ported from Lara by rooootdev. Run Infern0's shared exploit once, obtain and verify the matching kernelcache offsets through Lara's resolver and libgrabkernel2, inspect resolved values, clear stale kernelcache data, and configure Santander file-manager behavior.\n\nThis page includes explicit upstream credits and licensing. Lara is GNU AGPL-3.0; libgrabkernel2 is by Alfie CG under the MIT license. Infern0's contribution is the integration, crash guards, and shared safe-KRW adapter."
+                                        version:version
+                                         author:@"rooootdev / Lara contributors / Infern0 integration"
+                                       category:@"System"
+                                     symbolName:@"gearshape.2.fill"
+                                           kind:PackageInstallKindDirectTool
+                                     enabledKey:nil
+                                          isNew:YES];
+        laraSettings.settingsSection = kSecLaraSettings;
+
         Package *disableAppLibrary = [[Package alloc] initWithIdentifier:@"com.darksword.disable-app-library"
                                            name:@"Disable App Library"
                                shortDescription:@"Remove the App Library page"
@@ -1024,6 +1122,7 @@ static Package *catalog_community_port(NSString *identifier, NSString *name,
             layoutExtras,
             gravityLite,
             powercuff,
+            themer,
 
             disableAppLibrary,
 
@@ -1092,6 +1191,10 @@ static Package *catalog_community_port(NSString *identifier, NSString *name,
             }),
 
             otaBlock,
+            amfiBypass,
+            laraSettings,
+            laraVFS,
+            laraFonts,
 
             // Higher-risk/manual packages last so their warnings sit below core tweaks.
 #if CYANIDE_EXPERIMENTAL_TWEAKS_AVAILABLE
@@ -1132,6 +1235,9 @@ static Package *catalog_community_port(NSString *identifier, NSString *name,
             roundedIcons,
             watchLayout,
             lockCustomizer,
+            lockScreenOverlay,
+            magsafe,
+            upsideDown,
             freePlacement,
             appLibraryStudio,
             blurryBadges,
@@ -1139,15 +1245,6 @@ static Package *catalog_community_port(NSString *identifier, NSString *name,
             pullOver,
             alkaline,
             tweakLoader,
-            scrollingDock,
-            niuBiBar,
-            volSkip,
-            flowLite,
-            appProfiles,
-            chargeFX,
-            rotatePro,
-            keepEye,
-            lastLook,
 #endif
             locationSim,
             snowboardLite,
@@ -1156,6 +1253,54 @@ static Package *catalog_community_port(NSString *identifier, NSString *name,
             quickLoader,
             copypastaLite,
         ];
+        NSSet<NSString *> *retainedPackageIDs = [NSSet setWithArray:@[
+            @"com.darksword.statbar",
+            @"com.darksword.nsbar",
+            @"com.darksword.nicebarlite",
+            @"com.darksword.rssidisplay",
+            @"com.darksword.sbcustomizer",
+            @"com.darksword.powercuff",
+            @"com.darksword.axonlite",
+            @"com.darksword.typebanner",
+            @"com.darksword.notificationisland",
+            @"com.darksword.ipadecryptor",
+            @"com.darksword.stagestrip",
+            @"com.darksword.themer",
+            @"com.darksword.locationsim",
+            @"com.darksword.snowboardlite",
+            @"com.darksword.livewp",
+            @"com.darksword.layoutextras",
+            @"com.darksword.gravitylite",
+            @"com.darksword.appswitchergrid",
+            @"com.darksword.quickloader",
+            @"com.darksword.fastlockx-lite",
+            @"com.darksword.nanoregistry",
+            @"com.darksword.callrecording-sound",
+            @"com.darksword.hide-home-bar",
+            @"com.darksword.drag-coefficient",
+            @"com.darksword.ota-block",
+            @"com.darksword.amfi-bypass",
+            @"com.darksword.lara-settings",
+            @"com.darksword.lara-vfs",
+            @"com.darksword.lara-fonts",
+            @"com.darksword.disable-app-library",
+            @"com.darksword.disable-icon-flyin",
+            @"com.darksword.zero-wake-animation",
+            @"com.darksword.zero-backlight-fade",
+            @"com.darksword.double-tap-to-lock",
+            @"com.darksword.cylinderlite",
+            @"com.darksword.barmoji",
+            @"com.darksword.watchlayout",
+            @"com.darksword.lockcustomizer",
+            @"com.darksword.lockscreenoverlay",
+            @"com.darksword.vestalite",
+            @"com.darksword.magsafe",
+            @"com.darksword.upsidedown",
+        ]];
+        list = [list filteredArrayUsingPredicate:[NSPredicate predicateWithBlock:^BOOL(Package *package, NSDictionary *bindings) {
+            (void)bindings;
+            return [retainedPackageIDs containsObject:package.identifier];
+        }]];
         NSSet<NSString *> *darkSwordIDs = [NSSet setWithArray:@[
             @"com.darksword.disable-app-library",
             @"com.darksword.disable-icon-flyin",
@@ -1169,9 +1314,7 @@ static Package *catalog_community_port(NSString *identifier, NSString *name,
             }
         }
     });
-    NSArray<Package *> *repoPackages = [self repoPackages];
-    if (repoPackages.count == 0) return list;
-    return [list arrayByAddingObjectsFromArray:repoPackages];
+    return list;
 }
 
 + (NSArray<NSString *> *)categoriesInOrder

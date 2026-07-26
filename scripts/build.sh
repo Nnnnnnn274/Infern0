@@ -79,6 +79,15 @@ if [ ! -d "$APP_PATH" ]; then
     exit 1
 fi
 
+LARA_GRABKERNEL_SRC="$PWD/Infern0/utils/lara/lib/libgrabkernel2.dylib"
+if [ ! -f "$LARA_GRABKERNEL_SRC" ]; then
+    echo "error: missing Lara dependency: $LARA_GRABKERNEL_SRC" >&2
+    exit 1
+fi
+echo "==> embedding Lara libgrabkernel2"
+mkdir -p "$APP_PATH/Frameworks"
+ditto "$LARA_GRABKERNEL_SRC" "$APP_PATH/Frameworks/libgrabkernel2.dylib"
+
 if [ "$SDK" = "iphonesimulator" ]; then
     echo "==> simulator app $APP_PATH"
     exit 0

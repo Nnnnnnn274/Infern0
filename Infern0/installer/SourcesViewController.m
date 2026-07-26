@@ -10,8 +10,7 @@
 #import "PackageDetailViewController.h"
 #import "PackageQueue.h"
 #import "../SettingsViewController.h"
-#import "../tweaks/RepoTweaks.h"
-#import "../tweaks/QuickLoader.h"
+#import "../tweaks/retired_tweak_compat.h"
 #import "MainTabBarController.h"
 
 @interface Package ()

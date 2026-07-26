@@ -8,9 +8,9 @@
 #import "PackageQueue.h"
 #import "../LogTextView.h"
 #import "../SettingsViewController.h"
-#import "../tweaks/QuickLoader.h"
-#import "../tweaks/RepoTweaks.h"
+#import "../tweaks/retired_tweak_compat.h"
 #import <math.h>
+#import <objc/message.h>
 
 
 static NSString * const kCallRecordingDisclosureAcceptedDefault =
@@ -775,6 +775,24 @@ typedef NS_ENUM(NSInteger, PackageDetailSection) {
     self.primaryActionButton.showsMenuAsPrimaryAction = useMenu;
 }
 
+static UIViewController *pkgdetail_lara_tool_controller(NSString *identifier)
+{
+    NSString *className = nil;
+    if ([identifier isEqualToString:@"com.darksword.lara-vfs"]) {
+        className = @"LaraVFSFeatureBridge";
+    } else if ([identifier isEqualToString:@"com.darksword.lara-fonts"]) {
+        className = @"LaraFontFeatureBridge";
+    } else if ([identifier isEqualToString:@"com.darksword.lara-settings"]) {
+        className = @"LaraSettingsFeatureBridge";
+    }
+    if (!className) return nil;
+    Class bridge = NSClassFromString(className);
+    SEL selector = NSSelectorFromString(@"makeViewController");
+    if (!bridge || ![bridge respondsToSelector:selector]) return nil;
+    UIViewController *(*send)(id, SEL) = (void *)objc_msgSend;
+    return send(bridge, selector);
+}
+
 - (void)viewWillDisappear:(BOOL)animated
 {
     [super viewWillDisappear:animated];
@@ -1312,6 +1330,13 @@ typedef NS_ENUM(NSInteger, PackageDetailSection) {
 
 - (void)navigateToSettingsSection
 {
+    UIViewController *laraTool = pkgdetail_lara_tool_controller(self.package.identifier);
+    if (laraTool) {
+        laraTool.title = self.package.name;
+        [self.navigationController pushViewController:laraTool animated:YES];
+        return;
+    }
+
     UITabBarController *tab = self.tabBarController;
     NSUInteger settingsIndex = NSNotFound;
     UINavigationController *settingsNav = nil;

@@ -75,6 +75,8 @@ bool typebanner_run_once(void);
 bool typebanner_run_once_with_mobile_session(RemoteCallSession **mobileSessionRef);
 bool typebanner_run_once_with_mobile_session_and_current_springboard(RemoteCallSession **mobileSessionRef,
                                                                     bool currentSpringBoardReady);
+// daemonSessionRef is retained for source compatibility only. The safe live
+// path never caches an original-thread imagent session between polls.
 bool typebanner_run_once_with_cached_sessions(RemoteCallSession **mobileSessionRef,
                                               RemoteCallSession **daemonSessionRef,
                                               bool currentSpringBoardReady);

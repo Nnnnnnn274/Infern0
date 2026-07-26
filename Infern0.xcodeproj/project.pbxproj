@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		C0D3C0DE0000000000000030 /* LaraOffsets.m in Sources */ = {isa = PBXBuildFile; fileRef = C0D3C0DE0000000000000031 /* LaraOffsets.m */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXCopyFilesBuildPhase section */
 		AAA2989D2F7418CC000B5902 /* CopyFiles */ = {
 			isa = PBXCopyFilesBuildPhase;
@@ -19,6 +23,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		C0D3C0DE0000000000000031 /* LaraOffsets.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Infern0/utils/lara/LaraOffsets.m; sourceTree = "<group>"; };
 		AA73F7982F7BC6CB00134C31 /* ChOma.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; path = ChOma.xcodeproj; sourceTree = "<group>"; };
 		AA794BC92F828668001F0544 /* ChOma.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; path = ChOma.xcodeproj; sourceTree = "<group>"; };
 		AAA297772F72D439000B5902 /* infern0.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = infern0.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -160,6 +165,7 @@
 		AAA2976E2F72D439000B5902 = {
 			isa = PBXGroup;
 			children = (
+				C0D3C0DE0000000000000031 /* LaraOffsets.m */,
 				AAA297792F72D439000B5902 /* Cyanide */,
 				AAA298702F74153F000B5902 /* Frameworks */,
 				AAA297782F72D439000B5902 /* Products */,
@@ -625,6 +631,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C0D3C0DE0000000000000030 /* LaraOffsets.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -703,6 +710,7 @@
 				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "Infern0/Infern0-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -780,6 +788,7 @@
 				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "Infern0/Infern0-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -991,6 +1000,7 @@
 				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "Infern0/Infern0-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
