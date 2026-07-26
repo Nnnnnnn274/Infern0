@@ -12,6 +12,7 @@
 #import "xpaci.h"
 
 #import <Foundation/Foundation.h>
+#import <dlfcn.h>
 #import <mach/mach.h>
 #import <stdio.h>
 #import <stdarg.h>
@@ -30,6 +31,26 @@
 #define TASK_EXC_GUARD_MP_FATAL     0x80
 
 extern int proc_name(int pid, void *buffer, uint32_t buffersize);
+
+int lara_system_proc_name(int pid, void *buffer, uint32_t buffersize) {
+    typedef int (*proc_name_fn)(int, void *, uint32_t);
+    static proc_name_fn function;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        function = (proc_name_fn)dlsym(RTLD_DEFAULT, "proc_name");
+    });
+    return function ? function(pid, buffer, buffersize) : 0;
+}
+
+int lara_system_proc_pidpath(int pid, void *buffer, uint32_t buffersize) {
+    typedef int (*proc_pidpath_fn)(int, void *, uint32_t);
+    static proc_pidpath_fn function;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        function = (proc_pidpath_fn)dlsym(RTLD_DEFAULT, "proc_pidpath");
+    });
+    return function ? function(pid, buffer, buffersize) : 0;
+}
 
 #ifndef PROC_PIDPATHINFO_MAXSIZE
 #define PROC_PIDPATHINFO_MAXSIZE (4 * PATH_MAX)
@@ -261,7 +282,7 @@ static size_t procnamecandidates(char names[][64], size_t max_count) {
     size_t count = 0;
 
     char host_name[64] = {0};
-    if (proc_name(getpid(), host_name, sizeof(host_name)) > 0 && host_name[0] != '\0') {
+    if (lara_system_proc_name(getpid(), host_name, sizeof(host_name)) > 0 && host_name[0] != '\0') {
         snprintf(names[count], sizeof(names[count]), "%s", host_name);
         count++;
     }

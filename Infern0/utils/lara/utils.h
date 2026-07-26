@@ -57,6 +57,8 @@ extern "C" {
 #endif
 
 void init_offsets(void);
+int lara_system_proc_name(int pid, void *buffer, uint32_t buffersize);
+int lara_system_proc_pidpath(int pid, void *buffer, uint32_t buffersize);
 uint64_t ourproc(void);
 uint64_t taskbyproc(uint64_t procaddr);
 uint64_t procbyname(const char *procname);

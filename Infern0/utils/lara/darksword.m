@@ -255,7 +255,7 @@ static void initprocmarkers(void) {
     }
 
     char host_executable_path[PROC_PIDPATHINFO_MAXSIZE] = {0};
-    if (proc_pidpath(getpid(), host_executable_path, sizeof(host_executable_path)) > 0) {
+    if (lara_system_proc_pidpath(getpid(), host_executable_path, sizeof(host_executable_path)) > 0) {
         const char *host_name = strrchr(host_executable_path, '/');
         host_name = host_name ? host_name + 1 : host_executable_path;
         if (host_name && host_name[0] != '\0') {
@@ -263,7 +263,7 @@ static void initprocmarkers(void) {
         }
     }
 
-    int proc_name_length = proc_name(getpid(), kernel_process_name, sizeof(kernel_process_name));
+    int proc_name_length = lara_system_proc_name(getpid(), kernel_process_name, sizeof(kernel_process_name));
     if (proc_name_length <= 0) {
         kernel_process_name[0] = '\0';
     }

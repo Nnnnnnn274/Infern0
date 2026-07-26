@@ -1,5 +1,6 @@
 #import "screentime.h"
 #import "darksword.h"
+#import "utils.h"
 #import "pe/apfs.h"
 #import "TaskRop/RemoteCall.h"
 
@@ -34,7 +35,7 @@ static void st_killproc(const char *name) {
     int count = (int)(size / sizeof(struct kinfo_proc));
     for (int i = 0; i < count; i++) {
         char pname[64] = {0};
-        proc_name(procs[i].kp_proc.p_pid, pname, sizeof(pname));
+        lara_system_proc_name(procs[i].kp_proc.p_pid, pname, sizeof(pname));
         if (strcasecmp(pname, name) == 0) {
             printf("[ST] killing %s pid=%d\n", name, procs[i].kp_proc.p_pid);
             kill(procs[i].kp_proc.p_pid, SIGKILL);
