@@ -7,7 +7,6 @@
 #include "../kexploit/kexploit_opa334.h"
 #include "../kexploit/lara_compat.h"
 #import <Foundation/Foundation.h>
-#include <sys/sysctl.h>
 
 uint64_t ds_kread64(uint64_t address) {
     return kread64(address);
@@ -82,13 +81,6 @@ uint64_t ds_get_kernel_base(void) {
 
 uint64_t ds_get_kernel_slide(void) {
     return g_kernel_slide;
-}
-
-cpu_subtype_t get_hw_cpufamily(void) {
-    cpu_subtype_t cpuFamily = 0;
-    size_t cpuFamilySize = sizeof(cpuFamily);
-    sysctlbyname("hw.cpufamily", &cpuFamily, &cpuFamilySize, NULL, 0);
-    return cpuFamily;
 }
 
 bool ds_is_ready(void) {
