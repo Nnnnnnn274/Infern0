@@ -6,7 +6,7 @@
 //
 
 #import <Foundation/Foundation.h>
-#import "remotecall.h"
+#import "RemoteCall.h"
 #import "vm.h"
 #import "offsets.h"
 #import "darksword.h"

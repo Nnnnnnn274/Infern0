@@ -9,7 +9,7 @@
 #import "darksword.h"
 #import "offsets.h"
 #import "utils.h"
-#import "vm.h"
+#import "TaskRop/vm.h"
 
 #import <Foundation/Foundation.h>
 #import <mach/mach.h>
