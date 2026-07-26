@@ -14,6 +14,43 @@
 #include <stdbool.h>
 #include <mach/mach.h>
 
+// Lara carries its own kernel utility engine. Prefix its public symbols so it
+// can coexist with Infern0's original engine in the same executable.
+#define init_offsets lara_init_offsets
+#define ourproc lara_ourproc
+#define taskbyproc lara_taskbyproc
+#define procbyname lara_procbyname
+#define procbypid lara_procbypid
+#define proclist lara_proclist
+#define free_proclist lara_free_proclist
+#define aslrstate lara_aslrstate
+#define getaslrstate lara_getaslrstate
+#define toggleaslr lara_toggleaslr
+#define killproc lara_killproc
+#define islcruntime lara_islcruntime
+#define hexdump lara_hexdump
+#define filehexdump lara_filehexdump
+#define ipc_entry_lookup lara_ipc_entry_lookup
+#define task_get_ipc_port_table_entry lara_task_get_ipc_port_table_entry
+#define task_get_ipc_port_object lara_task_get_ipc_port_object
+#define task_get_ipc_port_kobject lara_task_get_ipc_port_kobject
+#define task_get_vm_map lara_task_get_vm_map
+#define disable_excguard_kill lara_disable_excguard_kill
+#define thread_get_t_tro lara_thread_get_t_tro
+#define thread_get_task lara_thread_get_task
+#define thread_get_options lara_thread_get_options
+#define thread_set_options lara_thread_set_options
+#define thread_set_mutex lara_thread_set_mutex
+#define thread_get_mutex lara_thread_get_mutex
+#define thread_get_kstackptr lara_thread_get_kstackptr
+#define thread_get_jop_pid lara_thread_get_jop_pid
+#define thread_get_rop_pid lara_thread_get_rop_pid
+#define proc_task lara_proc_task
+#define proc_find_by_name lara_proc_find_by_name
+#define proc_self lara_proc_self
+#define task_self lara_task_self
+#define crashproc lara_crashproc
+
 #ifdef __cplusplus
 extern "C" {
 #endif

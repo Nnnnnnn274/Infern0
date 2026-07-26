@@ -13,6 +13,15 @@
 #import <stdbool.h>
 #import <mach/mach.h>
 
+#define nativestrip lara_nativestrip
+#define pacia lara_pacia
+#define ptrauthblend lara_ptrauthblend
+#define ptrauthstrdisc lara_ptrauthstrdisc
+#define pacsignworks lara_pacsignworks
+#define findpacia lara_findpacia
+#define paccleanup lara_paccleanup
+#define remotepac lara_remotepac
+
 uint64_t nativestrip(uint64_t address);
 uint64_t pacia(uint64_t ptr, uint64_t modifier);
 uint64_t ptrauthblend(uint64_t diver, uint64_t discriminator);

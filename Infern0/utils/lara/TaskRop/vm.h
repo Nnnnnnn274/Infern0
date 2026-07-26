@@ -10,6 +10,23 @@
 
 #include "RemoteCall.h"
 
+#define vmmapgetheader lara_vmmapgetheader
+#define vmmapheadergetfirstentry lara_vmmapheadergetfirstentry
+#define vmmapentrygetnextentry lara_vmmapentrygetnextentry
+#define vmmapheadergetnextentry lara_vmmapheadergetnextentry
+#define vm_header_get_nentries lara_vm_header_get_nentries
+#define vmmapheadergetnentries lara_vmmapheadergetnentries
+#define vmentrygetrange lara_vmentrygetrange
+#define vmmapiterateentries lara_vmmapiterateentries
+#define vmmapfindentry lara_vmmapfindentry
+#define vmgetobject lara_vmgetobject
+#define vmcreateshmemwithobj lara_vmcreateshmemwithobj
+#define vmmapremotepage lara_vmmapremotepage
+#define VM_PACKING_IS_BASE_RELATIVE LARA_VM_PACKING_IS_BASE_RELATIVE
+#define VME_OFFSET LARA_VME_OFFSET
+#define vmunpackptr lara_vmunpackptr
+#define vmpackptr lara_vmpackptr
+
 struct vmobj {
     uint64_t vmAddress;
     uint64_t address;

@@ -12,6 +12,26 @@
 @import Foundation;
 #import <mach/mach.h>
 
+// Isolate Lara's RemoteCall implementation from Infern0's original classes
+// and MIG-filter helpers.
+#define RemoteCall LaraRemoteCall
+#define RemotePointer LaraRemotePointer
+#define create_exception_port lara_create_exception_port
+#define disable_excguard_kill lara_disable_excguard_kill
+#define remote_alloc_str lara_remote_alloc_str
+#define remote_sel lara_remote_sel
+#define remote_getClass lara_remote_getClass
+#define remote_msg lara_remote_msg
+#define remote_errno lara_remote_errno
+#define remote_NSString lara_remote_NSString
+#define remote_getCGRect lara_remote_getCGRect
+#define remote_setCGRect lara_remote_setCGRect
+#define mig_bypass_init lara_mig_bypass_init
+#define mig_bypass_start lara_mig_bypass_start
+#define mig_bypass_resume lara_mig_bypass_resume
+#define mig_bypass_pause lara_mig_bypass_pause
+#define mig_bypass_monitor_threads lara_mig_bypass_monitor_threads
+
 // xnu-10002.81.5/osfmk/kern/exc_guard.h
 #define EXC_GUARD_ENCODE_TYPE(code, type) \
     ((code) |= (((uint64_t)(type) & 0x7ull) << 61))

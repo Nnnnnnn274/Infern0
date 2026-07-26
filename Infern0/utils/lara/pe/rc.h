@@ -10,6 +10,26 @@
 
 #import "../TaskRop/RemoteCall.h"
 
+#define status_bar_time_format lara_status_bar_time_format
+#define hide_icon_labels lara_hide_icon_labels
+#define enable_jit lara_enable_jit
+#define set_dock_icon_count lara_set_dock_icon_count
+#define five_icon_dock lara_five_icon_dock
+#define enable_upside_down lara_enable_upside_down
+#define enable_floating_dock lara_enable_floating_dock
+#define enable_grid_app_switcher lara_enable_grid_app_switcher
+#define enable_debug_overlay lara_enable_debug_overlay
+#define enable_freaky_dog_overlay lara_enable_freaky_dog_overlay
+#define move_freaky_dog_overlay lara_move_freaky_dog_overlay
+#define disable_freaky_dog_overlay lara_disable_freaky_dog_overlay
+#define get_performance_hud lara_get_performance_hud
+#define set_performance_hud lara_set_performance_hud
+#define wake_up_daemon lara_wake_up_daemon
+#define euenabler_overwrite_eligibility lara_euenabler_overwrite_eligibility
+#define euenabler_override_country_code lara_euenabler_override_country_code
+#define patch_homescreen_grid lara_patch_homescreen_grid
+#define youtube_tweak lara_youtube_tweak
+
 typedef void (^rc_euenabler_callback_t)(double progress);
 
 void status_bar_time_format(RemoteCall *proc, const char *dateFormat);

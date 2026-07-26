@@ -22,6 +22,8 @@ extern "C" {
 // match Lara's. Keep Lara's complete offset set in a separate namespace so
 // both engines can coexist in one executable without duplicate symbols.
 #define off_inpcb_inp_list_le_next lara_off_inpcb_inp_list_le_next
+#define gIsPACSupported lara_gIsPACSupported
+#define gIsA18Above lara_gIsA18Above
 #define off_inpcb_inp_pcbinfo lara_off_inpcb_inp_pcbinfo
 #define off_inpcb_inp_socket lara_off_inpcb_inp_socket
 #define off_inpcbinfo_ipi_zone lara_off_inpcbinfo_ipi_zone
