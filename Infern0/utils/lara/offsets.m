@@ -11,6 +11,7 @@
 #import <xpc/xpc.h>
 #import <UIKit/UIKit.h>
 #import <sys/sysctl.h>
+#import <dlfcn.h>
 
 #import "xpf.h"
 #import "libgrabkernel2.h"
@@ -27,6 +28,29 @@ static NSString *const krootvnodekey  = @"lara.rootvnodeoff";
 static NSString *const kkerncachekey  = @"lara.kernelcache_path";
 static NSString *const kkernprocsize  = @"lara.kernproc_size";
 static NSString *const kmacprocenforcekey = @"lara.mac_proc_enforce_off";
+
+typedef bool (*lara_grab_kernelcache_fn)(NSString *outPath);
+
+static bool lara_grab_kernelcache(NSString *outPath) {
+    static void *handle = NULL;
+    static lara_grab_kernelcache_fn function = NULL;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        NSString *frameworks = NSBundle.mainBundle.privateFrameworksPath;
+        NSString *path = [frameworks stringByAppendingPathComponent:@"libgrabkernel2.dylib"];
+        handle = dlopen(path.fileSystemRepresentation, RTLD_NOW | RTLD_LOCAL);
+        if (!handle) {
+            printf("(offs) libgrabkernel2 load failed: %s\n", dlerror() ?: "unknown");
+            return;
+        }
+        function = (lara_grab_kernelcache_fn)dlsym(handle, "grab_kernelcache");
+        if (!function) {
+            printf("(offs) libgrabkernel2 symbol missing: %s\n", dlerror() ?: "unknown");
+        }
+    });
+    if (!function) return false;
+    return function(outPath);
+}
 
 uint32_t off_inpcb_inp_list_le_next = 0;
 uint32_t off_inpcb_inp_pcbinfo = 0;
@@ -492,7 +516,7 @@ bool dlkcache(void) {
     if (![[NSFileManager defaultManager] fileExistsAtPath:outpath]) {
         printf("(offs) downloading kernelcache -> %s\n", outpath.UTF8String);
 
-        if (!grab_kernelcache(outpath)) {
+        if (!lara_grab_kernelcache(outpath)) {
             printf("(offs) kernelcache download failed.\n");
             return false;
         }
