@@ -94,9 +94,9 @@ final class laramgr: ObservableObject {
                 globallogger.log("Darksword ready; resolving kernel offsets.")
             }
 
-            var offsetsOK = emergencyfixfunctiontobereplacedlateronquestionmark()
+            var offsetsOK = lara_emergencyfixfunctiontobereplacedlateronquestionmark()
             if !offsetsOK {
-                offsetsOK = dlkcache()
+                offsetsOK = lara_dlkcache()
             }
             guard offsetsOK else {
                 DispatchQueue.main.async {
