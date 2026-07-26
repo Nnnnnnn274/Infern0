@@ -45,6 +45,15 @@ struct FontPicker: View {
         NavigationStack {
             List {
                 Section {
+                    Label("System font applying is temporarily disabled", systemImage: "exclamationmark.shield.fill")
+                        .foregroundStyle(.orange)
+                    Text("The previous VFS overwrite could truncate the active system font and crash or reboot the device. Downloads, imports, and previews remain available while the write path is quarantined.")
+                        .font(.footnote)
+                } header: {
+                    Text("Safety")
+                }
+
+                Section {
                     if repostore.repos.isEmpty {
                         Text("No repos added yet.")
                             .foregroundColor(.secondary)
@@ -106,8 +115,7 @@ struct FontPicker: View {
                                     save(customfonts)
                                     return
                                 }
-                                let success = mgr.vfsoverwritefromlocalpath(target: selectedTarget.path, source: font.path)
-                                success ? mgr.logmsg("font changed to \(font.name)") : mgr.logmsg("failed to change font")
+                                mgr.logmsg("Apply blocked for \(font.name): unsafe system-font writes are quarantined.")
                             } label: {
                                 Text(font.name)
                                     .font(viewfontfile(path: font.path, size: 17))
@@ -309,11 +317,7 @@ struct repofontrow: View {
 
         Button {
             if iddownloaded, let localurl {
-                let success = mgr.vfsoverwritefromlocalpath(
-                    target: laramgr.fontpath,
-                    source: localurl.path
-                )
-                success ? mgr.logmsg("font changed to \(font.name)") : mgr.logmsg("failed to change font")
+                mgr.logmsg("Apply blocked for \(font.name): unsafe system-font writes are quarantined.")
             } else {
                 Task {
                     await repostore.dlfont(font, repo: repo)
@@ -351,8 +355,7 @@ private struct repoemojirow: View {
             		mgr.logmsg("emoji font must be .ttc, got .\(localurl.pathExtension)")
             		return
         		}
-                let success = mgr.vfsoverwritefromlocalpath(target: emojipath, source: localurl.path)
-                success ? mgr.logmsg("emoji changed to \(emoji.name)") : mgr.logmsg("failed to change emojis")
+                mgr.logmsg("Apply blocked for \(emoji.name): unsafe emoji-font writes are quarantined.")
             } else {
                 Task { await repostore.dlemoji(emoji, repo: repo) }
             }

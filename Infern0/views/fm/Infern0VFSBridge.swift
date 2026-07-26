@@ -276,32 +276,71 @@ final class laramgr: ObservableObject {
     }
 
     func vfsoverwritefromlocalpath(target: String, source: String) -> Bool {
-        guard vfs_isready(), FileManager.default.fileExists(atPath: source) else {
-            logmsg("Write rejected: initialize VFS and verify the source file first.")
+        guard sbxready, FileManager.default.fileExists(atPath: source) else {
+            logmsg("Write rejected: enable sandbox access and verify the source file first.")
             return false
         }
-        let result = target.withCString { targetPointer in
-            source.withCString { sourcePointer in
-                vfs_overwritefile(targetPointer, sourcePointer)
-            }
+
+        if isSystemFontPath(target) {
+            logmsg("Blocked unsafe system-font overwrite. The previous VFS path could corrupt the active font and crash the device.")
+            return false
         }
-        logmsg(result == 0
-            ? "Overwrote \(target)."
-            : "Failed to overwrite \(target) (result \(result)).")
-        return result == 0
+
+        do {
+            let data = try Data(contentsOf: URL(fileURLWithPath: source), options: .mappedIfSafe)
+            return try writeSandboxData(data, target: target)
+        } catch {
+            logmsg("Safe write failed for \(target): \(error.localizedDescription)")
+            return false
+        }
     }
 
     func vfsoverwritewithdata(target: String, data: Data) -> Bool {
-        let tempURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("infern0-vfs-\(UUID().uuidString)")
-        do {
-            try data.write(to: tempURL, options: .atomic)
-            defer { try? FileManager.default.removeItem(at: tempURL) }
-            return vfsoverwritefromlocalpath(target: target, source: tempURL.path)
-        } catch {
-            logmsg("Could not prepare VFS write: \(error.localizedDescription)")
+        guard sbxready else {
+            logmsg("Write rejected: sandbox filesystem access is not ready.")
             return false
         }
+        if isSystemFontPath(target) {
+            logmsg("Blocked unsafe system-font overwrite.")
+            return false
+        }
+        do {
+            return try writeSandboxData(data, target: target)
+        } catch {
+            logmsg("Safe write failed for \(target): \(error.localizedDescription)")
+            return false
+        }
+    }
+
+    private func writeSandboxData(_ data: Data, target: String) throws -> Bool {
+        guard data.count <= 64 * 1024 * 1024 else {
+            logmsg("Write rejected: files larger than 64 MB are not written in-process.")
+            return false
+        }
+        guard FileManager.default.fileExists(atPath: target) else {
+            logmsg("Write rejected: the target does not exist. Create it from the file manager first.")
+            return false
+        }
+
+        let targetURL = URL(fileURLWithPath: target)
+        let handle = try FileHandle(forWritingTo: targetURL)
+        defer { try? handle.close() }
+        try handle.seek(toOffset: 0)
+        try handle.write(contentsOf: data)
+        try handle.truncate(atOffset: UInt64(data.count))
+        try handle.synchronize()
+
+        let verified = try Data(contentsOf: targetURL, options: .mappedIfSafe) == data
+        logmsg(verified
+            ? "Safely wrote and verified \(data.count) bytes to \(target)."
+            : "Write verification failed for \(target).")
+        return verified
+    }
+
+    private func isSystemFontPath(_ path: String) -> Bool {
+        let normalized = URL(fileURLWithPath: path).standardizedFileURL.path
+        return normalized.hasPrefix("/System/Library/Fonts/") ||
+            normalized.hasPrefix("/System/Library/Fonts/CoreAddition/")
     }
 
     func respring() {

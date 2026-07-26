@@ -292,17 +292,10 @@ enum santanderfs {
     }
 
     static func writefile(path: String, data: Data, readsbx: Bool, writevfs: Bool) -> Bool {
-        if writevfs {
+        if readsbx || writevfs {
             return laramgr.shared.vfsoverwritewithdata(target: path, data: data)
         }
-        guard readsbx else { return false }
-        do {
-            clearImmutableIfPossible(atPath: path)
-            try data.write(to: URL(fileURLWithPath: path), options: .atomic)
-            return true
-        } catch {
-            return false
-        }
+        return false
     }
 
     static func readdata(path: String, readsbx: Bool, max: Int) -> Data? {
