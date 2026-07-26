@@ -1,0 +1,855 @@
+//
+//  utils.m
+//  lara
+//
+//  Created by ruter on 25.03.26.
+//
+
+#import "utils.h"
+#import "darksword.h"
+#import "xpf.h"
+#import "offsets.h"
+#import "xpaci.h"
+
+#import <Foundation/Foundation.h>
+#import <mach/mach.h>
+#import <stdio.h>
+#import <stdarg.h>
+#import <unistd.h>
+#import <fcntl.h>
+#import <string.h>
+#import <sys/types.h>
+#import <mach-o/dyld.h>
+#import <sys/mount.h>
+#include <sys/sysctl.h>
+#include <stdint.h>
+#include <stdbool.h>
+
+#define TASK_EXC_GUARD_MP_DELIVER   0x10
+#define TASK_EXC_GUARD_MP_CORPSE    0x40
+#define TASK_EXC_GUARD_MP_FATAL     0x80
+
+extern int proc_name(int pid, void *buffer, uint32_t buffersize);
+
+#ifndef PROC_PIDPATHINFO_MAXSIZE
+#define PROC_PIDPATHINFO_MAXSIZE (4 * PATH_MAX)
+#endif
+
+#define P_DISABLE_ASLR 0x00001000
+
+uint32_t PROC_PID_OFFSET;                           // p_pid
+static const uint32_t PROC_NAME_OFFSET_FALLBACK = 0x56c;     // p_comm
+static const uint32_t PROC_UID_OFFSET  = 0x30;      // p_uid
+static const uint32_t PROC_GID_OFFSET  = 0x34;      // p_gid
+static const uint32_t PROC_NEXT_OFFSET_FALLBACK = 0x08;      // p_list le_next
+static const uint32_t PROC_PREV_OFFSET = 0x00;      // p_list le_prev
+static const uint32_t PROC_PFLAG_OFFSET = 0x454;
+static const uint32_t ARM_SS_OFFSET = 0x8;
+uint32_t TASK_TNEXT_OFFSET;
+uint32_t THREAD_MUPCB_OFFSET;
+
+struct arm_saved_state64 {
+  uint64_t x[29];
+  uint64_t fp;
+  uint64_t lr;
+  uint64_t sp;
+  uint64_t pc;
+  uint32_t cpsr;
+  uint32_t aspsr;
+  uint64_t far;
+  uint32_t esr;
+  uint32_t exception;
+  uint64_t jophash;
+};
+
+static NSString *kerncachepath(void) {
+    NSString *docs = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
+    return [docs stringByAppendingPathComponent:@"kernelcache"];
+}
+
+void init_offsets(void) {
+    char ios[256];
+    size_t size = sizeof(ios);
+
+    sysctlbyname("kern.osproductversion", ios, &size, NULL, 0);
+
+    int major = 0, minor = 0, patch = 0;
+    sscanf(ios, "%d.%d.%d", &major, &minor, &patch);
+
+    if (major >= 16) {
+        PROC_PID_OFFSET = 0x60;
+    } else {
+        PROC_PID_OFFSET = 0x28;
+    }
+
+    if (major == 17 && minor <= 7) {
+        TASK_TNEXT_OFFSET = 0x58;
+    } else if (major >= 18) {
+        TASK_TNEXT_OFFSET = 0x50;
+    } else {
+        TASK_TNEXT_OFFSET = 0x50;
+    }
+
+    cpu_subtype_t cpufam = get_hw_cpufamily();
+
+    bool isA10 =
+        (cpufam == CPUFAMILY_ARM_HURRICANE);
+
+    bool isA17Above =
+        (cpufam == CPUFAMILY_ARM_COLL ||
+         cpufam == CPUFAMILY_ARM_IBIZA ||
+         cpufam == CPUFAMILY_ARM_TUPAI ||
+         cpufam == CPUFAMILY_ARM_DONAN);
+
+    if (major >= 18) {
+        if (isA17Above)
+            THREAD_MUPCB_OFFSET = 0x108;
+        else if (isA10)
+            THREAD_MUPCB_OFFSET = 0x100;
+        else
+            THREAD_MUPCB_OFFSET = 0xb8;
+    } else {
+        if (isA17Above)
+            THREAD_MUPCB_OFFSET = 0x100;
+        else if (isA10)
+            THREAD_MUPCB_OFFSET = 0xf8;
+        else
+            THREAD_MUPCB_OFFSET = 0xb0;
+    }
+
+    NSString *kcpath = kerncachepath();
+    if (!kcpath || ![[NSFileManager defaultManager] fileExistsAtPath:kcpath]) {
+        printf("(utils) no kernelcache...\n");
+    }
+    
+    if (xpf_start_with_kernel_path(kcpath.UTF8String) != 0) {
+        printf("xpf start error: %s\n", xpf_get_error());
+    }
+    
+    uint64_t t1sz_boot = xpf_gett1szboot();
+    printf("(utils) T1SZ_BOOT: 0x%llx\n", t1sz_boot);
+    printf("(utils) TASK_TNEXT_OFFSET: 0x%x\n", TASK_TNEXT_OFFSET);
+    printf("(utils) THREAD_MUPCB_OFFSET: 0x%x\n", THREAD_MUPCB_OFFSET);
+    printf("(utils) PROC_PID_OFFSET: 0x%x\n", PROC_PID_OFFSET);
+}
+
+static NSString *const kkernprocoffset = @"lara.kernprocoff";
+static NSString *const kallprocoffset = @"lara.allprocoff";
+
+static inline uint32_t proc_name_offset(void) {
+    return off_proc_p_name ? off_proc_p_name : PROC_NAME_OFFSET_FALLBACK;
+}
+
+static inline uint32_t proc_next_offset(void) {
+    return off_proc_p_list_le_next ? off_proc_p_list_le_next : PROC_NEXT_OFFSET_FALLBACK;
+}
+
+static bool is_kptr(uint64_t p) {
+    return (p & 0xffff000000000000ULL) == 0xffff000000000000ULL;
+}
+
+static inline uint64_t signptr(uint64_t v) {
+    if ((v >> 32) > 0xFFFF) return v | pac_mask;
+    return v;
+}
+
+#define S(x) ({ uint64_t _v = xpaci(x); signptr(_v); })
+
+static void utils_log_file(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
+static void utils_log_file(const char *fmt, ...) {
+    static int fd = -2;
+    if (fd == -2) {
+        fd = -1;
+        @autoreleasepool {
+            NSArray<NSString *> *dirs = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+            NSString *docs = dirs.firstObject;
+            if (docs.length != 0) {
+                NSString *path = [docs stringByAppendingPathComponent:@"lara.log"];
+                fd = open(path.fileSystemRepresentation, O_WRONLY | O_CREAT | O_APPEND, 0644);
+            }
+        }
+    }
+    if (fd < 0) return;
+
+    char message[1024];
+    va_list ap;
+    va_start(ap, fmt);
+    vsnprintf(message, sizeof(message), fmt, ap);
+    va_end(ap);
+
+    char line[1150];
+    int len = snprintf(line, sizeof(line), "(utils) %s\n", message);
+    if (len <= 0) return;
+    if (len >= (int)sizeof(line)) len = (int)sizeof(line) - 1;
+    write(fd, line, (size_t)len);
+    fsync(fd);
+}
+
+static uint64_t loadkernproc(void) {
+    NSNumber *n = [[NSUserDefaults standardUserDefaults] objectForKey:kkernprocoffset];
+    if (!n) return 0;
+    return (uint64_t)n.unsignedLongLongValue;
+}
+
+static uint64_t loadallproc(void) {
+    NSNumber *n = [[NSUserDefaults standardUserDefaults] objectForKey:kallprocoffset];
+    if (!n) return 0;
+    return (uint64_t)n.unsignedLongLongValue;
+}
+
+static uint64_t kernprocaddress(void) {
+    uint64_t offset = loadkernproc();
+    if (offset != 0) {
+        return ds_get_kernel_base() + offset;
+    }
+
+    uint64_t kernslide = ds_get_kernel_slide();
+    return 0xfffffff0079fd9c8 + kernslide;
+}
+
+static uint64_t allprocaddress(void) {
+    uint64_t offset = loadallproc();
+    if (offset != 0) {
+        return ds_get_kernel_base() + offset;
+    }
+
+    return 0;
+}
+
+static uint64_t kernproc_head(void) {
+    uint64_t kernprocaddr = kernprocaddress();
+    if (!is_kptr(kernprocaddr)) {
+        utils_log_file("kernproc address invalid: 0x%llx", kernprocaddr);
+        return 0;
+    }
+
+    uint64_t kernproc = S(ds_kread64(kernprocaddr));
+    if (!is_kptr(kernproc)) {
+        utils_log_file("kernproc invalid: addr=0x%llx value=0x%llx", kernprocaddr, kernproc);
+        return 0;
+    }
+    return kernproc;
+}
+
+static uint64_t allproc_head(void) {
+    uint64_t allprocaddr = allprocaddress();
+    if (!is_kptr(allprocaddr)) {
+        utils_log_file("allproc address invalid: 0x%llx", allprocaddr);
+        return 0;
+    }
+
+    uint64_t allproc = S(ds_kread64(allprocaddr));
+    if (!is_kptr(allproc)) {
+        utils_log_file("allproc invalid: addr=0x%llx value=0x%llx", allprocaddr, allproc);
+        return 0;
+    }
+    return allproc;
+}
+
+bool islcruntime(void) {
+    static int cached_result = -1;
+    if (cached_result != -1) {
+        return cached_result == 1;
+    }
+
+    NSString *appInfoPath = [[NSBundle mainBundle] pathForResource:@"LCAppInfo" ofType:@"plist"];
+    cached_result = appInfoPath != nil ? 1 : 0;
+    return cached_result == 1;
+}
+
+static size_t procnamecandidates(char names[][64], size_t max_count) {
+    size_t count = 0;
+
+    char host_name[64] = {0};
+    if (proc_name(getpid(), host_name, sizeof(host_name)) > 0 && host_name[0] != '\0') {
+        snprintf(names[count], sizeof(names[count]), "%s", host_name);
+        count++;
+    }
+
+    if (count < max_count) {
+        char executable_path[PROC_PIDPATHINFO_MAXSIZE] = {0};
+        uint32_t length = sizeof(executable_path);
+        if (_NSGetExecutablePath(executable_path, &length) == 0) {
+            const char *guest_name = strrchr(executable_path, '/');
+            guest_name = guest_name ? guest_name + 1 : executable_path;
+            if (guest_name && guest_name[0] != '\0') {
+                bool duplicate = false;
+                for (size_t i = 0; i < count; i++) {
+                    if (strncmp(names[i], guest_name, sizeof(names[i])) == 0) {
+                        duplicate = true;
+                        break;
+                    }
+                }
+                if (!duplicate) {
+                    snprintf(names[count], sizeof(names[count]), "%s", guest_name);
+                    count++;
+                }
+            }
+        }
+    }
+
+    return count;
+}
+
+static uint64_t checkprocforpid(uint64_t candidate, pid_t pid, const char *src, uint32_t off) {
+    if (!is_kptr(candidate)) {
+        return 0;
+    }
+
+    uint32_t pid_offsets[2] = { PROC_PID_OFFSET, PROC_PID_OFFSET == 0x60 ? 0x28 : 0x60 };
+    for (size_t i = 0; i < 2; i++) {
+        uint32_t current_pid = ds_kread32(candidate + pid_offsets[i]);
+        if (current_pid == (uint32_t)pid) {
+            printf("(utils) found self proc via %s+0x%x -> 0x%llx pid=%d (pidoff=0x%x)\n",
+                   src, off, candidate, current_pid, pid_offsets[i]);
+            return candidate;
+        }
+    }
+
+    return 0;
+}
+
+static uint64_t procbysock(void) {
+    uint64_t rw_pcb = ds_get_rw_socket_pcb();
+    if (!is_kptr(rw_pcb)) {
+        utils_log_file("rw_socket_pcb invalid: 0x%llx", rw_pcb);
+        printf("(utils) rw_socket_pcb invalid: 0x%llx\n", rw_pcb);
+        return 0;
+    }
+
+    pid_t ourpid = getpid();
+    utils_log_file("socket fallback: pcb=0x%llx pid=%d", rw_pcb, ourpid);
+    printf("(utils) socket fallback: pcb=0x%llx pid=%d\n", rw_pcb, ourpid);
+
+    uint8_t pcbbuf[0x200];
+    utils_log_file("socket fallback: reading pcb buffer");
+    ds_kread(rw_pcb, pcbbuf, sizeof(pcbbuf));
+    utils_log_file("socket fallback: pcb buffer read");
+    for (uint32_t off = 0; off < sizeof(pcbbuf); off += 8) {
+        uint64_t candidate = S(*(uint64_t *)(pcbbuf + off));
+        uint64_t proc = checkprocforpid(candidate, ourpid, "pcb", off);
+        if (proc != 0) {
+            return proc;
+        }
+    }
+
+    uint64_t sock = 0;
+    for (uint32_t sock_offset = 0x10; sock_offset <= 0x50; sock_offset += 0x08) {
+        uint64_t candidate = S(ds_kread64(rw_pcb + sock_offset));
+        if (!is_kptr(candidate)) {
+            continue;
+        }
+
+        for (uint32_t backptr_offset = 0; backptr_offset <= 0x30; backptr_offset += 0x08) {
+            uint64_t backptr = S(ds_kread64(candidate + backptr_offset));
+            if (backptr == rw_pcb) {
+                sock = candidate;
+                printf("(utils) socket found via pcb+0x%x = 0x%llx (backptr at +0x%x)\n",
+                       sock_offset, sock, backptr_offset);
+                break;
+            }
+        }
+
+        if (sock != 0) {
+            break;
+        }
+    }
+
+    if (!sock) {
+        uint64_t candidate = S(ds_kread64(rw_pcb + 0x40));
+        if (is_kptr(candidate)) {
+            sock = candidate;
+            printf("(utils) socket via fixed pcb+0x40 = 0x%llx\n", sock);
+        }
+    }
+
+    if (!is_kptr(sock)) {
+        printf("(utils) socket scan found nothing (pcb=0x%llx sock=0x%llx)\n", rw_pcb, sock);
+        return 0;
+    }
+
+    uint8_t sockbuf[0x300];
+    ds_kread(sock, sockbuf, sizeof(sockbuf));
+    for (uint32_t off = 0; off < sizeof(sockbuf); off += 8) {
+        uint64_t candidate = S(*(uint64_t *)(sockbuf + off));
+        uint64_t proc = checkprocforpid(candidate, ourpid, "sock", off);
+        if (proc != 0) {
+            return proc;
+        }
+    }
+
+    for (uint32_t off = 0; off < sizeof(sockbuf); off += 8) {
+        uint64_t pointer = S(*(uint64_t *)(sockbuf + off));
+        if (!is_kptr(pointer)) {
+            continue;
+        }
+
+        uint8_t inner[0x100];
+        ds_kread(pointer, inner, sizeof(inner));
+        for (uint32_t inner_offset = 0; inner_offset < sizeof(inner); inner_offset += 8) {
+            uint64_t candidate = S(*(uint64_t *)(inner + inner_offset));
+            uint64_t proc = checkprocforpid(candidate, ourpid, "sock->ptr", off);
+            if (proc != 0) {
+                return proc;
+            }
+        }
+    }
+
+    printf("(utils) socket scan found nothing (pcb=0x%llx sock=0x%llx)\n", rw_pcb, sock);
+    return 0;
+}
+
+static uint64_t procbysock_hardcoded(void) {
+    uint64_t rw_pcb = ds_get_rw_socket_pcb();
+    if (!is_kptr(rw_pcb)) {
+        utils_log_file("socket hardcoded: invalid pcb=0x%llx", rw_pcb);
+        printf("(utils) rw_socket_pcb invalid: 0x%llx\n", rw_pcb);
+        return 0;
+    }
+
+    utils_log_file("socket hardcoded: pcb=0x%llx", rw_pcb);
+    uint64_t rwSocketAddr = ds_kread64(rw_pcb + off_inpcb_inp_socket);
+    if (!is_kptr(rwSocketAddr)) {
+        utils_log_file("socket hardcoded: invalid socket=0x%llx", rwSocketAddr);
+        printf("(utils) socket hardcoded: invalid socket=0x%llx\n", rwSocketAddr);
+        return 0;
+    }
+
+    utils_log_file("socket hardcoded: socket=0x%llx", rwSocketAddr);
+    uint64_t current_thread = ds_kread64(rwSocketAddr + off_socket_so_background_thread);
+    if (!is_kptr(current_thread)) {
+        utils_log_file("socket hardcoded: invalid thread=0x%llx", current_thread);
+        printf("(utils) socket hardcoded: invalid thread=0x%llx\n", current_thread);
+        return 0;
+    }
+
+    utils_log_file("socket hardcoded: thread=0x%llx", current_thread);
+    uint64_t current_thread_ro = thread_get_t_tro(current_thread);
+    if (!is_kptr(current_thread_ro)) {
+        utils_log_file("socket hardcoded: invalid thread_ro=0x%llx", current_thread_ro);
+        printf("(utils) socket hardcoded: invalid thread_ro=0x%llx\n", current_thread_ro);
+        return 0;
+    }
+
+    utils_log_file("socket hardcoded: thread_ro=0x%llx", current_thread_ro);
+    uint64_t proc = ds_kread64(current_thread_ro + off_thread_ro_tro_proc);
+    uint64_t checked_proc = checkprocforpid(proc, getpid(), "thread_ro", off_thread_ro_tro_proc);
+    if (!checked_proc) {
+        utils_log_file("socket hardcoded: proc candidate failed pid check raw=0x%llx", proc);
+        printf("(utils) socket hardcoded: proc candidate failed pid check raw=0x%llx\n", proc);
+        return 0;
+    }
+
+    utils_log_file("found self proc via socket hardcoded -> 0x%llx", checked_proc);
+    printf("(utils) found self proc via socket hardcoded -> 0x%llx\n", checked_proc);
+    return checked_proc;
+}
+
+uint64_t procbypid(pid_t targetpid) {
+    if (!kernel_base) {
+        printf("(utils) darksword not ready\n");
+        return 0;
+    }
+
+    static pid_t cached_self_pid = -1;
+    static uint64_t cached_self_proc = 0;
+    static uint64_t cached_launchd_proc = 0;
+    if (targetpid == 1 && is_kptr(cached_launchd_proc)) {
+        return cached_launchd_proc;
+    }
+    if (targetpid == cached_self_pid && is_kptr(cached_self_proc)) {
+        return cached_self_proc;
+    }
+
+    uint64_t heads[2] = { kernproc_head(), allproc_head() };
+    uint32_t pid_offsets[2] = { off_proc_p_pid, off_proc_p_pid == 0x60 ? 0x28 : 0x60 };
+    for (size_t head_index = 0; head_index < 2; head_index++) {
+        uint64_t proc = heads[head_index];
+        utils_log_file("procbypid start: pid=%d source=%s head=0x%llx",
+                       targetpid, head_index == 0 ? "kernproc" : "allproc", proc);
+        for (int iter = 0; is_kptr(proc) && iter < 4096; iter++) {
+            for (size_t i = 0; i < 2; i++) {
+                uint32_t curPid = ds_kread32(proc + pid_offsets[i]);
+                if (curPid == (uint32_t)targetpid) {
+                    utils_log_file("found proc via %s list -> 0x%llx pid=%d pidoff=0x%x",
+                                   head_index == 0 ? "kernproc" : "allproc",
+                                   proc, targetpid, pid_offsets[i]);
+                    if (targetpid == 1) {
+                        cached_launchd_proc = proc;
+                    } else if (targetpid == getpid()) {
+                        cached_self_pid = targetpid;
+                        cached_self_proc = proc;
+                    }
+                    return proc;
+                }
+            }
+
+            uint64_t raw_next = ds_kread64(proc + off_proc_p_list_le_next);
+            uint64_t next = S(raw_next);
+            if (!is_kptr(next) || next == proc) {
+                break;
+            }
+            proc = next;
+        }
+    }
+
+    utils_log_file("procbypid failed: pid=%d", targetpid);
+    return 0;
+}
+
+uint64_t ourproc(void) {
+    uint64_t proc = procbysock_hardcoded();
+    if (proc != 0) {
+        return proc;
+    }
+
+    proc = procbysock();
+    if (proc != 0) {
+        return proc;
+    }
+
+    if (islcruntime()) {
+        printf("(utils) lc proc lookup failed\n");
+        return 0;
+    }
+
+    proc = procbypid(getpid());
+    if (proc != 0) {
+        return proc;
+    }
+
+    utils_log_file("ourproc lookup failed");
+    printf("(utils) ourproc lookup failed\n");
+    return 0;
+}
+
+uint64_t taskbyproc(uint64_t procaddr) {
+    if (!is_kptr(procaddr)) {
+        return 0;
+    }
+    uint64_t p_proc_ro = S(ds_kread64(procaddr + off_proc_p_proc_ro));
+    if (!is_kptr(p_proc_ro)) {
+        return 0;
+    }
+    uint64_t pr_task = S(ds_kread64(p_proc_ro + off_proc_ro_pr_task));
+    return pr_task;
+}
+
+typedef struct { char data[40]; } StringWrapper;
+StringWrapper proc_get_p_name(uint64_t proc) {
+    StringWrapper procNameTmp = {0};
+    if(!proc)   return procNameTmp;
+    memset(procNameTmp.data, 0, 40);
+    uint64_t off = off_proc_p_name & 0x7;
+    ds_kreadbuf(proc + off_proc_p_name - off, &procNameTmp.data, 40);
+    memmove(procNameTmp.data, procNameTmp.data + off, 40 - off);
+    procNameTmp.data[32] = '\0';
+    return procNameTmp;
+}
+
+uint64_t procbyname(const char *name) {
+    if (!name || strlen(name) == 0) {
+        printf("(utils) invalid process name\n");
+        return 0;
+    }
+
+    if (!ds_is_ready()) {
+        printf("(utils) darksword not ready\n");
+        return 0;
+    }
+
+    uint64_t heads[2] = { kernproc_head(), allproc_head() };
+    for (size_t head_index = 0; head_index < 2; head_index++) {
+        uint64_t proc = heads[head_index];
+        for (int iter = 0; is_kptr(proc) && iter < 4096; iter++) {
+            char *p_name = proc_get_p_name(proc).data;
+            if(strcmp(p_name, name) == 0)
+                return proc;
+
+            uint64_t next = S(ds_kread64(proc + off_proc_p_list_le_next));
+            if (!is_kptr(next) || next == proc) {
+                break;
+            }
+            proc = next;
+        }
+    }
+    
+    return 0;
+}
+
+proc_entry_t* proclist(const char *search, int *out_count) {
+    if (!ds_is_ready()) {
+        *out_count = 0;
+        return NULL;
+    }
+
+    bool list_all = (!search || strlen(search) == 0);
+
+    uint64_t currentproc = allproc_head();
+    if (!is_kptr(currentproc)) {
+        currentproc = kernproc_head();
+    }
+
+    if (!is_kptr(currentproc)) {
+        *out_count = 0;
+        return NULL;
+    }
+
+    int capacity = 2048;
+    proc_entry_t *results = malloc(sizeof(proc_entry_t) * capacity);
+    if (!results) {
+        *out_count = 0;
+        return NULL;
+    }
+
+    int iter = 0;
+    int matches = 0;
+
+    while (currentproc && iter < 2000) {
+        if (!is_kptr(currentproc)) break;
+
+        char name[33] = {0};
+        ds_kread(currentproc + proc_name_offset(), name, 32);
+        name[32] = '\0';
+
+        bool match = list_all || (strcasestr(name, search) != NULL);
+
+        if (match) {
+            if (matches >= capacity) break;
+
+            results[matches].pid = ds_kread32(currentproc + PROC_PID_OFFSET);
+            results[matches].uid = ds_kread32(currentproc + PROC_UID_OFFSET);
+            results[matches].gid = ds_kread32(currentproc + PROC_GID_OFFSET);
+            results[matches].kaddr = currentproc;
+            strncpy(results[matches].name, name, sizeof(results[matches].name) - 1);
+            results[matches].name[sizeof(results[matches].name) - 1] = '\0';
+
+            matches++;
+        }
+
+        uint64_t next = S(ds_kread64(currentproc + proc_next_offset()));
+        if (!is_kptr(next) || next == currentproc) break;
+
+        currentproc = next;
+        iter++;
+    }
+
+    *out_count = matches;
+    return results;
+}
+
+void free_proclist(proc_entry_t *list) {
+    if (list) free(list);
+}
+
+bool aslrstate;
+
+void getaslrstate(void) {
+    uint64_t launchd = procbypid(1);
+    if (!launchd) {
+        printf("(aslr) failed. could not find launchd proc\n");
+        return;
+    }
+
+    uint32_t pflag = ds_kread32(launchd + PROC_PFLAG_OFFSET);
+    aslrstate = !(pflag & P_DISABLE_ASLR);
+    printf("(aslr) refreshed. aslr is %s\n", aslrstate ? "on" : "off");
+}
+
+int toggleaslr(void) {
+    uint64_t launchd = procbypid(1);
+    if (!launchd) {
+        printf("(aslr) failed. could not find launchd proc\n");
+        return -1;
+    }
+
+    uint32_t pflag = ds_kread32(launchd + PROC_PFLAG_OFFSET);
+    uint32_t desired;
+
+    if (aslrstate) {
+        desired = pflag | P_DISABLE_ASLR;
+        ds_kwrite32(launchd + PROC_PFLAG_OFFSET, desired);
+    } else {
+        desired = pflag & ~P_DISABLE_ASLR;
+        ds_kwrite32(launchd + PROC_PFLAG_OFFSET, desired);
+    }
+    uint32_t verify = ds_kread32(launchd + PROC_PFLAG_OFFSET);
+    aslrstate = !(verify & P_DISABLE_ASLR);
+
+    printf("(aslr) aslr is now %s\n", aslrstate ? "on" : "off");
+
+    return 0;
+}
+
+void hexdump(const void* data, size_t size) {
+    char ascii[17];
+    size_t i, j;
+    ascii[16] = '\0';
+    
+    for (i = 0; i < size; ++i) {
+        if ((i % 16) == 0) {
+            printf("[0x%016llx+0x%03zx] ", &data, i);
+        }
+
+        printf("%02X ", ((unsigned char*)data)[i]);
+        if (((unsigned char*)data)[i] >= ' ' && ((unsigned char*)data)[i] <= '~') {
+            ascii[i % 16] = ((unsigned char*)data)[i];
+        } else {
+            ascii[i % 16] = '.';
+        }
+
+        if ((i + 1) % 8 == 0 || i + 1 == size) {
+            printf(" ");
+            if ((i + 1) % 16 == 0) {
+                printf("|  %s \n", ascii);
+            } else if (i + 1 == size) {
+                ascii[(i + 1) % 16] = '\0';
+                
+                if ((i + 1) % 16 <= 8) {
+                    printf(" ");
+                } else {
+                    for (j = (i + 1) % 16; j < 16; ++j) {
+                        printf("   ");
+                    }
+                }
+
+                printf("|  %s \n", ascii);
+            }
+        }
+    }
+}
+
+void filehexdump(const char *path, size_t size) {
+    int fd = open(path, O_RDONLY);
+    void *buf = malloc(size);
+    
+    ssize_t n = read(fd, buf, size);
+    close(fd);
+    
+    if (n > 0) {
+        hexdump(buf, n);
+    }
+    
+    free(buf);
+}
+
+uint64_t ipc_entry_lookup(uint64_t space, mach_port_name_t name) {
+    uint64_t table = ds_kreadsmrptr(space + off_ipc_space_is_table);
+
+    if (!is_pac_supported()) {
+        table |= 0xFFFFFF8000000000ULL;
+        table = ds_kallocarrdec(table);
+    }
+
+    return (table + (sizeof_ipc_entry * (name >> 8)));
+}
+
+uint64_t task_get_ipc_port_table_entry(uint64_t task, mach_port_t port) {
+    uint64_t itk_space = ds_kreadptr(task + off_task_itk_space);
+    return ipc_entry_lookup(itk_space, port);
+}
+
+uint64_t task_get_ipc_port_object(uint64_t task, mach_port_t port) {
+    return ds_kreadptr(task_get_ipc_port_table_entry(task, port) + off_ipc_entry_ie_object);
+}
+
+uint64_t task_get_ipc_port_kobject(uint64_t task, mach_port_t port) {
+    return ds_kreadptr(task_get_ipc_port_object(task, port) + off_ipc_port_ip_kobject);
+}
+
+uint64_t task_get_vm_map(uint64_t task_ptr) {
+    return ds_kreadptr(task_ptr + off_task_map);
+}
+
+int disable_excguard_kill(uint64_t task) {
+    uint32_t excGuard = ds_kread32(task + off_task_task_exc_guard);
+    excGuard &= ~(TASK_EXC_GUARD_MP_CORPSE | TASK_EXC_GUARD_MP_FATAL);
+    excGuard |= TASK_EXC_GUARD_MP_DELIVER;
+    ds_kwrite32(task + off_task_task_exc_guard, excGuard);
+
+    return 0;
+}
+
+uint64_t thread_get_t_tro(uint64_t thread) {
+    return ds_kread64(thread + off_thread_t_tro);
+}
+
+uint64_t thread_get_task(uint64_t thread) {
+    uint64_t tro = thread_get_t_tro(thread);
+    return ds_kread64(tro + off_thread_ro_tro_task);
+}
+
+uint16_t thread_get_options(uint64_t thread) {
+    return ds_kread16(thread + off_thread_options);
+}
+
+void thread_set_options(uint64_t thread, uint16_t options) {
+    ds_kwrite16(thread + off_thread_options, options);
+}
+
+void thread_set_mutex(uint64_t thread, uint32_t ctid) {
+    ds_kwrite32(thread + off_thread_mutex_lck_mtx_data, ctid);
+}
+
+uint32_t thread_get_mutex(uint64_t thread) {
+    return ds_kread32(thread + off_thread_mutex_lck_mtx_data);
+}
+
+uint64_t thread_get_kstackptr(uint64_t thread) {
+    return ds_kreadptr(thread + off_thread_machine_kstackptr);
+}
+
+uint64_t thread_get_jop_pid(uint64_t thread) {
+    return ds_kread64(thread + off_thread_machine_jop_pid);
+}
+
+uint64_t thread_get_rop_pid(uint64_t thread) {
+    return ds_kread64(thread + off_thread_machine_rop_pid);
+}
+
+uint64_t proc_task(uint64_t proc) {
+    return taskbyproc(proc);
+}
+
+uint64_t proc_find_by_name(const char* name) {
+    return procbyname(name);
+}
+
+static uint64_t gSelfProc = 0;
+static uint64_t gSelfTask = 0;
+
+bool recover_proc_self(uint64_t proc) {
+    printf("(utils) launchd proc: 0x%llx\n", proc);
+    gSelfProc = proc;
+    gSelfProc = procbypid(getpid());
+    return gSelfProc != 0;
+}
+
+uint64_t proc_self(void) {
+    if (!gSelfProc) {
+        gSelfProc = ourproc();
+    }
+    return gSelfProc;
+}
+
+uint64_t task_self(void) {
+    if (!gSelfTask) {
+        uint64_t proc = proc_self();
+        if (!proc) {
+            return 0;
+        }
+        gSelfTask = proc_task(proc);
+    }
+    return gSelfTask;
+}
+
+int crashproc(const char* name) {
+    uint64_t proc = procbyname(name);
+    uint64_t task = taskbyproc(proc);
+    uint64_t threads = ds_kread64(task + off_task_threads_next);
+    uint64_t upcb = ds_kread64(threads + off_thread_machine_upcb);
+    uint64_t state = xpaci(upcb) + off_arm_saved_state_uss_ss_64;
+    
+    ds_kwrite64(state + offsetof(struct arm_saved_state64, sp), 0x1337133713371337);
+    return 0;
+}

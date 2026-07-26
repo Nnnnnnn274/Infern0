@@ -1,12 +1,22 @@
 //
 //  offsets.h
-//  Cyanide
+//  lara
 //
-//  Created by seo on 3/24/26.
+//  Created by ruter on 04.04.26.
 //
 
+#ifndef offsets_h
+#define offsets_h
+
 #import <stdio.h>
-#import <stdint.h>
+#include <stdint.h>
+#include <unistd.h>
+#include <sys/types.h>
+#import <Foundation/Foundation.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 extern uint32_t off_inpcb_inp_list_le_next;
 extern uint32_t off_inpcb_inp_pcbinfo;
@@ -17,6 +27,7 @@ extern uint32_t off_inpcb_inp_depend6_inp6_chksum;
 extern uint32_t off_socket_so_usecount;
 extern uint32_t off_socket_so_proto;
 extern uint32_t off_socket_so_background_thread;
+extern uint32_t off_protosw_pr_input;
 extern uint32_t off_kalloc_type_view_kt_zv_zv_name;
 extern uint32_t off_thread_t_tro;
 extern uint32_t off_thread_ro_tro_proc;
@@ -45,7 +56,6 @@ extern uint32_t off_proc_p_textvp;
 extern uint32_t off_proc_p_name;
 extern uint32_t off_proc_ro_pr_task;
 extern uint32_t off_proc_ro_p_ucred;
-extern uint32_t off_proc_ro_csflags;
 extern uint32_t off_ucred_cr_label;
 extern uint32_t off_task_itk_space;
 extern uint32_t off_task_threads_next;
@@ -95,7 +105,29 @@ extern uint64_t smr_base;
 extern uint64_t t1sz_boot;
 extern uint64_t VM_MIN_KERNEL_ADDRESS;
 extern uint64_t VM_MAX_KERNEL_ADDRESS;
+
 extern uint64_t pac_mask;
 
+NSDictionary *alloffs(void);
+
+void savealloffsets(void);
+
+bool verifykernoffsets(void);
+bool emergencyfixfunctiontobereplacedlateronquestionmark(void);
+
 void offsets_init(void);
+
+bool dlkcache(void);
+static bool resolvekernoffsets(NSString *kcpath);
+uint64_t getrootvnode(void);
+uint64_t getmacprocenforceoff(void);
+NSString *getkerncache(void);
+void clearkerncachedata(void);
+bool is_pac_supported(void);
 cpu_subtype_t get_hw_cpufamily(void);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* offsets_h */
