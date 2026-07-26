@@ -9,6 +9,12 @@ enum method: String, CaseIterable {
     case hybrid = "Hybrid"
 }
 
+enum fmAppsDisplayMode: String, CaseIterable {
+    case UUID = "UUID"
+    case bundleID = "Bundle ID"
+    case appName = "App Name"
+}
+
 final class Infern0LaraLogger: ObservableObject {
     @Published var logs: [String] = []
 
@@ -139,6 +145,34 @@ final class laramgr: ObservableObject {
         let read = path.withCString { vfs_read($0, &bytes, count, 0) }
         guard read >= 0 else { return nil }
         return Data(bytes.prefix(Int(read)))
+    }
+
+    func vfslistdir(path: String) -> [(name: String, isDir: Bool)]? {
+        guard vfs_isready() else {
+            logmsg("VFS listdir rejected: not ready (\(path)).")
+            return nil
+        }
+        var pointer: UnsafeMutablePointer<vfs_entry_t>?
+        var count: Int32 = 0
+        let result = path.withCString { vfs_listdir($0, &pointer, &count) }
+        guard result == 0, let entries = pointer else {
+            logmsg("VFS listdir failed (\(path)), result \(result).")
+            return nil
+        }
+        defer { vfs_freelisting(entries) }
+
+        var items: [(String, Bool)] = []
+        for index in 0..<Int(count) {
+            let entry = entries[index]
+            let name = withUnsafePointer(to: entry.name) { pointer in
+                pointer.withMemoryRebound(to: CChar.self, capacity: 256) {
+                    String(cString: $0)
+                }
+            }
+            items.append((name, entry.d_type == 4))
+        }
+        logmsg("Listed \(items.count) entries in \(path).")
+        return items.sorted { $0.0.localizedCaseInsensitiveCompare($1.0) == .orderedAscending }
     }
 
     func vfsoverwritefromlocalpath(target: String, source: String) -> Bool {
