@@ -109,6 +109,7 @@ static BOOL catalog_repo_script_requires_native_bridge(NSString *rawScript)
 static const NSInteger kSecOTA              = 3;
 static const NSInteger kSecLaraVFS          = -1000;
 static const NSInteger kSecLaraFonts        = -1001;
+static const NSInteger kSecLaraSettings     = -1002;
 static const NSInteger kSecSBC              = 4;
 static const NSInteger kSecStatBar          = 5;
 static const NSInteger kSecNSBar            = 6;
@@ -1088,6 +1089,19 @@ static const NSInteger kSecDarkSwordTweaks  = 13;
         laraFonts.settingsSection = kSecLaraFonts;
         laraFonts.unstableWarning = @"System font replacement is persistent until restored or overwritten. Keep a known-good font available, initialize VFS first, and only apply compatible patched fonts.";
 
+        Package *laraSettings = [[Package alloc] initWithIdentifier:@"com.darksword.lara-settings"
+                                           name:@"Lara Settings"
+                               shortDescription:@"Kernelcache offset grabber, VFS preferences, logs, and credits"
+                                longDescription:@"Settings and offset-management hub ported from Lara by rooootdev. Run Infern0's shared exploit once, obtain and verify the matching kernelcache offsets through Lara's resolver and libgrabkernel2, inspect resolved values, clear stale kernelcache data, and configure Santander file-manager behavior.\n\nThis page includes explicit upstream credits and licensing. Lara is GNU AGPL-3.0; libgrabkernel2 is by Alfie CG under the MIT license. Infern0's contribution is the integration, crash guards, and shared safe-KRW adapter."
+                                        version:version
+                                         author:@"rooootdev / Lara contributors / Infern0 integration"
+                                       category:@"System"
+                                     symbolName:@"gearshape.2.fill"
+                                           kind:PackageInstallKindDirectTool
+                                     enabledKey:nil
+                                          isNew:YES];
+        laraSettings.settingsSection = kSecLaraSettings;
+
         Package *disableAppLibrary = [[Package alloc] initWithIdentifier:@"com.darksword.disable-app-library"
                                            name:@"Disable App Library"
                                shortDescription:@"Remove the App Library page"
@@ -1178,6 +1192,7 @@ static const NSInteger kSecDarkSwordTweaks  = 13;
 
             otaBlock,
             amfiBypass,
+            laraSettings,
             laraVFS,
             laraFonts,
 
@@ -1265,6 +1280,7 @@ static const NSInteger kSecDarkSwordTweaks  = 13;
             @"com.darksword.drag-coefficient",
             @"com.darksword.ota-block",
             @"com.darksword.amfi-bypass",
+            @"com.darksword.lara-settings",
             @"com.darksword.lara-vfs",
             @"com.darksword.lara-fonts",
             @"com.darksword.disable-app-library",

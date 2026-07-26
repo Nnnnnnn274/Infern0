@@ -38,6 +38,10 @@ final class laramgr: ObservableObject {
     @Published var initializing = false
     @Published var progress = 0.0
     @Published var status = "VFS has not been initialized."
+    @Published var resolvingOffsets = false
+    @Published var offsetsReady = false
+    @Published var offsetProgress = 0.0
+    @Published var offsetStatus = "Kernelcache offsets have not been checked."
 
     private init() {
         refresh()
@@ -46,6 +50,79 @@ final class laramgr: ObservableObject {
     func refresh() {
         dsready = ds_is_ready()
         vfsready = vfs_isready()
+        let defaults = UserDefaults.standard
+        offsetsReady = defaults.object(forKey: "lara.kernprocoff") != nil &&
+            defaults.object(forKey: "lara.rootvnodeoff") != nil
+    }
+
+    func resolveKernelcacheOffsets() {
+        guard !resolvingOffsets else { return }
+        resolvingOffsets = true
+        offsetProgress = 0.02
+        offsetStatus = "Loading Lara's device offset profile..."
+        globallogger.log("Offset Grabber: loading Lara device profile.")
+
+        DispatchQueue.global(qos: .userInitiated).async {
+            lara_offsets_init()
+
+            DispatchQueue.main.async {
+                self.offsetProgress = 0.12
+                self.offsetStatus = "Starting the shared Infern0 kernel session..."
+                globallogger.log("Offset Grabber: requesting shared Infern0 KRW.")
+            }
+
+            let exploitResult = ds_is_ready() ? 0 : ds_run()
+            guard exploitResult == 0, ds_is_ready() else {
+                DispatchQueue.main.async {
+                    self.resolvingOffsets = false
+                    self.offsetsReady = false
+                    self.offsetProgress = 1.0
+                    self.offsetStatus = "Kernel session failed safely; offsets were not changed."
+                    globallogger.log("Offset Grabber: Infern0 KRW failed safely.")
+                }
+                return
+            }
+
+            DispatchQueue.main.async {
+                self.dsready = true
+                self.offsetProgress = 0.42
+                self.offsetStatus = "Checking the cached Lara kernelcache..."
+                globallogger.log("Offset Grabber: checking cached kernelcache.")
+            }
+
+            var resolved = lara_emergencyfixfunctiontobereplacedlateronquestionmark()
+            if !resolved {
+                DispatchQueue.main.async {
+                    self.offsetProgress = 0.58
+                    self.offsetStatus = "Fetching kernelcache with Lara's offset grabber..."
+                    globallogger.log("Offset Grabber: invoking Lara/libgrabkernel2.")
+                }
+                resolved = lara_dlkcache()
+            }
+
+            let verified = resolved && lara_verifykernoffsets()
+            DispatchQueue.main.async {
+                self.resolvingOffsets = false
+                self.offsetsReady = verified
+                self.offsetProgress = 1.0
+                self.offsetStatus = verified
+                    ? "Lara kernelcache offsets resolved and verified."
+                    : "Offset resolution failed; existing values were not marked ready."
+                globallogger.log(verified
+                    ? "Offset Grabber: offsets resolved and verified."
+                    : "Offset Grabber: resolution or verification failed.")
+                self.refresh()
+            }
+        }
+    }
+
+    func clearKernelcacheOffsets() {
+        guard !resolvingOffsets else { return }
+        lara_clearkerncachedata()
+        offsetsReady = false
+        offsetProgress = 0.0
+        offsetStatus = "Kernelcache and saved Lara offsets were removed."
+        globallogger.log("Offset Grabber: cleared kernelcache and saved offsets.")
     }
 
     func logmsg(_ message: String) {
@@ -265,6 +342,114 @@ private struct Infern0VFSLauncher: View {
     }
 }
 
+@MainActor
+private struct LaraOffsetSnapshotView: View {
+    private var entries: [(String, String)] {
+        guard let dictionary = alloffs() as? [String: Any] else { return [] }
+        return dictionary.map { key, value in
+            let number = (value as? NSNumber)?.uint64Value ?? 0
+            return (key, String(format: "0x%llx", number))
+        }
+        .sorted { $0.0.localizedCaseInsensitiveCompare($1.0) == .orderedAscending }
+    }
+
+    var body: some View {
+        List {
+            Section {
+                ForEach(Array(entries.enumerated()), id: \.offset) { _, entry in
+                    LabeledContent(entry.0, value: entry.1)
+                        .font(.system(size: 12, design: .monospaced))
+                }
+            } footer: {
+                Text("Read-only snapshot from Lara's OffsetManagementView data. Editing kernel structure offsets manually is intentionally disabled in Infern0.")
+            }
+        }
+        .navigationTitle("Resolved Offsets")
+    }
+}
+
+@MainActor
+private struct LaraSettingsView: View {
+    @ObservedObject private var manager = laramgr.shared
+    @AppStorage("selectedmethod") private var selectedMethod: method = .hybrid
+    @AppStorage("selectedFMAppsDisplayMode") private var displayMode: fmAppsDisplayMode = .appName
+    @AppStorage("fmRecursiveSearch") private var recursiveSearch = false
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section("Lara") {
+                    Text("Lara integration settings and kernelcache offset management.")
+                    Link("Upstream: rooootdev/lara", destination: URL(string: "https://github.com/rooootdev/lara")!)
+                    Link("Main developer: rooootdev", destination: URL(string: "https://github.com/rooootdev")!)
+                }
+
+                Section("Kernelcache Offset Grabber") {
+                    Text(manager.offsetStatus)
+                    if manager.resolvingOffsets {
+                        ProgressView(value: manager.offsetProgress)
+                    }
+                    Button(manager.resolvingOffsets ? "Resolving..." : "Run Exploit Once & Get Offsets") {
+                        manager.resolveKernelcacheOffsets()
+                    }
+                    .disabled(manager.resolvingOffsets)
+
+                    NavigationLink("View Resolved Offsets") {
+                        LaraOffsetSnapshotView()
+                    }
+                    .disabled(!manager.offsetsReady)
+
+                    Button("Remove Kernelcache & Saved Offsets", role: .destructive) {
+                        manager.clearKernelcacheOffsets()
+                    }
+                    .disabled(manager.resolvingOffsets || !manager.offsetsReady)
+                } footer: {
+                    Text("This uses Lara's current kernelcache resolver and bundled libgrabkernel2. The exploit stage uses Infern0's shared, non-crashing KRW bridge; it is acquired once and reused by VFS and Fonts.")
+                }
+
+                Section("File Manager") {
+                    Picker("Access Mode", selection: $selectedMethod) {
+                        ForEach(method.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+
+                    Picker("App Folder Labels", selection: $displayMode) {
+                        ForEach(fmAppsDisplayMode.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                    }
+                    Toggle("Recursive Search", isOn: $recursiveSearch)
+                }
+
+                Section("Upstream Attribution") {
+                    Text("The Lara toolbox, Santander VFS UI, offset manager, kernelcache resolver, and related integration are upstream work from Lara by rooootdev and its contributors. Infern0 does not claim these components as original work.")
+                    Text("Lara is licensed under GNU AGPL-3.0. Infern0's changes are the Tools-tab integration, shared KRW compatibility bridge, crash guards, and write verification.")
+                    Link("Lara source and AGPL-3.0 license", destination: URL(string: "https://github.com/rooootdev/lara")!)
+                    Link("libgrabkernel2 by Alfie CG (MIT)", destination: URL(string: "https://github.com/rooootdev/lara/blob/main/lara/licenses/LICENSE_libgrabkernel2.md")!)
+                }
+
+                Section("Lara Credits") {
+                    Link("roooot — Main Developer", destination: URL(string: "https://github.com/rooootdev")!)
+                    Link("wh1te4ever — darksword-kexploit-fun", destination: URL(string: "https://github.com/wh1te4ever")!)
+                    Link("Duy Tran — RemoteCall improvements", destination: URL(string: "https://github.com/khanhduytran0")!)
+                    Link("AppInstalleriOS — offsets and development help", destination: URL(string: "https://github.com/AppInstalleriOSGH")!)
+                    Link("lunginspector — frontend rewrite", destination: URL(string: "https://github.com/lunginspector")!)
+                    Link("hxhlb — bug fixes", destination: URL(string: "https://github.com/hxhlb")!)
+                }
+
+                Section("Detailed Lara Log") {
+                    if globallogger.logs.isEmpty {
+                        Text("No Lara activity yet.").foregroundStyle(.secondary)
+                    }
+                    ForEach(Array(globallogger.logs.enumerated()), id: \.offset) { _, line in
+                        Text(line).font(.system(size: 12, design: .monospaced))
+                    }
+                }
+            }
+            .navigationTitle("Lara Settings")
+            .onAppear { manager.refresh() }
+        }
+    }
+}
+
 @objc(LaraVFSFeatureBridge)
 @MainActor
 final class LaraVFSFeatureBridge: NSObject {
@@ -278,5 +463,13 @@ final class LaraVFSFeatureBridge: NSObject {
 final class LaraFontFeatureBridge: NSObject {
     @objc static func makeViewController() -> UIViewController {
         UIHostingController(rootView: FontPicker(mgr: laramgr.shared))
+    }
+}
+
+@objc(LaraSettingsFeatureBridge)
+@MainActor
+final class LaraSettingsFeatureBridge: NSObject {
+    @objc static func makeViewController() -> UIViewController {
+        UIHostingController(rootView: LaraSettingsView())
     }
 }
