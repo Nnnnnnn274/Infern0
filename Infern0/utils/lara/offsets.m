@@ -572,7 +572,7 @@ static bool is_known_a_series_ipad_identifier(void) {
            strcmp(machine, "iPad14,2") == 0;
 }
 
-void offsets_init(void) {
+void lara_offsets_init(void) {
     if (!(SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(@"16.0") && SYSTEM_VERSION_LESS_THAN(@"26.1"))) {
         printf("(offs) only supported offset for iOS 16.0 - 26.0.x\n");
         exit(EXIT_FAILURE);

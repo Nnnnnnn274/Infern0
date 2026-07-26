@@ -115,7 +115,7 @@ void savealloffsets(void);
 bool verifykernoffsets(void);
 bool emergencyfixfunctiontobereplacedlateronquestionmark(void);
 
-void offsets_init(void);
+void lara_offsets_init(void);
 
 bool dlkcache(void);
 static bool resolvekernoffsets(NSString *kcpath);

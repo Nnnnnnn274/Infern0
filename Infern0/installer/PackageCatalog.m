@@ -107,6 +107,8 @@ static BOOL catalog_repo_script_requires_native_bridge(NSString *rawScript)
 // (kept in sync — must match the underlying section indices used for the
 // detail-mode SettingsViewController push).
 static const NSInteger kSecOTA              = 3;
+static const NSInteger kSecLaraVFS          = -1000;
+static const NSInteger kSecLaraFonts        = -1001;
 static const NSInteger kSecSBC              = 4;
 static const NSInteger kSecStatBar          = 5;
 static const NSInteger kSecNSBar            = 6;
@@ -1058,6 +1060,34 @@ static const NSInteger kSecDarkSwordTweaks  = 13;
         amfiBypass.settingsSection = kSecAMFIBypass;
         amfiBypass.unstableWarning = @"Experimental kernel-memory test. It only patches infern0's current process and can fail on protected or unsupported layouts. Review the AMFI activity log after every run.";
 
+        Package *laraVFS = [[Package alloc] initWithIdentifier:@"com.darksword.lara-vfs"
+                                           name:@"Lara VFS File Manager"
+                               shortDescription:@"Full VFS/SBX/hybrid filesystem browser"
+                                longDescription:@"Direct port of Lara's Santander file manager and VFS stack. Browse directories, search recursively, show hidden files, label app containers, preview text, plists, binary data, images, audio, and video, and import or export files. Hybrid mode also exposes copy, paste, replace, rename, create, delete, chmod, and chown when Lara's sandbox escape is ready.\n\nOpen the tool, choose VFS, SBX, or Hybrid, then initialize the full Lara kernel/VFS session. The detailed log reports every stage and never marks the browser ready unless the underlying primitive reports ready."
+                                        version:version
+                                         author:@"rooootdev / lunginspector / infern0"
+                                       category:@"System"
+                                     symbolName:@"externaldrive.fill"
+                                           kind:PackageInstallKindDirectTool
+                                     enabledKey:nil
+                                          isNew:YES];
+        laraVFS.settingsSection = kSecLaraVFS;
+        laraVFS.unstableWarning = @"Advanced system tool: file writes, replacement, chmod, chown, and deletion can damage iOS or user data when used on the wrong path. Prefer read-only browsing and export until the VFS session has been tested on your exact device.";
+
+        Package *laraFonts = [[Package alloc] initWithIdentifier:@"com.darksword.lara-fonts"
+                                           name:@"Lara Font Manager"
+                               shortDescription:@"Lara font repos, imports, previews, and emoji packs"
+                                longDescription:@"Direct port of Lara's current Font Picker. It uses native URLSession and JSONDecoder rather than the fork's unfinished curl/cJSON stub. Browse Lara-compatible font repositories, preview downloaded fonts, import local font files, choose Standard, Mono, or Italic targets, and apply compatible TTC emoji packs through the shared VFS session."
+                                        version:version
+                                         author:@"rooootdev / ruter / infern0"
+                                       category:@"Theming"
+                                     symbolName:@"textformat"
+                                           kind:PackageInstallKindDirectTool
+                                     enabledKey:nil
+                                          isNew:YES];
+        laraFonts.settingsSection = kSecLaraFonts;
+        laraFonts.unstableWarning = @"System font replacement is persistent until restored or overwritten. Keep a known-good font available, initialize VFS first, and only apply compatible patched fonts.";
+
         Package *disableAppLibrary = [[Package alloc] initWithIdentifier:@"com.darksword.disable-app-library"
                                            name:@"Disable App Library"
                                shortDescription:@"Remove the App Library page"
@@ -1148,6 +1178,8 @@ static const NSInteger kSecDarkSwordTweaks  = 13;
 
             otaBlock,
             amfiBypass,
+            laraVFS,
+            laraFonts,
 
             // Higher-risk/manual packages last so their warnings sit below core tweaks.
 #if CYANIDE_EXPERIMENTAL_TWEAKS_AVAILABLE
@@ -1233,6 +1265,8 @@ static const NSInteger kSecDarkSwordTweaks  = 13;
             @"com.darksword.drag-coefficient",
             @"com.darksword.ota-block",
             @"com.darksword.amfi-bypass",
+            @"com.darksword.lara-vfs",
+            @"com.darksword.lara-fonts",
             @"com.darksword.disable-app-library",
             @"com.darksword.disable-icon-flyin",
             @"com.darksword.zero-wake-animation",

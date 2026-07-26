@@ -9,8 +9,25 @@
 #import "PackageDetailViewController.h"
 #import "PackageQueue.h"
 #import "../SettingsViewController.h"
+#import <objc/message.h>
 
 static NSString * const kCatPkgCellID = @"CatPkgCell";
+
+static UIViewController *catpkg_lara_tool_controller(NSString *identifier)
+{
+    NSString *className = nil;
+    if ([identifier isEqualToString:@"com.darksword.lara-vfs"]) {
+        className = @"LaraVFSFeatureBridge";
+    } else if ([identifier isEqualToString:@"com.darksword.lara-fonts"]) {
+        className = @"LaraFontFeatureBridge";
+    }
+    if (!className) return nil;
+    Class bridge = NSClassFromString(className);
+    SEL selector = NSSelectorFromString(@"makeViewController");
+    if (!bridge || ![bridge respondsToSelector:selector]) return nil;
+    UIViewController *(*send)(id, SEL) = (void *)objc_msgSend;
+    return send(bridge, selector);
+}
 
 @interface CategoryPackagesViewController () <UISearchResultsUpdating>
 @property (nonatomic, copy) NSArray<Package *> *allPackages;
@@ -346,6 +363,13 @@ static NSString * const kCatPkgCellID = @"CatPkgCell";
 
 - (void)navigateToSettingsSectionForPackage:(Package *)pkg
 {
+    UIViewController *laraTool = catpkg_lara_tool_controller(pkg.identifier);
+    if (laraTool) {
+        laraTool.title = pkg.name;
+        [self.navigationController pushViewController:laraTool animated:YES];
+        return;
+    }
+
     UITabBarController *tab = self.tabBarController;
     NSUInteger settingsIndex = NSNotFound;
     UINavigationController *settingsNav = nil;
