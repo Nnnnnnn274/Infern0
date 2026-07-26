@@ -21,6 +21,7 @@
 #define taskbyproc lara_taskbyproc
 #define procbyname lara_procbyname
 #define procbypid lara_procbypid
+#define proc_get_p_name lara_proc_get_p_name
 #define proclist lara_proclist
 #define free_proclist lara_free_proclist
 #define aslrstate lara_aslrstate
