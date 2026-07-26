@@ -114,8 +114,6 @@ struct santanderdirview: View {
     @State private var showimport = false
     @State private var msg: santandermsg?
     @State private var infoitem: santanderitem?
-    @State private var chmoditem: santanderitem?
-    @State private var chownitem: santanderitem?
     @State private var delitem: santanderitem?
     @State private var renameitem: santanderitem?
     @State private var shownewfolder = false
@@ -185,18 +183,6 @@ struct santanderdirview: View {
                                 Label("Replace With Clipboard", systemImage: "doc.on.clipboard")
                             }
                             .disabled(clip.item == nil || (!readsbx && !writevfs))
-
-                            Button {
-                                chmoditem = entry
-                            } label: {
-                                Label("Chmod", systemImage: "lock.open")
-                            }
-
-                            Button {
-                                chownitem = entry
-                            } label: {
-                                Label("Chown", systemImage: "person.crop.circle")
-                            }
 
                             Button(role: .destructive) {
                                 delitem = entry
@@ -357,20 +343,6 @@ struct santanderdirview: View {
                 actiontitle: "Rename"
             ) { newname in
                 rename(entry, newname: newname)
-            }
-        }
-        .sheet(item: $chmoditem) { entry in
-            santanderchmodsheet(item: entry) { mode in
-                santanderfs.clearImmutableIfPossible(atPath: entry.path)
-                let ok = entry.path.withCString { apfs_mod($0, mode) == 0 }
-                msg = santandermsg(title: "Chmod", text: ok ? "Operation completed." : "Operation failed.")
-            }
-        }
-        .sheet(item: $chownitem) { entry in
-            santanderchownsheet(item: entry) { uid, gid in
-                santanderfs.clearImmutableIfPossible(atPath: entry.path)
-                let ok = entry.path.withCString { apfs_own($0, uid, gid) == 0 }
-                msg = santandermsg(title: "Chown", text: ok ? "Operation completed." : "Operation failed.")
             }
         }
         .alert("File Manager Info", isPresented: $showvfsinfo) {
