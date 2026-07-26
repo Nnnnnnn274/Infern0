@@ -6,13 +6,12 @@
 //
 
 #import "utils.h"
-#import "darksword.h"
+#import "../ds_bridge.h"
 #import "xpf.h"
 #import "offsets.h"
 #import "xpaci.h"
 
 #import <Foundation/Foundation.h>
-#import <dlfcn.h>
 #import <mach/mach.h>
 #import <stdio.h>
 #import <stdarg.h>
@@ -31,26 +30,6 @@
 #define TASK_EXC_GUARD_MP_FATAL     0x80
 
 extern int proc_name(int pid, void *buffer, uint32_t buffersize);
-
-int lara_system_proc_name(int pid, void *buffer, uint32_t buffersize) {
-    typedef int (*proc_name_fn)(int, void *, uint32_t);
-    static proc_name_fn function;
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        function = (proc_name_fn)dlsym(RTLD_DEFAULT, "proc_name");
-    });
-    return function ? function(pid, buffer, buffersize) : 0;
-}
-
-int lara_system_proc_pidpath(int pid, void *buffer, uint32_t buffersize) {
-    typedef int (*proc_pidpath_fn)(int, void *, uint32_t);
-    static proc_pidpath_fn function;
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        function = (proc_pidpath_fn)dlsym(RTLD_DEFAULT, "proc_pidpath");
-    });
-    return function ? function(pid, buffer, buffersize) : 0;
-}
 
 #ifndef PROC_PIDPATHINFO_MAXSIZE
 #define PROC_PIDPATHINFO_MAXSIZE (4 * PATH_MAX)
@@ -282,7 +261,7 @@ static size_t procnamecandidates(char names[][64], size_t max_count) {
     size_t count = 0;
 
     char host_name[64] = {0};
-    if (lara_system_proc_name(getpid(), host_name, sizeof(host_name)) > 0 && host_name[0] != '\0') {
+    if (proc_name(getpid(), host_name, sizeof(host_name)) > 0 && host_name[0] != '\0') {
         snprintf(names[count], sizeof(names[count]), "%s", host_name);
         count++;
     }
@@ -328,142 +307,6 @@ static uint64_t checkprocforpid(uint64_t candidate, pid_t pid, const char *src, 
     }
 
     return 0;
-}
-
-static uint64_t procbysock(void) {
-    uint64_t rw_pcb = ds_get_rw_socket_pcb();
-    if (!is_kptr(rw_pcb)) {
-        utils_log_file("rw_socket_pcb invalid: 0x%llx", rw_pcb);
-        printf("(utils) rw_socket_pcb invalid: 0x%llx\n", rw_pcb);
-        return 0;
-    }
-
-    pid_t ourpid = getpid();
-    utils_log_file("socket fallback: pcb=0x%llx pid=%d", rw_pcb, ourpid);
-    printf("(utils) socket fallback: pcb=0x%llx pid=%d\n", rw_pcb, ourpid);
-
-    uint8_t pcbbuf[0x200];
-    utils_log_file("socket fallback: reading pcb buffer");
-    ds_kread(rw_pcb, pcbbuf, sizeof(pcbbuf));
-    utils_log_file("socket fallback: pcb buffer read");
-    for (uint32_t off = 0; off < sizeof(pcbbuf); off += 8) {
-        uint64_t candidate = S(*(uint64_t *)(pcbbuf + off));
-        uint64_t proc = checkprocforpid(candidate, ourpid, "pcb", off);
-        if (proc != 0) {
-            return proc;
-        }
-    }
-
-    uint64_t sock = 0;
-    for (uint32_t sock_offset = 0x10; sock_offset <= 0x50; sock_offset += 0x08) {
-        uint64_t candidate = S(ds_kread64(rw_pcb + sock_offset));
-        if (!is_kptr(candidate)) {
-            continue;
-        }
-
-        for (uint32_t backptr_offset = 0; backptr_offset <= 0x30; backptr_offset += 0x08) {
-            uint64_t backptr = S(ds_kread64(candidate + backptr_offset));
-            if (backptr == rw_pcb) {
-                sock = candidate;
-                printf("(utils) socket found via pcb+0x%x = 0x%llx (backptr at +0x%x)\n",
-                       sock_offset, sock, backptr_offset);
-                break;
-            }
-        }
-
-        if (sock != 0) {
-            break;
-        }
-    }
-
-    if (!sock) {
-        uint64_t candidate = S(ds_kread64(rw_pcb + 0x40));
-        if (is_kptr(candidate)) {
-            sock = candidate;
-            printf("(utils) socket via fixed pcb+0x40 = 0x%llx\n", sock);
-        }
-    }
-
-    if (!is_kptr(sock)) {
-        printf("(utils) socket scan found nothing (pcb=0x%llx sock=0x%llx)\n", rw_pcb, sock);
-        return 0;
-    }
-
-    uint8_t sockbuf[0x300];
-    ds_kread(sock, sockbuf, sizeof(sockbuf));
-    for (uint32_t off = 0; off < sizeof(sockbuf); off += 8) {
-        uint64_t candidate = S(*(uint64_t *)(sockbuf + off));
-        uint64_t proc = checkprocforpid(candidate, ourpid, "sock", off);
-        if (proc != 0) {
-            return proc;
-        }
-    }
-
-    for (uint32_t off = 0; off < sizeof(sockbuf); off += 8) {
-        uint64_t pointer = S(*(uint64_t *)(sockbuf + off));
-        if (!is_kptr(pointer)) {
-            continue;
-        }
-
-        uint8_t inner[0x100];
-        ds_kread(pointer, inner, sizeof(inner));
-        for (uint32_t inner_offset = 0; inner_offset < sizeof(inner); inner_offset += 8) {
-            uint64_t candidate = S(*(uint64_t *)(inner + inner_offset));
-            uint64_t proc = checkprocforpid(candidate, ourpid, "sock->ptr", off);
-            if (proc != 0) {
-                return proc;
-            }
-        }
-    }
-
-    printf("(utils) socket scan found nothing (pcb=0x%llx sock=0x%llx)\n", rw_pcb, sock);
-    return 0;
-}
-
-static uint64_t procbysock_hardcoded(void) {
-    uint64_t rw_pcb = ds_get_rw_socket_pcb();
-    if (!is_kptr(rw_pcb)) {
-        utils_log_file("socket hardcoded: invalid pcb=0x%llx", rw_pcb);
-        printf("(utils) rw_socket_pcb invalid: 0x%llx\n", rw_pcb);
-        return 0;
-    }
-
-    utils_log_file("socket hardcoded: pcb=0x%llx", rw_pcb);
-    uint64_t rwSocketAddr = ds_kread64(rw_pcb + off_inpcb_inp_socket);
-    if (!is_kptr(rwSocketAddr)) {
-        utils_log_file("socket hardcoded: invalid socket=0x%llx", rwSocketAddr);
-        printf("(utils) socket hardcoded: invalid socket=0x%llx\n", rwSocketAddr);
-        return 0;
-    }
-
-    utils_log_file("socket hardcoded: socket=0x%llx", rwSocketAddr);
-    uint64_t current_thread = ds_kread64(rwSocketAddr + off_socket_so_background_thread);
-    if (!is_kptr(current_thread)) {
-        utils_log_file("socket hardcoded: invalid thread=0x%llx", current_thread);
-        printf("(utils) socket hardcoded: invalid thread=0x%llx\n", current_thread);
-        return 0;
-    }
-
-    utils_log_file("socket hardcoded: thread=0x%llx", current_thread);
-    uint64_t current_thread_ro = thread_get_t_tro(current_thread);
-    if (!is_kptr(current_thread_ro)) {
-        utils_log_file("socket hardcoded: invalid thread_ro=0x%llx", current_thread_ro);
-        printf("(utils) socket hardcoded: invalid thread_ro=0x%llx\n", current_thread_ro);
-        return 0;
-    }
-
-    utils_log_file("socket hardcoded: thread_ro=0x%llx", current_thread_ro);
-    uint64_t proc = ds_kread64(current_thread_ro + off_thread_ro_tro_proc);
-    uint64_t checked_proc = checkprocforpid(proc, getpid(), "thread_ro", off_thread_ro_tro_proc);
-    if (!checked_proc) {
-        utils_log_file("socket hardcoded: proc candidate failed pid check raw=0x%llx", proc);
-        printf("(utils) socket hardcoded: proc candidate failed pid check raw=0x%llx\n", proc);
-        return 0;
-    }
-
-    utils_log_file("found self proc via socket hardcoded -> 0x%llx", checked_proc);
-    printf("(utils) found self proc via socket hardcoded -> 0x%llx\n", checked_proc);
-    return checked_proc;
 }
 
 uint64_t procbypid(pid_t targetpid) {
@@ -519,16 +362,17 @@ uint64_t procbypid(pid_t targetpid) {
 }
 
 uint64_t ourproc(void) {
-    uint64_t proc = procbysock_hardcoded();
-    if (proc != 0) {
-        return proc;
+    uint64_t proc = procbyname(Infern0);
+    if (islcruntime() || proc != NULL) {
+        if (proc != NULL) {
+            return proc;
+        } 
+        proc = procbyname(LiveContainer);
+        if (proc != NULL) {
+            return proc;
+        }
     }
-
-    proc = procbysock();
-    if (proc != 0) {
-        return proc;
-    }
-
+    
     if (islcruntime()) {
         printf("(utils) lc proc lookup failed\n");
         return 0;
@@ -583,8 +427,8 @@ uint64_t procbyname(const char *name) {
     for (size_t head_index = 0; head_index < 2; head_index++) {
         uint64_t proc = heads[head_index];
         for (int iter = 0; is_kptr(proc) && iter < 4096; iter++) {
-            StringWrapper procName = proc_get_p_name(proc);
-            if(strcmp(procName.data, name) == 0)
+            char *p_name = proc_get_p_name(proc).data;
+            if(strcmp(p_name, name) == 0)
                 return proc;
 
             uint64_t next = S(ds_kread64(proc + off_proc_p_list_le_next));
@@ -709,8 +553,7 @@ void hexdump(const void* data, size_t size) {
     
     for (i = 0; i < size; ++i) {
         if ((i % 16) == 0) {
-            printf("[0x%016llx+0x%03zx] ",
-                   (unsigned long long)(uintptr_t)data, i);
+            printf("[0x%016llx+0x%03zx] ", &data, i);
         }
 
         printf("%02X ", ((unsigned char*)data)[i]);

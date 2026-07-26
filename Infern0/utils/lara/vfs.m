@@ -7,7 +7,7 @@
 
 #import "xpf.h"
 #include "vfs.h"
-#include "darksword.h"
+#include "../ds_bridge.h"
 #include "utils.h"
 #include "offsets.h"
 
