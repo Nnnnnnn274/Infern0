@@ -17,10 +17,10 @@
 #import <sys/mman.h>
 #import <objc/runtime.h>
 
-#import "pac.h"
+#import "../TaskRop/pac.h"
 #import "rc.h"
-#import "RemoteCall.h"
-#import "PrivateAPI.h"
+#import "../TaskRop/RemoteCall.h"
+#import "../TaskRop/privateapi.h"
 
 int ptrace(int _request, pid_t _pid, caddr_t _addr, int _data);
 #define PT_DETACH       11
