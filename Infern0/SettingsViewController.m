@@ -8511,7 +8511,7 @@ static void settings_schedule_live_apply_for_key(NSString *key)
                 settings_notify_package_queue_changed_async();
             });
         } else if (![d boolForKey:kSettingsMacaronLiteEnabled]) {
-            BOOL hadApplied = settings_tweak_has_applied_state(kSettingsMacaronLiteEnabled);
+            BOOL hadApplied = settings_tweak_is_applied(kSettingsMacaronLiteEnabled);
             settings_mark_tweak_applied(kSettingsMacaronLiteEnabled, NO);
             settings_notify_package_queue_changed_async();
             if (hadApplied && g_springboard_rc_ready) {
@@ -10392,7 +10392,7 @@ static void settings_run_actions_internal(BOOL pendingOnly)
                             runCompletionMessage = @"Macaron Lite could not safely locate the Dock background.";
                         }
                     } else if (!macaronLiteEnabled &&
-                               settings_tweak_has_applied_state(kSettingsMacaronLiteEnabled)) {
+                               settings_tweak_is_applied(kSettingsMacaronLiteEnabled)) {
                         macaronlite_stop_in_session();
                         settings_mark_tweak_applied(kSettingsMacaronLiteEnabled, NO);
                     }
