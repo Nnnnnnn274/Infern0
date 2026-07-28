@@ -97,6 +97,7 @@ extern NSString * const kSettingsFakeClockUpEnabled;
 extern NSString * const kSettingsFakeClockUpSpeed;
 extern NSString * const kSettingsPancakeEnabled;
 extern NSString * const kSettingsCylinderLiteEnabled;
+extern NSString * const kSettingsMacaronLiteEnabled;
 extern NSString * const kSettingsBarmojiEnabled;
 extern NSString * const kSettingsRoundedIconsEnabled;
 extern NSString * const kSettingsWatchLayoutEnabled;
@@ -136,6 +137,16 @@ extern NSString * const kSettingsSnowBoardLiteSelectedThemeID;
 
 extern NSString * const kSettingsLiveWPEnabled;
 extern NSString * const kSettingsLiveWPVideoPath;
+extern NSString * const kSettingsMetalLockLightEnabled;
+extern NSString * const kSettingsMetalLockLightColorPct;
+extern NSString * const kSettingsMetalLockLightReflectPct;
+extern NSString * const kSettingsMetalLockLightMode;
+extern NSString * const kSettingsMoodWallpaperEnabled;
+extern NSString * const kSettingsMoodWallpaperImagePaths;
+extern NSString * const kSettingsMoodWallpaperMainIndex;
+extern NSString * const kSettingsMoodWallpaperLeftPath;
+extern NSString * const kSettingsMoodWallpaperRightPath;
+extern NSString * const kSettingsMoodWallpaperLogOnly;
 
 extern NSString * const kSettingsQuickLoaderEnabled;
 

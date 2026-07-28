@@ -1057,9 +1057,18 @@ static NSString * const kSettingsPancakeMinTouches = @"PancakeMinTouches";
 static NSString * const kSettingsPancakeMaxTouches = @"PancakeMaxTouches";
 static NSString * const kSettingsPancakeCancelsTouches = @"PancakeCancelsTouches";
 NSString * const kSettingsCylinderLiteEnabled = @"CylinderLiteEnabled";
-static NSString * const kSettingsCylinderLiteDepth = @"CylinderLiteDepth";
-static NSString * const kSettingsCylinderLitePerspective = @"CylinderLitePerspective";
-static NSString * const kSettingsCylinderLiteMaxIcons = @"CylinderLiteMaxIcons";
+static NSString * const kSettingsCylinderLiteEffect = @"CylinderLiteEffect";
+static NSString * const kSettingsCylinderLiteIntensityPct = @"CylinderLiteIntensityPct";
+static NSString * const kSettingsCylinderLiteOpacityPct = @"CylinderLiteOpacityPct";
+static NSString * const kSettingsCylinderLiteFollowGesture = @"CylinderLiteFollowGesture";
+static NSString * const kSettingsCylinderLiteOneShotDurationMs = @"CylinderLiteOneShotDurationMs";
+NSString * const kSettingsMacaronLiteEnabled = @"MacaronLiteEnabled";
+static NSString * const kSettingsMacaronLiteMode = @"MacaronLiteMode";
+static NSString * const kSettingsMacaronLitePrimaryHex = @"MacaronLitePrimaryHex";
+static NSString * const kSettingsMacaronLiteSecondaryHex = @"MacaronLiteSecondaryHex";
+static NSString * const kSettingsMacaronLiteOpacityPct = @"MacaronLiteOpacityPct";
+static NSString * const kSettingsMacaronLiteKeepBlur = @"MacaronLiteKeepBlur";
+static NSString * const kSettingsMacaronLitePhotoPath = @"MacaronLitePhotoPath";
 NSString * const kSettingsBarmojiEnabled = @"BarmojiEnabled";
 static NSString * const kSettingsBarmojiYOffset = @"BarmojiYOffset";
 static NSString * const kSettingsBarmojiWidthPct = @"BarmojiWidthPct";
@@ -1175,6 +1184,16 @@ NSString * const kSettingsSnowBoardLiteSelectedThemeID = @"SnowBoardLiteSelected
 
 NSString * const kSettingsLiveWPEnabled = @"LiveWPEnabled";
 NSString * const kSettingsLiveWPVideoPath = @"LiveWPVideoPath";
+NSString * const kSettingsMetalLockLightEnabled = @"MetalLockLightEnabled";
+NSString * const kSettingsMetalLockLightColorPct = @"MetalLockLightColorPct";
+NSString * const kSettingsMetalLockLightReflectPct = @"MetalLockLightReflectPct";
+NSString * const kSettingsMetalLockLightMode = @"MetalLockLightMode";
+NSString * const kSettingsMoodWallpaperEnabled = @"MoodWallpaperEnabled";
+NSString * const kSettingsMoodWallpaperImagePaths = @"MoodWallpaperImagePaths";
+NSString * const kSettingsMoodWallpaperMainIndex = @"MoodWallpaperMainIndex";
+NSString * const kSettingsMoodWallpaperLeftPath = @"MoodWallpaperLeftPath";
+NSString * const kSettingsMoodWallpaperRightPath = @"MoodWallpaperRightPath";
+NSString * const kSettingsMoodWallpaperLogOnly = @"MoodWallpaperLogOnly";
 static NSString * const kSettingsLiveWPMoodMode = @"LiveWPMoodMode";
 static NSString * const kSettingsLiveWPMoodImagePaths = @"LiveWPMoodImagePaths";
 static NSString * const kSettingsLiveWPMoodDuration = @"LiveWPMoodDuration";
@@ -1648,6 +1667,15 @@ static bool settings_stop_cylinderlite_registered(BOOL springboardWillDie)
     return cylinderlite_stop_in_session();
 }
 
+static bool settings_stop_macaronlite_registered(BOOL springboardWillDie)
+{
+    if (springboardWillDie) {
+        macaronlite_forget_remote_state();
+        return true;
+    }
+    return macaronlite_stop_in_session();
+}
+
 static bool settings_stop_barmoji_registered(BOOL springboardWillDie)
 {
     (void)springboardWillDie;
@@ -1806,6 +1834,7 @@ static void settings_each_springboard_cleanup_entry(void (^block)(const Settings
         { kSettingsFakeClockUpEnabled, "FakeClockUp", NULL, settings_stop_fakeclockup_registered, fakeclockup_forget_remote_state, NULL, YES, YES },
         { kSettingsPancakeEnabled, "Pancake", NULL, settings_stop_pancake_registered, pancake_forget_remote_state, NULL, YES, YES },
         { kSettingsCylinderLiteEnabled, "Cylinder Lite", NULL, settings_stop_cylinderlite_registered, cylinderlite_forget_remote_state, NULL, YES, YES },
+        { kSettingsMacaronLiteEnabled, "Macaron Lite", NULL, settings_stop_macaronlite_registered, macaronlite_forget_remote_state, NULL, YES, YES },
         { kSettingsBarmojiEnabled, "Clipboard Bar Lite", NULL, settings_stop_barmoji_registered, barmoji_forget_remote_state, NULL, YES, YES },
         { kSettingsRoundedIconsEnabled, "Rounded Icons", NULL, settings_stop_roundedicons_registered, roundedicons_forget_remote_state, NULL, YES, YES },
         { kSettingsWatchLayoutEnabled, "Watch Layout", NULL, settings_stop_watchlayout_registered, watchlayout_forget_remote_state, NULL, YES, YES },
@@ -6124,7 +6153,7 @@ static BOOL settings_visual_refresh_tick(NSUserDefaults *d, BOOL advanceHeavySca
         settings_visual_refresh_mark_if_ready(kSettingsHapticCCEnabled, hapticcc_apply_in_session());
     if ([d boolForKey:kSettingsCylinderLiteEnabled])
         settings_visual_refresh_mark_if_ready(kSettingsCylinderLiteEnabled,
-                                              cylinderlite_refresh_in_session(false));
+                                              cylinderlite_tick_in_session());
     return attempted;
 }
 
@@ -6744,9 +6773,11 @@ static BOOL settings_key_is_pancake(NSString *key)
 static BOOL settings_key_is_cylinderlite(NSString *key)
 {
     return [key isEqualToString:kSettingsCylinderLiteEnabled] ||
-           [key isEqualToString:kSettingsCylinderLiteDepth] ||
-           [key isEqualToString:kSettingsCylinderLitePerspective] ||
-           [key isEqualToString:kSettingsCylinderLiteMaxIcons];
+           [key isEqualToString:kSettingsCylinderLiteEffect] ||
+           [key isEqualToString:kSettingsCylinderLiteIntensityPct] ||
+           [key isEqualToString:kSettingsCylinderLiteOpacityPct] ||
+           [key isEqualToString:kSettingsCylinderLiteFollowGesture] ||
+           [key isEqualToString:kSettingsCylinderLiteOneShotDurationMs];
 }
 
 static void settings_configure_pancake(NSUserDefaults *d)
@@ -6756,11 +6787,78 @@ static void settings_configure_pancake(NSUserDefaults *d)
                       [d boolForKey:kSettingsPancakeCancelsTouches]);
 }
 
-static void settings_configure_cylinderlite(NSUserDefaults *d)
+static CylinderLiteEffect settings_cylinderlite_effect_from_defaults(NSUserDefaults *d)
 {
-    cylinderlite_configure((int)[d integerForKey:kSettingsCylinderLiteDepth],
-                           (int)[d integerForKey:kSettingsCylinderLitePerspective],
-                           (int)[d integerForKey:kSettingsCylinderLiteMaxIcons]);
+    NSInteger raw = [d integerForKey:kSettingsCylinderLiteEffect];
+    if (raw == 0 || raw < CylinderLiteEffectSlide || raw > CylinderLiteEffectLast) {
+        return CylinderLiteEffectZoomFadeOut;
+    }
+    switch ((CylinderLiteEffect)raw) {
+        case CylinderLiteEffectBackwards:
+        case CylinderLiteEffectHellaFar:
+        case CylinderLiteEffectCubeInside:
+        case CylinderLiteEffectCubeOutside:
+        case CylinderLiteEffectTurn:
+            return CylinderLiteEffectZoomFadeOut;
+        default:
+            break;
+    }
+    return (CylinderLiteEffect)raw;
+}
+
+static bool settings_apply_cylinderlite_from_defaults_locked(NSUserDefaults *d)
+{
+    if (![d boolForKey:kSettingsCylinderLiteEnabled]) return false;
+    return cylinderlite_apply_in_session_with_options(settings_cylinderlite_effect_from_defaults(d),
+                                                      (int)[d integerForKey:kSettingsCylinderLiteIntensityPct],
+                                                      (int)[d integerForKey:kSettingsCylinderLiteOpacityPct],
+                                                      false,
+                                                      (int)[d integerForKey:kSettingsCylinderLiteOneShotDurationMs]);
+}
+
+static NSString *settings_cylinderlite_effect_name(NSInteger raw)
+{
+    switch ((CylinderLiteEffect)raw) {
+        case CylinderLiteEffectSlide: return @"Fade Out";
+        case CylinderLiteEffectFlip: return @"Horizontal Squeeze";
+        case CylinderLiteEffectPageSpin: return @"Page Spin";
+        case CylinderLiteEffectPageFlip: return @"Page Flip";
+        case CylinderLiteEffectPageTwist: return @"Page Twist";
+        case CylinderLiteEffectVerticalScroll: return @"Vertical Scroll";
+        case CylinderLiteEffectBackwards: return @"Backwards";
+        case CylinderLiteEffectHellaFar: return @"Hella Far";
+        case CylinderLiteEffectCubeInside: return @"Cube Inside";
+        case CylinderLiteEffectCubeOutside: return @"Cube Outside";
+        case CylinderLiteEffectCardHorizontal: return @"Card Horizontal";
+        case CylinderLiteEffectCardVertical: return @"Card Vertical";
+        case CylinderLiteEffectWheel: return @"Wheel";
+        case CylinderLiteEffectHinge: return @"Hinge";
+        case CylinderLiteEffectTurn: return @"Turn";
+        case CylinderLiteEffectZoomFadeOut: return @"Zoom Fade Out";
+        case CylinderLiteEffectZoomFadeIn: return @"Zoom Fade In";
+        default: return @"Zoom Fade Out";
+    }
+}
+
+static NSArray<NSNumber *> *settings_cylinderlite_effect_values(void)
+{
+    return @[
+        @(CylinderLiteEffectSlide), @(CylinderLiteEffectFlip),
+        @(CylinderLiteEffectPageSpin), @(CylinderLiteEffectPageFlip),
+        @(CylinderLiteEffectPageTwist), @(CylinderLiteEffectVerticalScroll),
+        @(CylinderLiteEffectCardHorizontal), @(CylinderLiteEffectCardVertical),
+        @(CylinderLiteEffectWheel), @(CylinderLiteEffectHinge),
+        @(CylinderLiteEffectZoomFadeOut), @(CylinderLiteEffectZoomFadeIn)
+    ];
+}
+
+static NSArray<NSString *> *settings_cylinderlite_effect_titles(void)
+{
+    NSMutableArray<NSString *> *titles = [NSMutableArray array];
+    for (NSNumber *value in settings_cylinderlite_effect_values()) {
+        [titles addObject:settings_cylinderlite_effect_name(value.integerValue)];
+    }
+    return titles;
 }
 
 static void settings_log_pancake_config(NSUserDefaults *d, const char *prefix)
@@ -6774,11 +6872,68 @@ static void settings_log_pancake_config(NSUserDefaults *d, const char *prefix)
 
 static void settings_log_cylinderlite_config(NSUserDefaults *d, const char *prefix)
 {
-    log_user("[%s] Cylinder Lite config: engine=scalar-page-layer anchorGeometry=1 refresh=250ms depth=%ld curveDistance=%ld pageCap=%ld remoteReads=0 iconMutations=0 taps=preserved.\n",
+    log_user("[%s] Cylinder Lite config: source=hxhlb/cyanide effect=%s strength=%ld%% opacity=%ld%% followGesture=%d duration=%ldms.\n",
              prefix ?: "CFG",
-             (long)[d integerForKey:kSettingsCylinderLiteDepth],
-             (long)[d integerForKey:kSettingsCylinderLitePerspective],
-             MIN(16L, MAX(3L, (long)[d integerForKey:kSettingsCylinderLiteMaxIcons] / 32L)));
+             settings_cylinderlite_effect_name(settings_cylinderlite_effect_from_defaults(d)).UTF8String,
+             (long)[d integerForKey:kSettingsCylinderLiteIntensityPct],
+             (long)[d integerForKey:kSettingsCylinderLiteOpacityPct],
+             0,
+             (long)[d integerForKey:kSettingsCylinderLiteOneShotDurationMs]);
+}
+
+static BOOL settings_key_is_macaronlite(NSString *key)
+{
+    return [key isEqualToString:kSettingsMacaronLiteEnabled] ||
+           [key isEqualToString:kSettingsMacaronLiteMode] ||
+           [key isEqualToString:kSettingsMacaronLitePrimaryHex] ||
+           [key isEqualToString:kSettingsMacaronLiteSecondaryHex] ||
+           [key isEqualToString:kSettingsMacaronLiteOpacityPct] ||
+           [key isEqualToString:kSettingsMacaronLiteKeepBlur] ||
+           [key isEqualToString:kSettingsMacaronLitePhotoPath];
+}
+
+static NSString *settings_macaronlite_mode_name(NSInteger mode)
+{
+    switch ((MacaronLiteMode)mode) {
+        case MacaronLiteModeSolid: return @"Solid Color";
+        case MacaronLiteModeGradient: return @"Gradient";
+        case MacaronLiteModePhoto: return @"Photo";
+        case MacaronLiteModeTransparent: return @"Transparent";
+        default: return @"Solid Color";
+    }
+}
+
+static NSString *settings_macaronlite_absolute_photo_path(NSUserDefaults *d)
+{
+    NSString *stored = [d stringForKey:kSettingsMacaronLitePhotoPath];
+    if (stored.length == 0) return nil;
+    if ([stored hasPrefix:@"/"]) return stored;
+    NSString *docs = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory,
+                                                          NSUserDomainMask, YES).firstObject;
+    return docs.length ? [docs stringByAppendingPathComponent:stored] : nil;
+}
+
+static void settings_configure_macaronlite(NSUserDefaults *d)
+{
+    NSString *photo = settings_macaronlite_absolute_photo_path(d);
+    macaronlite_configure((MacaronLiteMode)[d integerForKey:kSettingsMacaronLiteMode],
+                          (int)[d integerForKey:kSettingsMacaronLiteOpacityPct],
+                          [d boolForKey:kSettingsMacaronLiteKeepBlur],
+                          ([d stringForKey:kSettingsMacaronLitePrimaryHex] ?: @"#6E5AE6").UTF8String,
+                          ([d stringForKey:kSettingsMacaronLiteSecondaryHex] ?: @"#34C8FF").UTF8String,
+                          photo.UTF8String);
+}
+
+static bool settings_apply_macaronlite_from_defaults_locked(NSUserDefaults *d)
+{
+    if (![d boolForKey:kSettingsMacaronLiteEnabled]) return false;
+    settings_configure_macaronlite(d);
+    log_user("[MACARON][SETTINGS] Applying mode=%s opacity=%ld%% blur=%d photo=%s.\n",
+             settings_macaronlite_mode_name([d integerForKey:kSettingsMacaronLiteMode]).UTF8String,
+             (long)[d integerForKey:kSettingsMacaronLiteOpacityPct],
+             [d boolForKey:kSettingsMacaronLiteKeepBlur],
+             settings_macaronlite_absolute_photo_path(d).length ? "selected" : "none");
+    return macaronlite_apply_in_session();
 }
 
 static void settings_configure_control_center_tweaks(NSUserDefaults *d)
@@ -8319,9 +8474,8 @@ static void settings_schedule_live_apply_for_key(NSString *key)
                 dispatch_async(dispatch_get_global_queue(0, 0), ^{
                     @synchronized (settings_rc_lock()) {
                         if (settings_cleanup_in_progress() || ![d boolForKey:kSettingsCylinderLiteEnabled] || !g_springboard_rc_ready) return;
-                        settings_configure_cylinderlite(d);
                         settings_log_cylinderlite_config(d, "LIVE");
-                        bool ok = cylinderlite_apply_in_session();
+                        bool ok = settings_apply_cylinderlite_from_defaults_locked(d);
                         settings_mark_tweak_applied(kSettingsCylinderLiteEnabled, ok && [d boolForKey:kSettingsCylinderLiteEnabled]);
                         printf("[SETTINGS] live Cylinder Lite apply result=%d\n", ok);
                     }
@@ -8337,6 +8491,38 @@ static void settings_schedule_live_apply_for_key(NSString *key)
                         }
                     });
                 }
+        }
+        return;
+    }
+
+    if (settings_key_is_macaronlite(key)) {
+        if ([d boolForKey:kSettingsMacaronLiteEnabled] && g_springboard_rc_ready) {
+            dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+                bool ok = false;
+                @synchronized (settings_rc_lock()) {
+                    if (settings_cleanup_in_progress() ||
+                        ![d boolForKey:kSettingsMacaronLiteEnabled] ||
+                        !g_springboard_rc_ready) return;
+                    ok = settings_apply_macaronlite_from_defaults_locked(d);
+                    settings_mark_tweak_applied(kSettingsMacaronLiteEnabled,
+                                                ok && [d boolForKey:kSettingsMacaronLiteEnabled]);
+                    printf("[SETTINGS] live Macaron Lite apply result=%d\n", ok);
+                }
+                settings_notify_package_queue_changed_async();
+            });
+        } else if (![d boolForKey:kSettingsMacaronLiteEnabled]) {
+            BOOL hadApplied = settings_tweak_has_applied_state(kSettingsMacaronLiteEnabled);
+            settings_mark_tweak_applied(kSettingsMacaronLiteEnabled, NO);
+            settings_notify_package_queue_changed_async();
+            if (hadApplied && g_springboard_rc_ready) {
+                dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+                    @synchronized (settings_rc_lock()) {
+                        if (g_springboard_rc_ready) macaronlite_stop_in_session();
+                    }
+                });
+            } else if (hadApplied) {
+                macaronlite_forget_remote_state();
+            }
         }
         return;
     }
@@ -9069,9 +9255,18 @@ void settings_register_defaults(void)
         kSettingsPancakeMaxTouches: @1,
         kSettingsPancakeCancelsTouches: @NO,
         kSettingsCylinderLiteEnabled: @NO,
-        kSettingsCylinderLiteDepth: @-10,
-        kSettingsCylinderLitePerspective: @650,
-        kSettingsCylinderLiteMaxIcons: @512,
+        kSettingsCylinderLiteEffect: @(CylinderLiteEffectZoomFadeOut),
+        kSettingsCylinderLiteIntensityPct: @90,
+        kSettingsCylinderLiteOpacityPct: @35,
+        kSettingsCylinderLiteFollowGesture: @NO,
+        kSettingsCylinderLiteOneShotDurationMs: @520,
+        kSettingsMacaronLiteEnabled: @NO,
+        kSettingsMacaronLiteMode: @(MacaronLiteModeSolid),
+        kSettingsMacaronLitePrimaryHex: @"#6E5AE6",
+        kSettingsMacaronLiteSecondaryHex: @"#34C8FF",
+        kSettingsMacaronLiteOpacityPct: @82,
+        kSettingsMacaronLiteKeepBlur: @YES,
+        kSettingsMacaronLitePhotoPath: @"",
         kSettingsBarmojiEnabled: @NO,
         kSettingsBarmojiYOffset: @92,
         kSettingsBarmojiWidthPct: @92,
@@ -9238,6 +9433,7 @@ void settings_register_defaults(void)
             kSettingsFakeClockUpEnabled,
             kSettingsPancakeEnabled,
             kSettingsCylinderLiteEnabled,
+            kSettingsMacaronLiteEnabled,
             kSettingsBarmojiEnabled,
             kSettingsRoundedIconsEnabled,
             kSettingsWatchLayoutEnabled,
@@ -9317,6 +9513,7 @@ static void settings_log_tweak_plan_details(NSUserDefaults *d, BOOL pendingOnly)
         { kSettingsFakeClockUpEnabled, "Animation Speed Lite", "changes active SpringBoard window-layer animation speed within a safe range" },
         { kSettingsPancakeEnabled, "Pancake Lite", "configures SpringBoard's current native interactive edge-back gesture" },
         { kSettingsCylinderLiteEnabled, "Cylinder Lite", "animates loaded home-screen pages through a live cylindrical swipe transform" },
+        { kSettingsMacaronLiteEnabled, "Macaron Lite", "styles only the existing Dock background with a reversible color, gradient, photo, or transparent pattern" },
         { kSettingsBarmojiEnabled, "Clipboard Bar Lite", "adds pressable emoji and clipboard buttons to SpringBoard; it is not injected into app keyboard processes" },
         { kSettingsRoundedIconsEnabled, "Rounded Icons", "applies a continuous corner mask to every discovered Home Screen icon" },
         { kSettingsWatchLayoutEnabled, "Watch Layout", "builds one scrolling Apple Watch-style honeycomb of pressable circular app icons" },
@@ -9408,6 +9605,7 @@ static void settings_run_actions_internal(BOOL pendingOnly)
             BOOL fakeClockUpEnabled = [d boolForKey:kSettingsFakeClockUpEnabled];
             BOOL pancakeEnabled = [d boolForKey:kSettingsPancakeEnabled];
             BOOL cylinderLiteEnabled = [d boolForKey:kSettingsCylinderLiteEnabled];
+            BOOL macaronLiteEnabled = [d boolForKey:kSettingsMacaronLiteEnabled];
             BOOL tweakLoaderEnabled = [d boolForKey:kSettingsTweakLoaderEnabled];
             BOOL appSwitcherGridEnabled = [d boolForKey:kSettingsAppSwitcherGridEnabled];
             BOOL themerEnabled = [d boolForKey:kSettingsThemerEnabled];
@@ -9446,6 +9644,7 @@ static void settings_run_actions_internal(BOOL pendingOnly)
             BOOL runFakeClockUp = settings_fakeclockup_install_allowed() && settings_enabled_tweak_should_run(d, kSettingsFakeClockUpEnabled, springBoardPendingOnly);
             BOOL runPancake = settings_pancake_install_allowed() && settings_enabled_tweak_should_run(d, kSettingsPancakeEnabled, springBoardPendingOnly);
             BOOL runCylinderLite = settings_cylinderlite_install_allowed() && settings_enabled_tweak_should_run(d, kSettingsCylinderLiteEnabled, springBoardPendingOnly);
+            BOOL runMacaronLite = settings_enabled_tweak_should_run(d, kSettingsMacaronLiteEnabled, springBoardPendingOnly);
             BOOL runBarmoji = settings_barmoji_install_allowed() && settings_enabled_tweak_should_run(d, kSettingsBarmojiEnabled, springBoardPendingOnly);
             BOOL runRoundedIcons = settings_enabled_tweak_should_run(d, kSettingsRoundedIconsEnabled, springBoardPendingOnly);
             BOOL runWatchLayout = settings_enabled_tweak_should_run(d, kSettingsWatchLayoutEnabled, springBoardPendingOnly);
@@ -9483,7 +9682,7 @@ static void settings_run_actions_internal(BOOL pendingOnly)
                 settings_note_themer_stage_conflict(YES);
             }
             BOOL cleanupDisabledSpringBoardTweaks = settings_disabled_applied_springboard_cleanup_needed(d);
-            BOOL needsSpringBoardWork = runSBC || runDarkTweaks || runStatBar || runNSBar || runNiceBarLite || runRSSI || runAxonLite || runGravityLite || runLayoutExtras || runTypeBanner || runNotificationIsland || runVelvet || runCleanNC || runUnderTime || runZeppelinLite || runCleanHomeScreen || runRealCC || runCleanCC || runFUGap || runModuleSpacing || runSugarCane || runBetterCCXI || runMagma || runBetterCCIcons || runCCNoPlatterDim || runCCStatus || runHapticCC || runSecureCC || runHideLabels || runFakeClockUp || runPancake || runCylinderLite || runBarmoji || runRoundedIcons || runWatchLayout || runAppLibraryStudio || runLockCustomizer || runLockScreenOverlay || runFreePlacement || runBlurryBadges || runSnapper || runPullOver || runAlkaline || runTweakLoader || runAppSwitcherGrid || runThemer || runSnowBoardLite || runLiveWP || runStageStrip || runFastLockXLite || runQuickLoader || runRepoTweaks || runMagsafe || runUpsideDown || cleanupDisabledSpringBoardTweaks;
+            BOOL needsSpringBoardWork = runSBC || runDarkTweaks || runStatBar || runNSBar || runNiceBarLite || runRSSI || runAxonLite || runGravityLite || runLayoutExtras || runTypeBanner || runNotificationIsland || runVelvet || runCleanNC || runUnderTime || runZeppelinLite || runCleanHomeScreen || runRealCC || runCleanCC || runFUGap || runModuleSpacing || runSugarCane || runBetterCCXI || runMagma || runBetterCCIcons || runCCNoPlatterDim || runCCStatus || runHapticCC || runSecureCC || runHideLabels || runFakeClockUp || runPancake || runCylinderLite || runMacaronLite || runBarmoji || runRoundedIcons || runWatchLayout || runAppLibraryStudio || runLockCustomizer || runLockScreenOverlay || runFreePlacement || runBlurryBadges || runSnapper || runPullOver || runAlkaline || runTweakLoader || runAppSwitcherGrid || runThemer || runSnowBoardLite || runLiveWP || runStageStrip || runFastLockXLite || runQuickLoader || runRepoTweaks || runMagsafe || runUpsideDown || cleanupDisabledSpringBoardTweaks;
             BOOL runSandboxEscape = [d boolForKey:kSettingsRunSandboxEscape] && (!pendingOnly || needsSpringBoardWork);
             // TypeBanner prewarms its hidden SpringBoard window during Apply
             // and reuses the open SpringBoard session for text-only updates.
@@ -9536,6 +9735,7 @@ static void settings_run_actions_internal(BOOL pendingOnly)
             if (runFakeClockUp) total++;
             if (runPancake) total++;
             if (runCylinderLite) total++;
+            if (runMacaronLite) total++;
             if (runBarmoji) total++;
             if (runRoundedIcons) total++;
             if (runWatchLayout) total++;
@@ -9569,6 +9769,7 @@ static void settings_run_actions_internal(BOOL pendingOnly)
             if (runRSSI) [enabledTweaks addObject:@"rssi"];
             if (runAxonLite) [enabledTweaks addObject:@"axon"];
             if (runNotificationIsland) [enabledTweaks addObject:@"notification-island"];
+            if (runMacaronLite) [enabledTweaks addObject:@"macaron-lite"];
             if (runVelvet) [enabledTweaks addObject:@"velvet"];
             if (runCleanNC) [enabledTweaks addObject:@"cleannc"];
             if (runUnderTime) [enabledTweaks addObject:@"undertime"];
@@ -10168,13 +10369,32 @@ static void settings_run_actions_internal(BOOL pendingOnly)
 
                     if (runCylinderLite) {
                         settings_progress(&step, total, "Applying Cylinder Lite");
-                        settings_configure_cylinderlite(d);
                         settings_log_cylinderlite_config(d, "RUN");
-                        bool ok = cylinderlite_apply_in_session();
+                        bool ok = settings_apply_cylinderlite_from_defaults_locked(d);
                         settings_mark_tweak_applied(kSettingsCylinderLiteEnabled, ok && [d boolForKey:kSettingsCylinderLiteEnabled]);
                         printf("[SETTINGS] Cylinder Lite result=%d\n", ok);
                         log_user("%s Cylinder Lite %s.\n", ok ? "[OK]" : "[WARN]", ok ? "active" : "did not start cleanly");
                         cyanide_upload_log_milestone(ok ? @"cylinderlite-applied" : @"cylinderlite-failed");
+                    }
+
+                    if (runMacaronLite) {
+                        settings_progress(&step, total, "Styling the Dock with Macaron Lite");
+                        bool ok = settings_apply_macaronlite_from_defaults_locked(d);
+                        settings_mark_tweak_applied(kSettingsMacaronLiteEnabled,
+                                                    ok && [d boolForKey:kSettingsMacaronLiteEnabled]);
+                        printf("[SETTINGS] Macaron Lite result=%d\n", ok);
+                        log_user("%s Macaron Lite %s.\n",
+                                 ok ? "[OK]" : "[WARN]",
+                                 ok ? "styled the Dock" : "did not find a safe Dock background");
+                        cyanide_upload_log_milestone(ok ? @"macaronlite-applied" : @"macaronlite-failed");
+                        if (!ok) {
+                            runHadBlockingFailure = YES;
+                            runCompletionMessage = @"Macaron Lite could not safely locate the Dock background.";
+                        }
+                    } else if (!macaronLiteEnabled &&
+                               settings_tweak_has_applied_state(kSettingsMacaronLiteEnabled)) {
+                        macaronlite_stop_in_session();
+                        settings_mark_tweak_applied(kSettingsMacaronLiteEnabled, NO);
                     }
 
                     if (runBarmoji) {
@@ -10591,6 +10811,7 @@ typedef NS_ENUM(NSInteger, SettingsSection) {
     SectionLockScreenOverlay,
     SectionMagsafe,
     SectionUpsideDown,
+    SectionMacaronLite,
     SectionCount,
 };
 
@@ -11996,14 +12217,63 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
 
 - (NSArray<NSDictionary *> *)cylinderliteRows
 {
+    NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
+    NSString *effect = settings_cylinderlite_effect_name(settings_cylinderlite_effect_from_defaults(d));
     return @[
         @{ @"kind": @"toggle", @"key": kSettingsCylinderLiteEnabled, @"title": @"Enable Cylinder Lite" },
-        @{ @"kind": @"info", @"title": @"Safer page animation", @"subtitle": @"Cylinder snapshots loaded pages once when Run starts, transforms each page as one layer, and reads only one anchor page per refresh. It never scans or mutates individual icon objects." },
-        @{ @"kind": @"slider", @"key": kSettingsCylinderLiteDepth, @"title": @"Page depth", @"min": @-80, @"max": @0, @"step": @1, @"default": @-10, @"unit": @"z" },
-        @{ @"kind": @"slider", @"key": kSettingsCylinderLitePerspective, @"title": @"Curve distance", @"min": @250, @"max": @1600, @"step": @25, @"default": @650 },
-        @{ @"kind": @"info", @"title": @"VM safety", @"subtitle": @"Automatic view-tree rediscovery is disabled. Two transport failures open a circuit breaker and stop further remote calls. Run again to rebuild the snapshot; Dock and App Library stay untouched." },
+        @{ @"kind": @"info", @"title": @"Original hxhlb engine", @"subtitle": @"This is the full Cylinder Lite implementation from hxhlb/cyanide, kept unchanged and compiled from its original tweaks location." },
+        @{ @"kind": @"button", @"title": [NSString stringWithFormat:@"Effect: %@", effect], @"action": @"cylinderlite-effect" },
+        @{ @"kind": @"slider", @"key": kSettingsCylinderLiteIntensityPct, @"title": @"Animation strength", @"min": @70, @"max": @100, @"step": @5, @"unit": @"%", @"default": @90 },
+        @{ @"kind": @"slider", @"key": kSettingsCylinderLiteOpacityPct, @"title": @"Minimum opacity", @"min": @10, @"max": @100, @"step": @5, @"unit": @"%", @"default": @35 },
+        @{ @"kind": @"slider", @"key": kSettingsCylinderLiteOneShotDurationMs, @"title": @"Animation duration", @"min": @250, @"max": @800, @"step": @50, @"unit": @"ms", @"default": @520 },
         @{ @"kind": @"button", @"title": @"View Detailed Activity Log", @"action": @"view-log" },
     ];
+}
+
+- (NSArray<NSDictionary *> *)macaronLiteRows
+{
+    NSUserDefaults *d = NSUserDefaults.standardUserDefaults;
+    NSInteger mode = [d integerForKey:kSettingsMacaronLiteMode];
+    NSMutableArray<NSDictionary *> *rows = [@[
+        @{ @"kind": @"toggle", @"key": kSettingsMacaronLiteEnabled, @"title": @"Enable Macaron Lite" },
+        @{ @"kind": @"button",
+           @"title": [NSString stringWithFormat:@"Style: %@", settings_macaronlite_mode_name(mode)],
+           @"action": @"macaron-mode" },
+    ] mutableCopy];
+    if (mode == MacaronLiteModeSolid || mode == MacaronLiteModeGradient) {
+        [rows addObject:@{ @"kind": @"button",
+                           @"title": [NSString stringWithFormat:@"Primary Color: %@", [d stringForKey:kSettingsMacaronLitePrimaryHex] ?: @"#6E5AE6"],
+                           @"action": @"macaron-primary" }];
+    }
+    if (mode == MacaronLiteModeGradient) {
+        [rows addObject:@{ @"kind": @"button",
+                           @"title": [NSString stringWithFormat:@"Secondary Color: %@", [d stringForKey:kSettingsMacaronLiteSecondaryHex] ?: @"#34C8FF"],
+                           @"action": @"macaron-secondary" }];
+    }
+    if (mode == MacaronLiteModePhoto) {
+        NSString *photo = [d stringForKey:kSettingsMacaronLitePhotoPath];
+        [rows addObject:@{ @"kind": @"button",
+                           @"title": photo.length ? @"Change Dock Photo..." : @"Choose Dock Photo...",
+                           @"subtitle": photo.length ? photo.lastPathComponent : @"Select one image from Photos.",
+                           @"action": @"macaron-photo" }];
+        if (photo.length) {
+            [rows addObject:@{ @"kind": @"button", @"title": @"Remove Dock Photo",
+                               @"action": @"macaron-photo-clear", @"destructive": @YES }];
+        }
+    }
+    if (mode != MacaronLiteModeTransparent) {
+        [rows addObject:@{ @"kind": @"slider", @"key": kSettingsMacaronLiteOpacityPct,
+                           @"title": @"Background opacity", @"min": @10, @"max": @100,
+                           @"step": @5, @"unit": @"%", @"default": @82 }];
+        [rows addObject:@{ @"kind": @"toggle", @"key": kSettingsMacaronLiteKeepBlur,
+                           @"title": @"Keep stock Dock blur" }];
+    }
+    [rows addObjectsFromArray:@[
+        @{ @"kind": @"info", @"title": @"Stable Dock-only styling",
+           @"subtitle": @"Changes only existing Dock background/material views. App icons, touches, page layouts, and system files are untouched. Clean Up restores every captured color and blur visibility value." },
+        @{ @"kind": @"button", @"title": @"View Detailed Activity Log", @"action": @"view-log" },
+    ]];
+    return rows;
 }
 
 - (NSArray<NSDictionary *> *)barmojiRows
@@ -12801,10 +13071,15 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
         BOOL applied = settings_tweak_is_applied(kSettingsCylinderLiteEnabled);
         [out addObject:@{@"title": @"Cylinder Lite",
                          @"value": applied ? @"Active" : (intent ? @"Queued" : @"Off")}];
-        [out addObject:@{@"title": @"Depth",
-                         @"value": [NSString stringWithFormat:@"%ld / %ld",
-                                    (long)[d integerForKey:kSettingsCylinderLiteDepth],
-                                    (long)[d integerForKey:kSettingsCylinderLitePerspective]]}];
+        [out addObject:@{@"title": @"Effect",
+                         @"value": settings_cylinderlite_effect_name(settings_cylinderlite_effect_from_defaults(d))}];
+    } else if (section == SectionMacaronLite) {
+        BOOL intent = [d boolForKey:kSettingsMacaronLiteEnabled];
+        BOOL applied = settings_tweak_is_applied(kSettingsMacaronLiteEnabled);
+        [out addObject:@{@"title": @"Macaron Lite",
+                         @"value": applied ? @"Active" : (intent ? @"Queued" : @"Off")}];
+        [out addObject:@{@"title": @"Style",
+                         @"value": settings_macaronlite_mode_name([d integerForKey:kSettingsMacaronLiteMode])}];
     } else if (section == SectionBarmoji) {
         BOOL intent = [d boolForKey:kSettingsBarmojiEnabled];
         BOOL applied = settings_tweak_is_applied(kSettingsBarmojiEnabled);
@@ -12942,6 +13217,7 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
         case SectionFakeClockUp: return settings_fakeclockup_install_allowed() ? self.fakeclockupRows : @[];
         case SectionPancake: return settings_pancake_install_allowed() ? self.pancakeRows : @[];
         case SectionCylinderLite: return settings_cylinderlite_install_allowed() ? self.cylinderliteRows : @[];
+        case SectionMacaronLite: return self.macaronLiteRows;
         case SectionBarmoji: return settings_barmoji_install_allowed() ? self.barmojiRows : @[];
         case SectionBlurryBadges: return settings_blurrybadges_install_allowed() ? self.blurrybadgesRows : @[];
         case SectionSnapper: return settings_snapper_install_allowed() ? self.snapperRows : @[];
@@ -12998,6 +13274,7 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
         @{ @"title": @"IPA Decryptor (Beta)", @"icon": @"lock.open.fill",                    @"color": [UIColor systemPurpleColor], @"section": @(SectionIPADecryptor), @"indev": @YES },
         @{ @"title": @"FastLockX Lite",     @"icon": @"lock.open.fill",                     @"color": [UIColor systemGreenColor],  @"section": @(SectionFastLockXLite) },
         @{ @"title": @"Cylinder Lite",      @"icon": @"perspective",                         @"color": [UIColor systemTealColor],   @"section": @(SectionCylinderLite) },
+        @{ @"title": @"Macaron Lite",       @"icon": @"dock.rectangle",                      @"color": [UIColor systemPurpleColor], @"section": @(SectionMacaronLite) },
         @{ @"title": @"Clipboard Bar Lite", @"icon": @"face.smiling.fill",                   @"color": [UIColor systemPinkColor],   @"section": @(SectionBarmoji) },
 #endif
         @{ @"title": @"Gravity Lite",       @"icon": @"arrow.down.circle.fill",              @"color": [UIColor systemGreenColor],  @"section": @(SectionGravityLite) },
@@ -13085,7 +13362,7 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
         switch (s) {
             case SectionSBC: case SectionLayoutExtras: case SectionGravityLite:
             case SectionRoundedIcons: case SectionWatchLayout: case SectionFreePlacement:
-            case SectionAppLibraryStudio: case SectionCylinderLite: case SectionHideLabels:
+            case SectionAppLibraryStudio: case SectionCylinderLite: case SectionMacaronLite: case SectionHideLabels:
             case SectionCleanHomeScreen: case SectionBlurryBadges:
                 destination = RootSectionHomeScreen; break;
             case SectionLockCustomizer: case SectionLockScreenOverlay: case SectionFastLockXLite: case SectionAxonLite:
@@ -13330,7 +13607,10 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
         return @"Uses the current navigation controller's native interactive edge-back recognizer. Touch limits are configurable, and disabling Pancake restores the recognizer's exact prior values.";
     }
     if (s == SectionCylinderLite) {
-        return @"Applies a low-traffic cylindrical transform to loaded Home Screen page layers. Individual icon objects are never scanned or mutated, so taps keep their stock behavior.";
+        return @"The complete Cylinder Lite page-animation implementation from hxhlb/cyanide, with all 17 upstream effects and its original RemoteCall behavior.";
+    }
+    if (s == SectionMacaronLite) {
+        return @"Community-inspired Dock styling with solid color, gradient, photo, blur, opacity, and transparent modes. It changes existing Dock background views only and restores their exact captured colors and material visibility during Clean Up.";
     }
     if (s == SectionBarmoji) {
         return @"Adds eight real emoji buttons and three clipboard slots near the bottom of SpringBoard. Pressing one copies its text to the system pasteboard; app-keyboard injection is intentionally outside this Lite port.";
@@ -13943,6 +14223,41 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
     [self presentViewController:picker animated:YES completion:nil];
 }
 
+- (void)presentMacaronLitePhotosPicker
+{
+    PHPickerConfiguration *config = [[PHPickerConfiguration alloc] init];
+    config.filter = [PHPickerFilter imagesFilter];
+    config.selectionLimit = 1;
+    config.preferredAssetRepresentationMode = PHPickerConfigurationAssetRepresentationModeCurrent;
+    PHPickerViewController *picker = [[PHPickerViewController alloc] initWithConfiguration:config];
+    picker.delegate = self;
+    self.pendingThemeImportMode = @"macaronlite";
+    [self presentViewController:picker animated:YES completion:nil];
+}
+
+- (NSString *)importMacaronLiteImageAtURL:(NSURL *)url error:(NSError **)error
+{
+    UIImage *image = [UIImage imageWithContentsOfFile:url.path];
+    if (!image || image.size.width < 32 || image.size.height < 32) {
+        if (error) *error = [NSError errorWithDomain:@"MacaronLite" code:1
+                                           userInfo:@{NSLocalizedDescriptionKey:
+                                               @"The selected image is unreadable or too small."}];
+        return nil;
+    }
+    NSString *docs = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory,
+                                                          NSUserDomainMask, YES).firstObject;
+    NSString *dir = [docs stringByAppendingPathComponent:@"MacaronLite"];
+    if (![NSFileManager.defaultManager createDirectoryAtPath:dir
+                                withIntermediateDirectories:YES
+                                                 attributes:nil error:error]) return nil;
+    NSString *dest = [dir stringByAppendingPathComponent:@"SelectedDockPhoto.png"];
+    NSData *png = UIImagePNGRepresentation(image);
+    if (![png writeToFile:dest options:NSDataWritingAtomic error:error]) return nil;
+    log_user("[MACARON][IMPORT] Copied photo %lux%lu to the private Macaron Lite folder.\n",
+             (unsigned long)image.size.width, (unsigned long)image.size.height);
+    return [@"MacaronLite" stringByAppendingPathComponent:@"SelectedDockPhoto.png"];
+}
+
 - (NSString *)importMoodWallpaperImageAtURL:(NSURL *)url error:(NSError **)error
 {
     NSString *docs = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
@@ -14112,6 +14427,53 @@ didFinishPicking:(NSArray<PHPickerResult *> *)results
     [picker dismissViewControllerAnimated:YES completion:nil];
     NSString *mode = self.pendingThemeImportMode;
     self.pendingThemeImportMode = nil;
+    if ([mode isEqualToString:@"macaronlite"]) {
+        PHPickerResult *result = results.firstObject;
+        if (!result) return;
+        NSItemProvider *provider = result.itemProvider;
+        NSString *identifier = nil;
+        for (NSString *candidate in @[@"public.image", @"public.jpeg", @"public.png", @"public.heic"]) {
+            if ([provider hasItemConformingToTypeIdentifier:candidate]) {
+                identifier = candidate;
+                break;
+            }
+        }
+        if (!identifier) {
+            UIAlertController *ac = [UIAlertController alertControllerWithTitle:@"Import Failed"
+                                                                         message:@"Choose a supported image."
+                                                                  preferredStyle:UIAlertControllerStyleAlert];
+            [ac addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
+            [self presentViewController:ac animated:YES completion:nil];
+            return;
+        }
+        [provider loadFileRepresentationForTypeIdentifier:identifier
+                                        completionHandler:^(NSURL *url, NSError *loadError) {
+            NSError *error = loadError;
+            NSString *relative = url ? [self importMacaronLiteImageAtURL:url error:&error] : nil;
+            dispatch_async(dispatch_get_main_queue(), ^{
+                if (relative.length) {
+                    NSUserDefaults *d = NSUserDefaults.standardUserDefaults;
+                    [d setObject:relative forKey:kSettingsMacaronLitePhotoPath];
+                    [d setInteger:MacaronLiteModePhoto forKey:kSettingsMacaronLiteMode];
+                    [d synchronize];
+                    settings_mark_tweak_applied(kSettingsMacaronLiteEnabled, NO);
+                    settings_note_package_configuration_changed(kSettingsMacaronLitePhotoPath);
+                    if ([d boolForKey:kSettingsMacaronLiteEnabled])
+                        settings_schedule_live_apply_for_key(kSettingsMacaronLitePhotoPath);
+                    [self reloadSectionOrAll:SectionMacaronLite];
+                }
+                UIAlertController *ac = [UIAlertController
+                    alertControllerWithTitle:relative.length ? @"Dock Photo Ready" : @"Import Failed"
+                                     message:relative.length
+                                         ? @"The image was copied locally. Enable Macaron Lite and Apply to use it."
+                                         : (error.localizedDescription ?: @"The selected image could not be imported.")
+                              preferredStyle:UIAlertControllerStyleAlert];
+                [ac addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
+                [self presentViewController:ac animated:YES completion:nil];
+            });
+        }];
+        return;
+    }
     if ([mode isEqualToString:@"moodwallpaper"]) {
         if (results.count == 0) return;
         dispatch_group_t group = dispatch_group_create();
@@ -17195,6 +17557,102 @@ void cyanide_present_contact(UIViewController *host)
     settings_present_controller(picker, self);
 }
 
+- (void)presentCylinderLiteEffectPicker
+{
+    NSArray<NSNumber *> *values = settings_cylinderlite_effect_values();
+    NSArray<NSString *> *titles = settings_cylinderlite_effect_titles();
+    UIAlertController *picker = [UIAlertController
+        alertControllerWithTitle:@"Cylinder Lite Effect"
+                         message:@"Choose one of the effects exposed by hxhlb's original settings."
+                  preferredStyle:UIAlertControllerStyleActionSheet];
+    __weak typeof(self) weakSelf = self;
+    [titles enumerateObjectsUsingBlock:^(NSString *title, NSUInteger index, __unused BOOL *stop) {
+        NSNumber *value = values[index];
+        [picker addAction:[UIAlertAction actionWithTitle:title
+                                                  style:UIAlertActionStyleDefault
+                                                handler:^(__unused UIAlertAction *action) {
+            NSUserDefaults *defaults = NSUserDefaults.standardUserDefaults;
+            [defaults setInteger:value.integerValue forKey:kSettingsCylinderLiteEffect];
+            [defaults synchronize];
+            settings_note_package_configuration_changed(kSettingsCylinderLiteEffect);
+            settings_schedule_live_apply_for_key(kSettingsCylinderLiteEffect);
+            log_user("[CYLINDER] Selected upstream effect %ld (%s).\n",
+                     (long)value.integerValue, title.UTF8String);
+            __strong typeof(weakSelf) strongSelf = weakSelf;
+            [strongSelf reloadSectionOrAll:SectionCylinderLite];
+            [strongSelf presentApplyLogIfRunning];
+        }]];
+    }];
+    [picker addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
+    picker.popoverPresentationController.sourceView = self.view;
+    picker.popoverPresentationController.sourceRect = self.view.bounds;
+    settings_present_controller(picker, self);
+}
+
+- (void)presentMacaronLiteModePicker
+{
+    NSArray<NSString *> *titles = @[@"Solid Color", @"Gradient", @"Photo", @"Transparent"];
+    UIAlertController *picker = [UIAlertController
+        alertControllerWithTitle:@"Macaron Lite Style"
+                         message:@"All styles are session-only and restore during Clean Up."
+                  preferredStyle:UIAlertControllerStyleActionSheet];
+    __weak typeof(self) weakSelf = self;
+    [titles enumerateObjectsUsingBlock:^(NSString *title, NSUInteger index, __unused BOOL *stop) {
+        [picker addAction:[UIAlertAction actionWithTitle:title
+                                                  style:UIAlertActionStyleDefault
+                                                handler:^(__unused UIAlertAction *action) {
+            NSUserDefaults *d = NSUserDefaults.standardUserDefaults;
+            [d setInteger:(NSInteger)index forKey:kSettingsMacaronLiteMode];
+            [d synchronize];
+            settings_note_package_configuration_changed(kSettingsMacaronLiteMode);
+            if ([d boolForKey:kSettingsMacaronLiteEnabled])
+                settings_schedule_live_apply_for_key(kSettingsMacaronLiteMode);
+            log_user("[MACARON][SETTINGS] Selected style %s.\n", title.UTF8String);
+            __strong typeof(weakSelf) self = weakSelf;
+            [self reloadSectionOrAll:SectionMacaronLite];
+        }]];
+    }];
+    [picker addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
+    picker.popoverPresentationController.sourceView = self.view;
+    picker.popoverPresentationController.sourceRect = self.view.bounds;
+    settings_present_controller(picker, self);
+}
+
+- (void)presentMacaronLiteColorEditorForKey:(NSString *)key title:(NSString *)title
+{
+    NSUserDefaults *d = NSUserDefaults.standardUserDefaults;
+    UIAlertController *editor = [UIAlertController alertControllerWithTitle:title
+                                                                     message:@"Enter a six-digit RGB value such as #6E5AE6."
+                                                              preferredStyle:UIAlertControllerStyleAlert];
+    [editor addTextFieldWithConfigurationHandler:^(UITextField *field) {
+        field.text = [d stringForKey:key] ?: @"#6E5AE6";
+        field.placeholder = @"#RRGGBB";
+        field.autocapitalizationType = UITextAutocapitalizationTypeAllCharacters;
+    }];
+    [editor addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
+    __weak typeof(self) weakSelf = self;
+    [editor addAction:[UIAlertAction actionWithTitle:@"Save" style:UIAlertActionStyleDefault
+                                             handler:^(__unused UIAlertAction *action) {
+        NSString *raw = [editor.textFields.firstObject.text ?: @"" uppercaseString];
+        NSString *clean = [raw stringByReplacingOccurrencesOfString:@"#" withString:@""];
+        NSCharacterSet *invalid = [NSCharacterSet characterSetWithCharactersInString:@"0123456789ABCDEF"].invertedSet;
+        if (clean.length != 6 || [clean rangeOfCharacterFromSet:invalid].location != NSNotFound) {
+            log_user("[MACARON][SETTINGS][WARN] Rejected invalid color %s.\n", raw.UTF8String);
+            return;
+        }
+        NSString *value = [@"#" stringByAppendingString:clean];
+        [d setObject:value forKey:key];
+        [d synchronize];
+        settings_note_package_configuration_changed(key);
+        if ([d boolForKey:kSettingsMacaronLiteEnabled])
+            settings_schedule_live_apply_for_key(key);
+        log_user("[MACARON][SETTINGS] Updated %s=%s.\n", key.UTF8String, value.UTF8String);
+        __strong typeof(weakSelf) self = weakSelf;
+        [self reloadSectionOrAll:SectionMacaronLite];
+    }]];
+    settings_present_controller(editor, self);
+}
+
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath
 {
     [tableView deselectRowAtIndexPath:indexPath animated:YES];
@@ -17303,6 +17761,50 @@ void cyanide_present_contact(UIViewController *host)
         NSString *action = selectedRows[indexPath.row][@"action"];
         if ([action hasPrefix:@"velvet-color-"]) {
             [self runVelvetColorAction:action];
+            return;
+        }
+    }
+
+    if (indexPath.section == SectionCylinderLite && indexPath.row < (NSInteger)selectedRows.count) {
+        NSString *action = selectedRows[indexPath.row][@"action"];
+        if ([action isEqualToString:@"cylinderlite-effect"]) {
+            [self presentCylinderLiteEffectPicker];
+            return;
+        }
+    }
+
+    if (indexPath.section == SectionMacaronLite && indexPath.row < (NSInteger)selectedRows.count) {
+        NSString *action = selectedRows[indexPath.row][@"action"];
+        if ([action isEqualToString:@"macaron-mode"]) {
+            [self presentMacaronLiteModePicker];
+            return;
+        }
+        if ([action isEqualToString:@"macaron-primary"]) {
+            [self presentMacaronLiteColorEditorForKey:kSettingsMacaronLitePrimaryHex
+                                                title:@"Primary Dock Color"];
+            return;
+        }
+        if ([action isEqualToString:@"macaron-secondary"]) {
+            [self presentMacaronLiteColorEditorForKey:kSettingsMacaronLiteSecondaryHex
+                                                title:@"Secondary Dock Color"];
+            return;
+        }
+        if ([action isEqualToString:@"macaron-photo"]) {
+            [self presentMacaronLitePhotosPicker];
+            return;
+        }
+        if ([action isEqualToString:@"macaron-photo-clear"]) {
+            NSUserDefaults *d = NSUserDefaults.standardUserDefaults;
+            NSString *path = settings_macaronlite_absolute_photo_path(d);
+            if (path.length) [NSFileManager.defaultManager removeItemAtPath:path error:nil];
+            [d setObject:@"" forKey:kSettingsMacaronLitePhotoPath];
+            [d setInteger:MacaronLiteModeSolid forKey:kSettingsMacaronLiteMode];
+            [d synchronize];
+            settings_note_package_configuration_changed(kSettingsMacaronLitePhotoPath);
+            if ([d boolForKey:kSettingsMacaronLiteEnabled])
+                settings_schedule_live_apply_for_key(kSettingsMacaronLitePhotoPath);
+            log_user("[MACARON][IMPORT] Removed the selected Dock photo and returned to solid color mode.\n");
+            [self reloadSectionOrAll:SectionMacaronLite];
             return;
         }
     }

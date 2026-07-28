@@ -172,6 +172,7 @@ static const NSInteger kSecAMFIBypass       = 63;
 static const NSInteger kSecLockScreenOverlay = 64;
 static const NSInteger kSecMagsafe          = 65;
 static const NSInteger kSecUpsideDown       = 66;
+static const NSInteger kSecMacaronLite      = 67;
 static const NSInteger kSecDarkSwordTweaks  = 13;
 
 + (NSArray<Package *> *)allPackages
@@ -787,16 +788,30 @@ static const NSInteger kSecDarkSwordTweaks  = 13;
 
         Package *cylinderLite = [[Package alloc] initWithIdentifier:@"com.darksword.cylinderlite"
                                            name:@"Cylinder Lite"
-                               shortDescription:@"Low-traffic cylindrical page-swipe animations"
-                                longDescription:@"Transforms loaded Home Screen pages as whole layers instead of scanning and mutating hundreds of individual icons. A one-time baseline records page positions; steady-state refreshes read one scalar anchor position and derive the shared scroll offset for every page. Rotation and depth use scalar Core Animation key paths with no remote memory reads or CATransform3D buffers. Centered pages settle at stock identity, icon taps keep their native behavior, and non-paging Dock and App Library lists remain untouched. A two-failure circuit breaker stops calls if the transport becomes unhealthy."
+                               shortDescription:@"Page-level Home Screen transition animations"
+                                longDescription:@"Animates the current Home Screen page container when you swipe between pages. This is hxhlb/cyanide's complete Cylinder Lite engine, copied without changes to its RemoteCall or animation implementation. Settings expose the same stable effect set selected by upstream."
                                         version:version
-                                         author:@"zeroxjf"
+                                         author:@"Banana"
                                        category:@"Home Screen"
-                                     symbolName:@"perspective"
+                                     symbolName:@"rotate.3d"
                                            kind:PackageInstallKindToggle
                                      enabledKey:kSettingsCylinderLiteEnabled
                                           isNew:NO];
         cylinderLite.settingsSection = kSecCylinderLite;
+        cylinderLite.unstableWarning = @"Upstream implementation: behavior depends on SpringBoard Home Screen internals and may vary by iOS version.";
+
+        Package *macaronLite = [[Package alloc] initWithIdentifier:@"com.infern0.macaronlite"
+                                           name:@"Macaron Lite"
+                               shortDescription:@"Color, gradient, photo, or transparent Dock backgrounds"
+                                longDescription:@"Community-inspired port of Macaron's Dock customization idea. It styles only the existing normal or floating Dock background using a solid color, horizontal gradient, selected photo, optional stock blur, opacity control, or a fully transparent appearance. App icons and gesture recognizers are never replaced. Every discovered Dock class and changed background is logged, and Clean Up restores the exact captured colors and material visibility."
+                                        version:version
+                                         author:@"Infern0 Team (inspired by Macaron)"
+                                       category:@"Home Screen"
+                                     symbolName:@"dock.rectangle"
+                                           kind:PackageInstallKindToggle
+                                     enabledKey:kSettingsMacaronLiteEnabled
+                                          isNew:YES];
+        macaronLite.settingsSection = kSecMacaronLite;
 
         Package *barmoji = [[Package alloc] initWithIdentifier:@"com.darksword.barmoji"
                                            name:@"Barmoji"
@@ -1289,6 +1304,7 @@ static const NSInteger kSecDarkSwordTweaks  = 13;
             @"com.darksword.zero-backlight-fade",
             @"com.darksword.double-tap-to-lock",
             @"com.darksword.cylinderlite",
+            @"com.infern0.macaronlite",
             @"com.darksword.barmoji",
             @"com.darksword.watchlayout",
             @"com.darksword.lockcustomizer",
