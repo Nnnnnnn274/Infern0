@@ -1246,6 +1246,7 @@ static const NSInteger kSecDarkSwordTweaks  = 13;
             fakeClockUp,
             pancake,
             cylinderLite,
+            macaronLite,
             barmoji,
             roundedIcons,
             watchLayout,
