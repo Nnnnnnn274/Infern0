@@ -1063,6 +1063,7 @@ static NSString * const kSettingsCylinderLiteOpacityPct = @"CylinderLiteOpacityP
 static NSString * const kSettingsCylinderLiteFollowGesture = @"CylinderLiteFollowGesture";
 static NSString * const kSettingsCylinderLiteOneShotDurationMs = @"CylinderLiteOneShotDurationMs";
 NSString * const kSettingsMacaronLiteEnabled = @"MacaronLiteEnabled";
+NSString * const kSettingsFloatingDockEnabled = @"FloatingDockEnabled";
 static NSString * const kSettingsMacaronLiteMode = @"MacaronLiteMode";
 static NSString * const kSettingsMacaronLitePrimaryHex = @"MacaronLitePrimaryHex";
 static NSString * const kSettingsMacaronLiteSecondaryHex = @"MacaronLiteSecondaryHex";
@@ -1680,6 +1681,15 @@ static bool settings_stop_macaronlite_registered(BOOL springboardWillDie)
     return macaronlite_stop_in_session();
 }
 
+static bool settings_stop_floatingdock_registered(BOOL springboardWillDie)
+{
+    if (springboardWillDie) {
+        floatingdock_forget_remote_state();
+        return true;
+    }
+    return floatingdock_stop_in_session();
+}
+
 static bool settings_stop_barmoji_registered(BOOL springboardWillDie)
 {
     (void)springboardWillDie;
@@ -1839,6 +1849,7 @@ static void settings_each_springboard_cleanup_entry(void (^block)(const Settings
         { kSettingsPancakeEnabled, "Pancake", NULL, settings_stop_pancake_registered, pancake_forget_remote_state, NULL, YES, YES },
         { kSettingsCylinderLiteEnabled, "Cylinder Lite", NULL, settings_stop_cylinderlite_registered, cylinderlite_forget_remote_state, NULL, YES, YES },
         { kSettingsMacaronLiteEnabled, "Macaron Lite", NULL, settings_stop_macaronlite_registered, macaronlite_forget_remote_state, NULL, YES, YES },
+        { kSettingsFloatingDockEnabled, "FloatingDock XVI Lite", NULL, settings_stop_floatingdock_registered, floatingdock_forget_remote_state, NULL, YES, YES },
         { kSettingsBarmojiEnabled, "Clipboard Bar Lite", NULL, settings_stop_barmoji_registered, barmoji_forget_remote_state, NULL, YES, YES },
         { kSettingsRoundedIconsEnabled, "Rounded Icons", NULL, settings_stop_roundedicons_registered, roundedicons_forget_remote_state, NULL, YES, YES },
         { kSettingsWatchLayoutEnabled, "Watch Layout", NULL, settings_stop_watchlayout_registered, watchlayout_forget_remote_state, NULL, YES, YES },
@@ -3568,9 +3579,14 @@ static bool settings_apply_sbc_from_defaults_locked(NSUserDefaults *d)
 {
     if (![d boolForKey:kSettingsSBCEnabled]) return false;
 
-    sbcustomizer_configure_ipad_dock([d boolForKey:kSettingsSBCIPadDockEnabled],
+    BOOL dedicatedFloatingDock = [d boolForKey:kSettingsFloatingDockEnabled];
+    sbcustomizer_configure_ipad_dock(!dedicatedFloatingDock &&
+                                     [d boolForKey:kSettingsSBCIPadDockEnabled],
                                      [d boolForKey:kSettingsSBCDockRecentsEnabled],
                                      [d boolForKey:kSettingsSBCDockAppLibraryEnabled]);
+    if (dedicatedFloatingDock && [d boolForKey:kSettingsSBCIPadDockEnabled]) {
+        log_user("[FLOATING-DOCK][CONFLICT] SBCustomizer's legacy iPad Dock path was skipped because FloatingDock XVI Lite owns the Dock controller.\n");
+    }
 
     return sbcustomizer_apply_in_session((int)[d integerForKey:kSettingsSBCDockIcons],
                                          (int)[d integerForKey:kSettingsSBCCols],
@@ -6952,6 +6968,16 @@ static bool settings_apply_macaronlite_from_defaults_locked(NSUserDefaults *d)
     return macaronlite_apply_in_session();
 }
 
+static bool settings_apply_floatingdock_from_defaults_locked(NSUserDefaults *d)
+{
+    if (![d boolForKey:kSettingsFloatingDockEnabled]) return false;
+    if ([d boolForKey:kSettingsSBCIPadDockEnabled]) {
+        log_user("[FLOATING-DOCK][CONFLICT] Dedicated controller mode overrides SBCustomizer's best-effort floating Dock option for this run.\n");
+    }
+    log_user("[FLOATING-DOCK][SETTINGS] Starting native iPad Dock controller creation with App Library access. All capability gates and the stock Dock state are captured first.\n");
+    return floatingdock_apply_in_session();
+}
+
 static void settings_configure_control_center_tweaks(NSUserDefaults *d)
 {
     cleancc_configure((int)[d integerForKey:kSettingsCleanCCMaterialAlphaPct],
@@ -8543,6 +8569,39 @@ static void settings_schedule_live_apply_for_key(NSString *key)
         return;
     }
 
+    if ([key isEqualToString:kSettingsFloatingDockEnabled]) {
+        if ([d boolForKey:kSettingsFloatingDockEnabled] && g_springboard_rc_ready) {
+            dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+                bool ok = false;
+                @synchronized (settings_rc_lock()) {
+                    if (settings_cleanup_in_progress() ||
+                        ![d boolForKey:kSettingsFloatingDockEnabled] ||
+                        !g_springboard_rc_ready) return;
+                    ok = settings_apply_floatingdock_from_defaults_locked(d);
+                    settings_mark_tweak_applied(kSettingsFloatingDockEnabled,
+                                                ok && [d boolForKey:kSettingsFloatingDockEnabled]);
+                    log_user("[FLOATING-DOCK][LIVE] Apply result=%s.\n",
+                             ok ? "success" : "failed safely");
+                }
+                settings_notify_package_queue_changed_async();
+            });
+        } else if (![d boolForKey:kSettingsFloatingDockEnabled]) {
+            BOOL hadApplied = settings_tweak_is_applied(kSettingsFloatingDockEnabled);
+            settings_mark_tweak_applied(kSettingsFloatingDockEnabled, NO);
+            settings_notify_package_queue_changed_async();
+            if (hadApplied && g_springboard_rc_ready) {
+                dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+                    @synchronized (settings_rc_lock()) {
+                        if (g_springboard_rc_ready) floatingdock_stop_in_session();
+                    }
+                });
+            } else if (hadApplied) {
+                floatingdock_forget_remote_state();
+            }
+        }
+        return;
+    }
+
     if (settings_key_is_split_experimental_tweak(key)) {
         NSString *masterKey = settings_split_tweak_master_key_for_key(key);
         if (g_springboard_rc_ready) {
@@ -9277,6 +9336,7 @@ void settings_register_defaults(void)
         kSettingsCylinderLiteFollowGesture: @NO,
         kSettingsCylinderLiteOneShotDurationMs: @520,
         kSettingsMacaronLiteEnabled: @NO,
+        kSettingsFloatingDockEnabled: @NO,
         kSettingsMacaronLiteMode: @(MacaronLiteModeSolid),
         kSettingsMacaronLitePrimaryHex: @"#6E5AE6",
         kSettingsMacaronLiteSecondaryHex: @"#34C8FF",
@@ -9454,6 +9514,7 @@ void settings_register_defaults(void)
             kSettingsPancakeEnabled,
             kSettingsCylinderLiteEnabled,
             kSettingsMacaronLiteEnabled,
+            kSettingsFloatingDockEnabled,
             kSettingsBarmojiEnabled,
             kSettingsRoundedIconsEnabled,
             kSettingsWatchLayoutEnabled,
@@ -9534,6 +9595,7 @@ static void settings_log_tweak_plan_details(NSUserDefaults *d, BOOL pendingOnly)
         { kSettingsPancakeEnabled, "Pancake Lite", "configures SpringBoard's current native interactive edge-back gesture" },
         { kSettingsCylinderLiteEnabled, "Cylinder Lite", "animates loaded home-screen pages through a live cylindrical swipe transform" },
         { kSettingsMacaronLiteEnabled, "Macaron Lite", "styles selected Dock, folder, page-indicator, and Search surfaces with reversible colors or Dock artwork" },
+        { kSettingsFloatingDockEnabled, "FloatingDock XVI Lite", "creates the native iPad floating Dock controller with recent-app and App Library support, then restores the stock Dock on cleanup" },
         { kSettingsBarmojiEnabled, "Clipboard Bar Lite", "adds pressable emoji and clipboard buttons to SpringBoard; it is not injected into app keyboard processes" },
         { kSettingsRoundedIconsEnabled, "Rounded Icons", "applies a continuous corner mask to every discovered Home Screen icon" },
         { kSettingsWatchLayoutEnabled, "Watch Layout", "builds one scrolling Apple Watch-style honeycomb of pressable circular app icons" },
@@ -9626,6 +9688,7 @@ static void settings_run_actions_internal(BOOL pendingOnly)
             BOOL pancakeEnabled = [d boolForKey:kSettingsPancakeEnabled];
             BOOL cylinderLiteEnabled = [d boolForKey:kSettingsCylinderLiteEnabled];
             BOOL macaronLiteEnabled = [d boolForKey:kSettingsMacaronLiteEnabled];
+            BOOL floatingDockEnabled = [d boolForKey:kSettingsFloatingDockEnabled];
             BOOL tweakLoaderEnabled = [d boolForKey:kSettingsTweakLoaderEnabled];
             BOOL appSwitcherGridEnabled = [d boolForKey:kSettingsAppSwitcherGridEnabled];
             BOOL themerEnabled = [d boolForKey:kSettingsThemerEnabled];
@@ -9665,6 +9728,7 @@ static void settings_run_actions_internal(BOOL pendingOnly)
             BOOL runPancake = settings_pancake_install_allowed() && settings_enabled_tweak_should_run(d, kSettingsPancakeEnabled, springBoardPendingOnly);
             BOOL runCylinderLite = settings_cylinderlite_install_allowed() && settings_enabled_tweak_should_run(d, kSettingsCylinderLiteEnabled, springBoardPendingOnly);
             BOOL runMacaronLite = settings_enabled_tweak_should_run(d, kSettingsMacaronLiteEnabled, springBoardPendingOnly);
+            BOOL runFloatingDock = settings_enabled_tweak_should_run(d, kSettingsFloatingDockEnabled, springBoardPendingOnly);
             BOOL runBarmoji = settings_barmoji_install_allowed() && settings_enabled_tweak_should_run(d, kSettingsBarmojiEnabled, springBoardPendingOnly);
             BOOL runRoundedIcons = settings_enabled_tweak_should_run(d, kSettingsRoundedIconsEnabled, springBoardPendingOnly);
             BOOL runWatchLayout = settings_enabled_tweak_should_run(d, kSettingsWatchLayoutEnabled, springBoardPendingOnly);
@@ -9702,7 +9766,7 @@ static void settings_run_actions_internal(BOOL pendingOnly)
                 settings_note_themer_stage_conflict(YES);
             }
             BOOL cleanupDisabledSpringBoardTweaks = settings_disabled_applied_springboard_cleanup_needed(d);
-            BOOL needsSpringBoardWork = runSBC || runDarkTweaks || runStatBar || runNSBar || runNiceBarLite || runRSSI || runAxonLite || runGravityLite || runLayoutExtras || runTypeBanner || runNotificationIsland || runVelvet || runCleanNC || runUnderTime || runZeppelinLite || runCleanHomeScreen || runRealCC || runCleanCC || runFUGap || runModuleSpacing || runSugarCane || runBetterCCXI || runMagma || runBetterCCIcons || runCCNoPlatterDim || runCCStatus || runHapticCC || runSecureCC || runHideLabels || runFakeClockUp || runPancake || runCylinderLite || runMacaronLite || runBarmoji || runRoundedIcons || runWatchLayout || runAppLibraryStudio || runLockCustomizer || runLockScreenOverlay || runFreePlacement || runBlurryBadges || runSnapper || runPullOver || runAlkaline || runTweakLoader || runAppSwitcherGrid || runThemer || runSnowBoardLite || runLiveWP || runStageStrip || runFastLockXLite || runQuickLoader || runRepoTweaks || runMagsafe || runUpsideDown || cleanupDisabledSpringBoardTweaks;
+            BOOL needsSpringBoardWork = runSBC || runDarkTweaks || runStatBar || runNSBar || runNiceBarLite || runRSSI || runAxonLite || runGravityLite || runLayoutExtras || runTypeBanner || runNotificationIsland || runVelvet || runCleanNC || runUnderTime || runZeppelinLite || runCleanHomeScreen || runRealCC || runCleanCC || runFUGap || runModuleSpacing || runSugarCane || runBetterCCXI || runMagma || runBetterCCIcons || runCCNoPlatterDim || runCCStatus || runHapticCC || runSecureCC || runHideLabels || runFakeClockUp || runPancake || runCylinderLite || runFloatingDock || runMacaronLite || runBarmoji || runRoundedIcons || runWatchLayout || runAppLibraryStudio || runLockCustomizer || runLockScreenOverlay || runFreePlacement || runBlurryBadges || runSnapper || runPullOver || runAlkaline || runTweakLoader || runAppSwitcherGrid || runThemer || runSnowBoardLite || runLiveWP || runStageStrip || runFastLockXLite || runQuickLoader || runRepoTweaks || runMagsafe || runUpsideDown || cleanupDisabledSpringBoardTweaks;
             BOOL runSandboxEscape = [d boolForKey:kSettingsRunSandboxEscape] && (!pendingOnly || needsSpringBoardWork);
             // TypeBanner prewarms its hidden SpringBoard window during Apply
             // and reuses the open SpringBoard session for text-only updates.
@@ -9755,6 +9819,7 @@ static void settings_run_actions_internal(BOOL pendingOnly)
             if (runFakeClockUp) total++;
             if (runPancake) total++;
             if (runCylinderLite) total++;
+            if (runFloatingDock) total++;
             if (runMacaronLite) total++;
             if (runBarmoji) total++;
             if (runRoundedIcons) total++;
@@ -9789,6 +9854,7 @@ static void settings_run_actions_internal(BOOL pendingOnly)
             if (runRSSI) [enabledTweaks addObject:@"rssi"];
             if (runAxonLite) [enabledTweaks addObject:@"axon"];
             if (runNotificationIsland) [enabledTweaks addObject:@"notification-island"];
+            if (runFloatingDock) [enabledTweaks addObject:@"floatingdock-xvi-lite"];
             if (runMacaronLite) [enabledTweaks addObject:@"macaron-lite"];
             if (runVelvet) [enabledTweaks addObject:@"velvet"];
             if (runCleanNC) [enabledTweaks addObject:@"cleannc"];
@@ -10397,6 +10463,25 @@ static void settings_run_actions_internal(BOOL pendingOnly)
                         cyanide_upload_log_milestone(ok ? @"cylinderlite-applied" : @"cylinderlite-failed");
                     }
 
+                    if (runFloatingDock) {
+                        settings_progress(&step, total, "Creating FloatingDock XVI Lite");
+                        bool ok = settings_apply_floatingdock_from_defaults_locked(d);
+                        settings_mark_tweak_applied(kSettingsFloatingDockEnabled,
+                                                    ok && [d boolForKey:kSettingsFloatingDockEnabled]);
+                        log_user("%s FloatingDock XVI Lite %s.\n",
+                                 ok ? "[OK]" : "[WARN]",
+                                 ok ? "created the native floating Dock" : "failed safely before replacing the stock Dock");
+                        cyanide_upload_log_milestone(ok ? @"floatingdock-applied" : @"floatingdock-failed");
+                        if (!ok) {
+                            runHadBlockingFailure = YES;
+                            runCompletionMessage = @"FloatingDock XVI Lite is unsupported on this SpringBoard build or could not create its controller safely.";
+                        }
+                    } else if (!floatingDockEnabled &&
+                               settings_tweak_is_applied(kSettingsFloatingDockEnabled)) {
+                        floatingdock_stop_in_session();
+                        settings_mark_tweak_applied(kSettingsFloatingDockEnabled, NO);
+                    }
+
                     if (runMacaronLite) {
                         settings_progress(&step, total, "Styling Home Screen chrome with Macaron Lite");
                         bool ok = settings_apply_macaronlite_from_defaults_locked(d);
@@ -10832,6 +10917,7 @@ typedef NS_ENUM(NSInteger, SettingsSection) {
     SectionMagsafe,
     SectionUpsideDown,
     SectionMacaronLite,
+    SectionFloatingDock,
     SectionCount,
 };
 
@@ -12304,6 +12390,22 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
     return rows;
 }
 
+- (NSArray<NSDictionary *> *)floatingDockRows
+{
+    return @[
+        @{ @"kind": @"toggle", @"key": kSettingsFloatingDockEnabled,
+           @"title": @"Enable FloatingDock XVI Lite" },
+        @{ @"kind": @"info", @"title": @"Native iPad Dock controller",
+           @"subtitle": @"Creates SpringBoard's own floating Dock controller, keeps icons pressable, exposes recent apps and App Library access when supported, and hides the stock Dock only after the replacement controller is ready." },
+        @{ @"kind": @"info", @"title": @"Exact cleanup",
+           @"subtitle": @"Clean Up restores the previous scene controller, stock Dock visibility, capability methods, and the original App Library-in-Dock preference. A failed capability check changes nothing." },
+        @{ @"kind": @"info", @"title": @"SBCustomizer compatibility",
+           @"subtitle": @"When this dedicated tweak is enabled, SBCustomizer's older best-effort iPad Dock switch is ignored for the session. Dock icon-count and Home Screen grid settings still apply." },
+        @{ @"kind": @"button", @"title": @"View Detailed Activity Log",
+           @"action": @"view-log" },
+    ];
+}
+
 - (NSArray<NSDictionary *> *)barmojiRows
 {
     return @[
@@ -13108,6 +13210,13 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
                          @"value": applied ? @"Active" : (intent ? @"Queued" : @"Off")}];
         [out addObject:@{@"title": @"Style",
                          @"value": settings_macaronlite_mode_name([d integerForKey:kSettingsMacaronLiteMode])}];
+    } else if (section == SectionFloatingDock) {
+        BOOL intent = [d boolForKey:kSettingsFloatingDockEnabled];
+        BOOL applied = settings_tweak_is_applied(kSettingsFloatingDockEnabled);
+        [out addObject:@{@"title": @"FloatingDock XVI Lite",
+                         @"subtitle": @"Native iPad-style Dock controller with App Library access",
+                         @"enabled": @(intent),
+                         @"value": applied ? @"Active" : (intent ? @"Queued" : @"Off")}];
     } else if (section == SectionBarmoji) {
         BOOL intent = [d boolForKey:kSettingsBarmojiEnabled];
         BOOL applied = settings_tweak_is_applied(kSettingsBarmojiEnabled);
@@ -13246,6 +13355,7 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
         case SectionPancake: return settings_pancake_install_allowed() ? self.pancakeRows : @[];
         case SectionCylinderLite: return settings_cylinderlite_install_allowed() ? self.cylinderliteRows : @[];
         case SectionMacaronLite: return self.macaronLiteRows;
+        case SectionFloatingDock: return self.floatingDockRows;
         case SectionBarmoji: return settings_barmoji_install_allowed() ? self.barmojiRows : @[];
         case SectionBlurryBadges: return settings_blurrybadges_install_allowed() ? self.blurrybadgesRows : @[];
         case SectionSnapper: return settings_snapper_install_allowed() ? self.snapperRows : @[];
@@ -13303,6 +13413,7 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
         @{ @"title": @"FastLockX Lite",     @"icon": @"lock.open.fill",                     @"color": [UIColor systemGreenColor],  @"section": @(SectionFastLockXLite) },
         @{ @"title": @"Cylinder Lite",      @"icon": @"perspective",                         @"color": [UIColor systemTealColor],   @"section": @(SectionCylinderLite) },
         @{ @"title": @"Macaron Lite",       @"icon": @"dock.rectangle",                      @"color": [UIColor systemPurpleColor], @"section": @(SectionMacaronLite) },
+        @{ @"title": @"FloatingDock XVI Lite", @"icon": @"dock.rectangle",                   @"color": [UIColor systemIndigoColor], @"section": @(SectionFloatingDock) },
         @{ @"title": @"Clipboard Bar Lite", @"icon": @"face.smiling.fill",                   @"color": [UIColor systemPinkColor],   @"section": @(SectionBarmoji) },
 #endif
         @{ @"title": @"Gravity Lite",       @"icon": @"arrow.down.circle.fill",              @"color": [UIColor systemGreenColor],  @"section": @(SectionGravityLite) },
@@ -13390,7 +13501,7 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
         switch (s) {
             case SectionSBC: case SectionLayoutExtras: case SectionGravityLite:
             case SectionRoundedIcons: case SectionWatchLayout: case SectionFreePlacement:
-            case SectionAppLibraryStudio: case SectionCylinderLite: case SectionMacaronLite: case SectionHideLabels:
+            case SectionAppLibraryStudio: case SectionCylinderLite: case SectionMacaronLite: case SectionFloatingDock: case SectionHideLabels:
             case SectionCleanHomeScreen: case SectionBlurryBadges:
                 destination = RootSectionHomeScreen; break;
             case SectionLockCustomizer: case SectionLockScreenOverlay: case SectionFastLockXLite: case SectionAxonLite:
@@ -13639,6 +13750,9 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
     }
     if (s == SectionMacaronLite) {
         return @"Community-inspired Home Screen chrome styling. Dock supports color, gradient, photo, blur, opacity, and transparency; optional folder backgrounds, page indicators, and Search use matching accent colors. Each captured property is restored during Clean Up.";
+    }
+    if (s == SectionFloatingDock) {
+        return @"Creates SpringBoard's native iPad floating Dock controller on supported iPhone builds, including recent-app and App Library surfaces. It validates the scene and controller before hiding the stock Dock, and Clean Up restores every captured gate, preference, controller, and visibility value.";
     }
     if (s == SectionBarmoji) {
         return @"Adds eight real emoji buttons and three clipboard slots near the bottom of SpringBoard. Pressing one copies its text to the system pasteboard; app-keyboard injection is intentionally outside this Lite port.";

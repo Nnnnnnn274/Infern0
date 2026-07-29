@@ -22,6 +22,7 @@ static bool gFloatingDockStockContainerWasHidden = false;
 static bool gFloatingDockCapturedPreviousController = false;
 static uint64_t gFloatingDockDefaults = 0;
 static bool gFloatingDockDefaultsCaptured = false;
+static bool gFloatingDockDefaultsOriginal = false;
 static bool gFloatingDockDefaultsChanged = false;
 static bool gFloatingDockApplied = false;
 static uint64_t gFloatingDockControllerHint = 0;
@@ -291,7 +292,10 @@ static bool floatingdock_enable_library_pref(void)
     bool current = r_msg2_main(defaults, "boolForKey:", key, 0, 0, 0) != 0;
     if (!gFloatingDockDefaultsCaptured) {
         gFloatingDockDefaults = defaults;
+        gFloatingDockDefaultsOriginal = current;
         gFloatingDockDefaultsCaptured = true;
+        log_user("[FLOATING-DOCK][PREF] Captured SBAppLibraryInDockEnabled=%d.\n",
+                 current);
     }
     if (!current) {
         r_msg2_main(defaults, "setBool:forKey:", 1, key, 0, 0);
@@ -308,8 +312,17 @@ static bool floatingdock_restore_library_pref(void)
 {
     if (!gFloatingDockDefaultsCaptured || !gFloatingDockDefaultsChanged ||
         !r_is_objc_ptr(gFloatingDockDefaults)) return true;
-    printf("[FLOATING-DOCK] keeping SBAppLibraryInDockEnabled=1 across respring for cold-start Library initialization\n");
-    return true;
+    uint64_t key = r_nsstr_retained("SBAppLibraryInDockEnabled");
+    if (!r_is_objc_ptr(key)) return false;
+    r_msg2_main(gFloatingDockDefaults, "setBool:forKey:",
+                gFloatingDockDefaultsOriginal ? 1 : 0, key, 0, 0);
+    (void)r_msg2_main(gFloatingDockDefaults, "synchronize", 0, 0, 0, 0);
+    bool restored = r_msg2_main(gFloatingDockDefaults, "boolForKey:", key, 0, 0, 0) != 0;
+    r_msg2(key, "release", 0, 0, 0, 0);
+    bool ok = restored == gFloatingDockDefaultsOriginal;
+    log_user("[FLOATING-DOCK][RESTORE] SBAppLibraryInDockEnabled restored=%d expected=%d result=%s.\n",
+             restored, gFloatingDockDefaultsOriginal, ok ? "clean" : "failed");
+    return ok;
 }
 
 static bool floatingdock_enable_library_defaults_for_controller(uint64_t controller)
@@ -692,6 +705,7 @@ void floatingdock_forget_remote_state(void)
     gFloatingDockCapturedPreviousController = false;
     gFloatingDockDefaults = 0;
     gFloatingDockDefaultsCaptured = false;
+    gFloatingDockDefaultsOriginal = false;
     gFloatingDockDefaultsChanged = false;
     gFloatingDockApplied = false;
     gFloatingDockControllerHint = 0;

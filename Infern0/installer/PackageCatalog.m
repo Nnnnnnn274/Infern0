@@ -173,6 +173,7 @@ static const NSInteger kSecLockScreenOverlay = 64;
 static const NSInteger kSecMagsafe          = 65;
 static const NSInteger kSecUpsideDown       = 66;
 static const NSInteger kSecMacaronLite      = 67;
+static const NSInteger kSecFloatingDock     = 68;
 static const NSInteger kSecDarkSwordTweaks  = 13;
 
 + (NSArray<Package *> *)allPackages
@@ -813,6 +814,20 @@ static const NSInteger kSecDarkSwordTweaks  = 13;
                                           isNew:YES];
         macaronLite.settingsSection = kSecMacaronLite;
 
+        Package *floatingDock = [[Package alloc] initWithIdentifier:@"com.infern0.floatingdockxvi-lite"
+                                           name:@"FloatingDock XVI Lite"
+                               shortDescription:@"Native iPad-style floating Dock on iPhone"
+                                longDescription:@"Community-requested native FloatingDock port. It validates SpringBoard's scene and Floating Dock capability classes, creates or safely reuses the native iPad Dock controller, enables recent-app and App Library surfaces, and hides the stock Dock only after the replacement is attached. Icons stay native and pressable. Detailed logs cover every capability gate, controller decision, preference change, verification, and restore step. Clean Up restores the prior scene controller, stock Dock visibility, method implementations, and App Library-in-Dock preference."
+                                        version:version
+                                         author:@"Infern0 Team (inspired by FloatingDockXVI)"
+                                       category:@"Home Screen"
+                                     symbolName:@"dock.rectangle"
+                                           kind:PackageInstallKindToggle
+                                     enabledKey:kSettingsFloatingDockEnabled
+                                          isNew:YES];
+        floatingDock.settingsSection = kSecFloatingDock;
+        floatingDock.unstableWarning = @"Compatibility depends on private native Floating Dock classes exposed by the installed iOS build. Unsupported builds fail before hiding the stock Dock.";
+
         Package *barmoji = [[Package alloc] initWithIdentifier:@"com.darksword.barmoji"
                                            name:@"Barmoji"
                                shortDescription:@"Pressable emoji button strip"
@@ -1247,6 +1262,7 @@ static const NSInteger kSecDarkSwordTweaks  = 13;
             pancake,
             cylinderLite,
             macaronLite,
+            floatingDock,
             barmoji,
             roundedIcons,
             watchLayout,
@@ -1306,6 +1322,7 @@ static const NSInteger kSecDarkSwordTweaks  = 13;
             @"com.darksword.double-tap-to-lock",
             @"com.darksword.cylinderlite",
             @"com.infern0.macaronlite",
+            @"com.infern0.floatingdockxvi-lite",
             @"com.darksword.barmoji",
             @"com.darksword.watchlayout",
             @"com.darksword.lockcustomizer",

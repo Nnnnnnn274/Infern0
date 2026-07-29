@@ -23,6 +23,7 @@
 #import "experimental/fastlockx_lite.h"
 #import "cylinderlite.h"
 #import "macaronlite.h"
+#import "floatingdock.h"
 #import "experimental/barmoji.h"
 #import "experimental/magma.h"
 #import "watchlayout.h"
