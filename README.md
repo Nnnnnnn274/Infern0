@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="Infern0/Assets.xcassets/AppIcon.appiconset/infern0-icon-master.png" alt="infern0 app icon" width="152">
+  <img src="Infern0/Assets.xcassets/AppIcon.appiconset/infern0-icon-master.png" alt="infern0 Classic Ember app icon" width="152">
 </p>
 
 <h1 align="center">infern0</h1>
@@ -64,13 +64,14 @@ The interface is now consistent across the Home screen, package browser,
 sources, queue, tools, activity log, settings, dialogs, controls, and tab bar.
 Five complete interface styles are included:
 
-- **Calm Crimson** - the new softer red default;
-- **Classic Ember** - the original infern0 interface for users who prefer it;
+- **Classic Ember** - the default infern0 interface and original fiery design;
+- **Calm Crimson** - a softer, polished red alternative;
 - **Midnight Rose** - a dark rose variant;
 - **fr0st** - a cool blue style;
 - **Minecraft** - a block-inspired green and earth-tone style.
 
-Modern, Classic, Midnight Rose, fr0st, and Minecraft app icons are included.
+Classic Ember is the default app icon. Modern, Midnight Rose, fr0st, and
+Minecraft alternate icons are also included.
 The selected icon is also used by the Home banner, so the app's identity stays
 in sync with the chosen style.
 

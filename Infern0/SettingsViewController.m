@@ -9173,7 +9173,7 @@ void settings_register_defaults(void)
 {
     NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
     [defaults registerDefaults:@{
-        CYInterfaceStyleDefaultsKey:  @0,
+        CYInterfaceStyleDefaultsKey:  @1,
         kSettingsAutoRunKexploit:    @NO,
         kSettingsRunSandboxEscape:   @YES,
         kSettingsRunPatchSandboxExt: @NO,
@@ -14235,7 +14235,7 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
             cell.imageView.image = [SettingsViewController iconBadgeWithSymbol:@"app.fill" color:UIColor.systemTealColor size:29.0];
             cell.textLabel.text = @"App Icon";
             if ([[self currentAppIconStyle] isEqualToString:@"classic"]) {
-                cell.detailTextLabel.text = @"Classic";
+                cell.detailTextLabel.text = @"Classic Ember";
             } else if ([[self currentAppIconStyle] isEqualToString:@"midnight"]) {
                 cell.detailTextLabel.text = @"Midnight Rose";
             } else if ([[self currentAppIconStyle] isEqualToString:@"fr0st"]) {
@@ -15648,7 +15648,7 @@ didPickDocumentsAtURLs:(NSArray<NSURL *> *)urls
 }
 
 // Alternate icons are registered in Info.plist with CFBundleIconFiles.
-// Modern is the asset-catalog primary, selected by passing nil.
+// Classic is the asset-catalog primary, selected by passing nil.
 + (UIImage *)appIconPreviewForStyle:(NSString *)style
 {
     NSString *name = @"preview-modern";
@@ -15676,11 +15676,12 @@ didPickDocumentsAtURLs:(NSArray<NSURL *> *)urls
 - (NSString *)currentAppIconStyle
 {
     NSString *alt = [UIApplication sharedApplication].alternateIconName;
-    if ([alt isEqualToString:@"Classic"]) return @"classic";
+    if ([alt isEqualToString:@"Modern"]) return @"modern";
+    if ([alt isEqualToString:@"Classic"]) return @"classic"; // Migrates the pre-4.0 alternate name.
     if ([alt isEqualToString:@"Midnight"]) return @"midnight";
     if ([alt isEqualToString:@"Fr0st"]) return @"fr0st";
     if ([alt isEqualToString:@"Minecraft"]) return @"minecraft";
-    return @"modern";
+    return @"classic";
 }
 
 - (UITableViewCell *)buildAppIconCellAtRow:(NSInteger)row tableView:(UITableView *)tableView
@@ -15705,10 +15706,10 @@ didPickDocumentsAtURLs:(NSArray<NSURL *> *)urls
 
     if (row == 0) {
         cell.textLabel.text = @"Modern";
-        cell.detailTextLabel.text = @"Default — refreshed v2 mark.";
+        cell.detailTextLabel.text = @"Calm Crimson's polished flame mark.";
     } else if (row == 1) {
-        cell.textLabel.text = @"Classic";
-        cell.detailTextLabel.text = @"Original release artwork.";
+        cell.textLabel.text = @"Classic Ember";
+        cell.detailTextLabel.text = @"Default — the Classic Ember artwork.";
     } else if (row == 2) {
         cell.textLabel.text = @"Midnight Rose";
         cell.detailTextLabel.text = @"Low-glare plum and smoky rose.";
@@ -15745,7 +15746,7 @@ didPickDocumentsAtURLs:(NSArray<NSURL *> *)urls
     }
 
     NSString *altName = nil;
-    if ([style isEqualToString:@"classic"]) altName = @"Classic";
+    if ([style isEqualToString:@"modern"]) altName = @"Modern";
     if ([style isEqualToString:@"midnight"]) altName = @"Midnight";
     if ([style isEqualToString:@"fr0st"]) altName = @"Fr0st";
     if ([style isEqualToString:@"minecraft"]) altName = @"Minecraft";
@@ -15781,7 +15782,7 @@ didPickDocumentsAtURLs:(NSArray<NSURL *> *)urls
                          message:nil
                   preferredStyle:UIAlertControllerStyleActionSheet];
     NSString *modernTitle = [current isEqualToString:@"modern"] ? @"Modern ✓" : @"Modern";
-    NSString *classicTitle = [current isEqualToString:@"classic"] ? @"Classic ✓" : @"Classic";
+    NSString *classicTitle = [current isEqualToString:@"classic"] ? @"Classic Ember ✓" : @"Classic Ember";
     NSString *midnightTitle = [current isEqualToString:@"midnight"] ? @"Midnight Rose ✓" : @"Midnight Rose";
     NSString *fr0stTitle = [current isEqualToString:@"fr0st"] ? @"fr0st ✓" : @"fr0st";
     NSString *minecraftTitle = [current isEqualToString:@"minecraft"] ? @"Minecraft ✓" : @"Minecraft";

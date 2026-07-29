@@ -53,12 +53,13 @@ UIImage *CYCurrentAppIconImage(void)
 {
     NSString *alternate = UIApplication.sharedApplication.alternateIconName;
     NSDictionary<NSString *, NSString *> *previews = @{
-        @"Classic": @"preview-classic",
+        @"Modern": @"preview-modern",
+        @"Classic": @"preview-classic", // Legacy alternate name from pre-4.0 builds.
         @"Midnight": @"preview-midnight",
         @"Fr0st": @"preview-fr0st",
         @"Minecraft": @"preview-minecraft",
     };
-    NSString *previewName = alternate.length ? previews[alternate] : @"preview-modern";
+    NSString *previewName = alternate.length ? previews[alternate] : @"preview-classic";
     UIImage *image = previewName.length ? [UIImage imageNamed:previewName] : nil;
     if (image) return image;
 

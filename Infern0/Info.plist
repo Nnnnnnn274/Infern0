@@ -47,11 +47,11 @@
 	<dict>
 		<key>CFBundleAlternateIcons</key>
 		<dict>
-			<key>Classic</key>
+			<key>Modern</key>
 			<dict>
 				<key>CFBundleIconFiles</key>
 				<array>
-					<string>infern0-Classic</string>
+					<string>infern0-Modern</string>
 				</array>
 				<key>UIPrerenderedIcon</key>
 				<false/>
@@ -89,11 +89,11 @@
 	<dict>
 		<key>CFBundleAlternateIcons</key>
 		<dict>
-			<key>Classic</key>
+			<key>Modern</key>
 			<dict>
 				<key>CFBundleIconFiles</key>
 				<array>
-					<string>infern0-Classic</string>
+					<string>infern0-Modern</string>
 				</array>
 				<key>UIPrerenderedIcon</key>
 				<false/>
