@@ -30,10 +30,13 @@ static uint64_t s_time_label = 0;
 static uint64_t s_date_label = 0;
 static uint64_t s_status_label = 0;
 static uint64_t s_host_window = 0;
+static int s_session_pid = 0;
 static LSOHiddenView s_hidden[LSO_MAX_HIDDEN];
 static int s_hidden_count = 0;
 static bool s_active = false;
 static bool s_config_dirty = true;
+static NSTimeInterval s_retry_after = 0.0;
+static unsigned s_suppressed_retries = 0;
 static int s_vertical_offset = 0;
 static int s_width_percent = 88;
 static int s_accent_style = 0;
@@ -41,10 +44,27 @@ static int s_glass_alpha = 72;
 static bool s_hide_quick_actions = true;
 static bool s_hide_page_dots = true;
 
+static bool lso_transport_healthy(void)
+{
+    int pid = remote_call_current_pid();
+    return pid > 0 && remote_call_current_success() &&
+           (s_session_pid <= 0 || s_session_pid == pid);
+}
+
+static bool lso_apply_failed(const char *stage)
+{
+    s_retry_after = [NSDate timeIntervalSinceReferenceDate] + 30.0;
+    s_suppressed_retries = 0;
+    log_user("[LOCKOVERLAY][FAIL] stage=%s retryCooldown=30s stockViewsHidden=%d activeOverlay=%d.\n",
+             stage ? stage : "unknown", s_hidden_count, s_active);
+    return false;
+}
+
 static uint64_t lso_safe_msg(uint64_t object, const char *selector,
                              uint64_t a0, uint64_t a1, uint64_t a2, uint64_t a3)
 {
-    if (!r_is_objc_ptr(object) || !selector || !r_responds_main(object, selector)) return 0;
+    if (!lso_transport_healthy() || !r_is_objc_ptr(object) || !selector ||
+        !r_responds_main(object, selector) || !remote_call_current_success()) return 0;
     return r_msg2_main(object, selector, a0, a1, a2, a3);
 }
 
@@ -87,7 +107,7 @@ static bool lso_is_kind_of_named_class(uint64_t object, const char *name)
     if (!r_is_objc_ptr(object) || !name) return false;
     uint64_t cls = r_class(name);
     return r_is_objc_ptr(cls) &&
-           (r_msg2_main(object, "isKindOfClass:", cls, 0, 0, 0) & 0xff) != 0;
+           (lso_safe_msg(object, "isKindOfClass:", cls, 0, 0, 0) & 0xff) != 0;
 }
 
 static bool lso_controller_matches(uint64_t controller, int depth)
@@ -107,11 +127,12 @@ static bool lso_controller_matches(uint64_t controller, int depth)
 
     uint64_t children = lso_safe_msg(controller, "childViewControllers", 0, 0, 0, 0);
     uint64_t count = r_is_objc_ptr(children)
-        ? r_msg2_main(children, "count", 0, 0, 0, 0) : 0;
+        ? lso_safe_msg(children, "count", 0, 0, 0, 0) : 0;
     if (count > 24) count = 24;
     for (uint64_t i = 0; i < count; i++) {
-        uint64_t child = r_msg2_main(children, "objectAtIndex:", i, 0, 0, 0);
+        uint64_t child = lso_safe_msg(children, "objectAtIndex:", i, 0, 0, 0);
         if (lso_controller_matches(child, depth + 1)) return true;
+        if (!remote_call_current_success()) return false;
     }
     return false;
 }
@@ -135,7 +156,7 @@ static bool lso_window_visible(uint64_t window)
 {
     if (!r_is_objc_ptr(window)) return false;
     if (r_responds_main(window, "isHidden") &&
-        (r_msg2_main(window, "isHidden", 0, 0, 0, 0) & 0xff)) return false;
+        (lso_safe_msg(window, "isHidden", 0, 0, 0, 0) & 0xff)) return false;
     return true;
 }
 
@@ -144,7 +165,7 @@ static uint64_t lso_find_window(bool *visible)
     if (visible) *visible = false;
     uint64_t appClass = r_class("UIApplication");
     uint64_t app = r_is_objc_ptr(appClass)
-        ? r_msg2_main(appClass, "sharedApplication", 0, 0, 0, 0) : 0;
+        ? lso_safe_msg(appClass, "sharedApplication", 0, 0, 0, 0) : 0;
     if (!r_is_objc_ptr(app)) return 0;
 
     uint64_t fallback = 0;
@@ -152,16 +173,16 @@ static uint64_t lso_find_window(bool *visible)
     if (r_is_objc_ptr(scenes) && r_responds_main(scenes, "allObjects"))
         scenes = lso_safe_msg(scenes, "allObjects", 0, 0, 0, 0);
     uint64_t sceneCount = r_is_objc_ptr(scenes)
-        ? r_msg2_main(scenes, "count", 0, 0, 0, 0) : 0;
+        ? lso_safe_msg(scenes, "count", 0, 0, 0, 0) : 0;
     if (sceneCount > 16) sceneCount = 16;
     for (uint64_t s = 0; s < sceneCount; s++) {
-        uint64_t scene = r_msg2_main(scenes, "objectAtIndex:", s, 0, 0, 0);
+        uint64_t scene = lso_safe_msg(scenes, "objectAtIndex:", s, 0, 0, 0);
         uint64_t windows = lso_safe_msg(scene, "windows", 0, 0, 0, 0);
         uint64_t count = r_is_objc_ptr(windows)
-            ? r_msg2_main(windows, "count", 0, 0, 0, 0) : 0;
+            ? lso_safe_msg(windows, "count", 0, 0, 0, 0) : 0;
         if (count > 32) count = 32;
         for (uint64_t i = 0; i < count; i++) {
-            uint64_t window = r_msg2_main(windows, "objectAtIndex:", i, 0, 0, 0);
+            uint64_t window = lso_safe_msg(windows, "objectAtIndex:", i, 0, 0, 0);
             if (!lso_window_matches(window)) continue;
             if (lso_window_visible(window)) {
                 if (visible) *visible = true;
@@ -173,10 +194,10 @@ static uint64_t lso_find_window(bool *visible)
 
     uint64_t windows = lso_safe_msg(app, "windows", 0, 0, 0, 0);
     uint64_t count = r_is_objc_ptr(windows)
-        ? r_msg2_main(windows, "count", 0, 0, 0, 0) : 0;
+        ? lso_safe_msg(windows, "count", 0, 0, 0, 0) : 0;
     if (count > 64) count = 64;
     for (uint64_t i = 0; i < count; i++) {
-        uint64_t window = r_msg2_main(windows, "objectAtIndex:", i, 0, 0, 0);
+        uint64_t window = lso_safe_msg(windows, "objectAtIndex:", i, 0, 0, 0);
         if (!lso_window_matches(window)) continue;
         if (lso_window_visible(window)) {
             if (visible) *visible = true;
@@ -254,10 +275,13 @@ static bool lso_already_hidden(uint64_t view)
 
 static void lso_hide_stock_view(uint64_t view)
 {
-    if (!r_is_objc_ptr(view) || s_hidden_count >= LSO_MAX_HIDDEN || lso_already_hidden(view)) return;
+    if (!lso_transport_healthy() || !r_is_objc_ptr(view) ||
+        s_hidden_count >= LSO_MAX_HIDDEN || lso_already_hidden(view)) return;
     if (!r_responds_main(view, "isHidden") || !r_responds_main(view, "setHidden:")) return;
-    bool hidden = (r_msg2_main(view, "isHidden", 0, 0, 0, 0) & 0xff) != 0;
-    r_msg2_main(view, "retain", 0, 0, 0, 0);
+    bool hidden = (lso_safe_msg(view, "isHidden", 0, 0, 0, 0) & 0xff) != 0;
+    if (!remote_call_current_success()) return;
+    uint64_t retained = r_msg2_main(view, "retain", 0, 0, 0, 0);
+    if (!remote_call_current_success() || retained != view) return;
     s_hidden[s_hidden_count++] = (LSOHiddenView){ .view = view, .originalHidden = hidden };
     r_msg2_main(view, "setHidden:", 1, 0, 0, 0);
 }
@@ -273,7 +297,8 @@ static bool lso_matches_any_class(uint64_t object,
 
 static void lso_scan_and_hide(uint64_t view, int depth, bool lockContext, int *visited)
 {
-    if (!r_is_objc_ptr(view) || !visited || depth > 12 || *visited >= LSO_MAX_VISITED) return;
+    if (!lso_transport_healthy() || !r_is_objc_ptr(view) || !visited ||
+        depth > 12 || *visited >= LSO_MAX_VISITED) return;
     (*visited)++;
     static const char *lockClasses[] = {
         "CSCoverSheetView", "CSMainPageView", "CSCombinedListView",
@@ -303,23 +328,32 @@ static void lso_scan_and_hide(uint64_t view, int depth, bool lockContext, int *v
         lso_hide_stock_view(view);
 
     uint64_t subviews = lso_safe_msg(view, "subviews", 0, 0, 0, 0);
-    uint64_t count = r_is_objc_ptr(subviews) ? r_msg2_main(subviews, "count", 0, 0, 0, 0) : 0;
+    uint64_t count = r_is_objc_ptr(subviews)
+        ? lso_safe_msg(subviews, "count", 0, 0, 0, 0) : 0;
     if (count > 96) count = 96;
-    for (uint64_t i = 0; i < count; i++)
-        lso_scan_and_hide(r_msg2_main(subviews, "objectAtIndex:", i, 0, 0, 0),
+    for (uint64_t i = 0; i < count && lso_transport_healthy(); i++)
+        lso_scan_and_hide(lso_safe_msg(subviews, "objectAtIndex:", i, 0, 0, 0),
                           depth + 1, lockContext, visited);
 }
 
-static void lso_release_hidden(bool restore)
+static bool lso_release_hidden(bool restore)
 {
-    for (int i = 0; i < s_hidden_count; i++) {
-        if (!r_is_objc_ptr(s_hidden[i].view)) continue;
-        if (restore)
-            r_msg2_main(s_hidden[i].view, "setHidden:", s_hidden[i].originalHidden ? 1 : 0, 0, 0, 0);
-        r_msg2_main(s_hidden[i].view, "release", 0, 0, 0, 0);
+    // Drain from the end so an interrupted cleanup never releases the same
+    // retained object twice on the next manual retry.
+    while (s_hidden_count > 0) {
+        int i = s_hidden_count - 1;
+        uint64_t view = s_hidden[i].view;
+        if (!lso_transport_healthy() || !r_is_objc_ptr(view)) return false;
+        if (restore) {
+            r_msg2_main(view, "setHidden:", s_hidden[i].originalHidden ? 1 : 0, 0, 0, 0);
+            if (!remote_call_current_success()) return false;
+        }
+        r_msg2_main(view, "release", 0, 0, 0, 0);
+        if (!remote_call_current_success()) return false;
+        memset(&s_hidden[i], 0, sizeof(s_hidden[i]));
+        s_hidden_count--;
     }
-    memset(s_hidden, 0, sizeof(s_hidden));
-    s_hidden_count = 0;
+    return true;
 }
 
 void lockscreenoverlay_configure(int verticalOffset, int widthPercent,
@@ -336,8 +370,11 @@ void lockscreenoverlay_configure(int verticalOffset, int widthPercent,
     if (glassAlphaPercent > 95) glassAlphaPercent = 95;
     if (s_vertical_offset != verticalOffset || s_width_percent != widthPercent ||
         s_accent_style != accentStyle || s_glass_alpha != glassAlphaPercent ||
-        s_hide_quick_actions != hideQuickActions || s_hide_page_dots != hidePageDots)
+        s_hide_quick_actions != hideQuickActions || s_hide_page_dots != hidePageDots) {
         s_config_dirty = true;
+        s_retry_after = 0.0;
+        s_suppressed_retries = 0;
+    }
     s_vertical_offset = verticalOffset;
     s_width_percent = widthPercent;
     s_accent_style = accentStyle;
@@ -351,17 +388,36 @@ void lockscreenoverlay_configure(int verticalOffset, int widthPercent,
 
 bool lockscreenoverlay_stop_in_session(void)
 {
+    if ((s_active || r_is_objc_ptr(s_overlay) || s_hidden_count > 0) &&
+        !lso_transport_healthy()) {
+        log_user("[LOCKOVERLAY][RESTORE-WAIT] RemoteCall session is unhealthy or changed; no cached object was messaged.\n");
+        return false;
+    }
+    int restored = s_hidden_count;
+    if (!lso_release_hidden(true)) {
+        log_user("[LOCKOVERLAY][RESTORE-WAIT] stock view restore paused with %d retained objects remaining.\n",
+                 s_hidden_count);
+        return false;
+    }
     bool removed = r_is_objc_ptr(s_overlay);
     if (removed) {
         r_msg2_main(s_overlay, "removeFromSuperview", 0, 0, 0, 0);
+        if (!remote_call_current_success()) return false;
         r_msg2_main(s_overlay, "release", 0, 0, 0, 0);
+        if (!remote_call_current_success()) return false;
+        s_overlay = s_time_label = s_date_label = s_status_label = 0;
     }
-    int restored = s_hidden_count;
-    lso_release_hidden(true);
-    if (r_is_objc_ptr(s_host_window)) r_msg2_main(s_host_window, "release", 0, 0, 0, 0);
+    if (r_is_objc_ptr(s_host_window)) {
+        r_msg2_main(s_host_window, "release", 0, 0, 0, 0);
+        if (!remote_call_current_success()) return false;
+        s_host_window = 0;
+    }
     s_overlay = s_time_label = s_date_label = s_status_label = s_host_window = 0;
+    s_session_pid = 0;
     s_active = false;
     s_config_dirty = true;
+    s_retry_after = 0.0;
+    s_suppressed_retries = 0;
     log_user("[LOCKOVERLAY][RESTORE] overlayRemoved=%d stockHiddenStatesRestored=%d result=%s.\n",
              removed, restored, (removed || restored > 0) ? "success" : "already-stock");
     return true;
@@ -369,15 +425,38 @@ bool lockscreenoverlay_stop_in_session(void)
 
 bool lockscreenoverlay_apply_in_session(void)
 {
+    int currentPID = remote_call_current_pid();
+    if (currentPID <= 0 || !remote_call_current_success())
+        return lso_apply_failed("remote-session");
+    if (s_session_pid > 0 && s_session_pid != currentPID) {
+        log_user("[LOCKOVERLAY][SESSION] SpringBoard pid changed %d->%d; forgetting unreachable cached objects.\n",
+                 s_session_pid, currentPID);
+        lockscreenoverlay_forget_remote_state();
+    }
+    NSTimeInterval now = [NSDate timeIntervalSinceReferenceDate];
+    if (now < s_retry_after) {
+        s_suppressed_retries++;
+        if (s_suppressed_retries == 1)
+            log_user("[LOCKOVERLAY][BACKOFF] suppressing repeated apply attempts for %.0fs.\n",
+                     s_retry_after - now);
+        return false;
+    }
+
     if (s_active && !s_config_dirty && r_is_objc_ptr(s_overlay)) {
         bool visible = false;
         uint64_t currentHost = lso_find_window(&visible);
+        if (!remote_call_current_success())
+            return lso_apply_failed("refresh-host");
         uint64_t parent = lso_safe_msg(s_overlay, "superview", 0, 0, 0, 0);
+        if (!remote_call_current_success())
+            return lso_apply_failed("refresh-attachment");
         if (r_is_objc_ptr(currentHost) && parent == currentHost) {
             lso_update_text();
             int before = s_hidden_count;
             int visited = 0;
             lso_scan_and_hide(currentHost, 0, true, &visited);
+            if (!remote_call_current_success())
+                return lso_apply_failed("refresh-stock-scan");
             lso_safe_msg(currentHost, "bringSubviewToFront:", s_overlay, 0, 0, 0);
             if (s_hidden_count > before)
                 log_user("[LOCKOVERLAY][REFRESH] lazy stock views discovered=%d totalHidden=%d visited=%d presentation=%s.\n",
@@ -388,15 +467,19 @@ bool lockscreenoverlay_apply_in_session(void)
         log_user("[LOCKOVERLAY][REBUILD] Cover Sheet host changed or detached; restoring the old capture before rebuilding.\n");
     }
     if (s_active || r_is_objc_ptr(s_overlay)) (void)lockscreenoverlay_stop_in_session();
+    if (s_active || r_is_objc_ptr(s_overlay))
+        return lso_apply_failed("restore-before-rebuild");
 
     log_user("[LOCKOVERLAY][1/4] Locating a class-verified Cover Sheet window...\n");
     bool visible = false;
     uint64_t host = lso_find_window(&visible);
     CGRect localBounds = UIScreen.mainScreen.bounds;
     LSOFrame bounds = { 0, 0, localBounds.size.width, localBounds.size.height };
+    if (!remote_call_current_success())
+        return lso_apply_failed("cover-sheet-discovery");
     if (!r_is_objc_ptr(host) || bounds.width < 200.0 || bounds.height < 300.0) {
         log_user("[LOCKOVERLAY][WAIT] Cover Sheet host is unavailable; stock Lock Screen was left untouched.\n");
-        return false;
+        return lso_apply_failed("cover-sheet-unavailable");
     }
 
     log_user("[LOCKOVERLAY][2/4] Building the independent glass clock overlay...\n");
@@ -410,7 +493,7 @@ bool lockscreenoverlay_apply_in_session(void)
     uint64_t panel = lso_new_view(panelFrame);
     if (!r_is_objc_ptr(panel)) {
         log_user("[LOCKOVERLAY][FAIL] UIView allocation failed; stock Lock Screen was left untouched.\n");
-        return false;
+        return lso_apply_failed("panel-allocation");
     }
     r_msg2_main(panel, "setTag:", LSO_OVERLAY_TAG, 0, 0, 0);
     r_msg2_main(panel, "setUserInteractionEnabled:", 0, 0, 0, 0);
@@ -477,7 +560,7 @@ bool lockscreenoverlay_apply_in_session(void)
         if (r_is_objc_ptr(statusLabel)) r_msg2_main(statusLabel, "release", 0, 0, 0, 0);
         r_msg2_main(panel, "release", 0, 0, 0, 0);
         log_user("[LOCKOVERLAY][FAIL] Label allocation failed; stock Lock Screen was left untouched.\n");
-        return false;
+        return lso_apply_failed("label-allocation");
     }
     uint64_t white = lso_color(1.0, 1.0, 1.0, 1.0);
     if (r_is_objc_ptr(white)) r_msg2_main(timeLabel, "setTextColor:", white, 0, 0, 0);
@@ -500,20 +583,29 @@ bool lockscreenoverlay_apply_in_session(void)
     r_msg2_main(statusLabel, "release", 0, 0, 0, 0);
     lso_update_text();
     r_msg2_main(host, "addSubview:", panel, 0, 0, 0);
-    if (lso_safe_msg(panel, "superview", 0, 0, 0, 0) != host) {
-        r_msg2_main(panel, "release", 0, 0, 0, 0);
+    uint64_t attachedHost = lso_safe_msg(panel, "superview", 0, 0, 0, 0);
+    if (!remote_call_current_success() || attachedHost != host) {
+        if (remote_call_current_success())
+            r_msg2_main(panel, "release", 0, 0, 0, 0);
         s_overlay = s_date_label = s_time_label = s_status_label = 0;
         log_user("[LOCKOVERLAY][FAIL] Overlay attachment did not verify; stock Lock Screen was left untouched.\n");
-        return false;
+        return lso_apply_failed("overlay-attachment");
     }
 
     log_user("[LOCKOVERLAY][3/4] Overlay attachment verified; hiding matched stock clock controls...\n");
+    r_msg2_main(host, "retain", 0, 0, 0, 0);
+    if (!remote_call_current_success())
+        return lso_apply_failed("host-retain");
+    s_host_window = host;
+    s_session_pid = currentPID;
+    s_active = true;
     int visited = 0;
     lso_scan_and_hide(host, 0, true, &visited);
-    r_msg2_main(host, "retain", 0, 0, 0, 0);
-    s_host_window = host;
-    s_active = true;
+    if (!remote_call_current_success())
+        return lso_apply_failed("initial-stock-scan");
     s_config_dirty = false;
+    s_retry_after = 0.0;
+    s_suppressed_retries = 0;
     log_user("[LOCKOVERLAY][4/4] active=1 presentation=%s overlay=0x%llx host=0x%llx visited=%d hiddenStockViews=%d touches=passthrough nativeBlur=%d dimensions=%.0fx%.0f vmReads=0.\n",
              visible ? "visible" : "prearmed-hidden", s_overlay, host, visited,
              s_hidden_count, r_is_objc_ptr(blurView), width, height);
@@ -525,7 +617,10 @@ void lockscreenoverlay_forget_remote_state(void)
     memset(s_hidden, 0, sizeof(s_hidden));
     s_hidden_count = 0;
     s_overlay = s_time_label = s_date_label = s_status_label = s_host_window = 0;
+    s_session_pid = 0;
     s_active = false;
     s_config_dirty = true;
+    s_retry_after = 0.0;
+    s_suppressed_retries = 0;
     log_user("[LOCKOVERLAY][FORGET] cleared stale remote overlay state.\n");
 }

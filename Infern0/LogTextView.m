@@ -6,6 +6,7 @@
 //
 
 #import "LogTextView.h"
+#import "installer/CYIconBadge.h"
 #include <pthread.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -410,8 +411,22 @@ static UIColor *colorForLogLine(NSString *line) {
 - (void)setup {
     self.editable   = NO;
     self.font       = [UIFont monospacedSystemFontOfSize:12.75 weight:UIFontWeightRegular];
-    self.backgroundColor = [UIColor colorWithRed:0.025 green:0.020 blue:0.019 alpha:1.0];
-    self.textColor  = [UIColor colorWithRed:0.94 green:0.90 blue:0.86 alpha:1.0];
+    if (CYUsesClassicInterfaceStyle()) {
+        self.backgroundColor = [UIColor colorWithRed:0.025 green:0.020 blue:0.019 alpha:1.0];
+        self.textColor = [UIColor colorWithRed:0.94 green:0.90 blue:0.86 alpha:1.0];
+    } else if (CYUsesMidnightInterfaceStyle()) {
+        self.backgroundColor = [UIColor colorWithRed:0.015 green:0.012 blue:0.019 alpha:1.0];
+        self.textColor = [UIColor colorWithRed:0.91 green:0.84 blue:0.89 alpha:1.0];
+    } else if (CYUsesFr0stInterfaceStyle()) {
+        self.backgroundColor = [UIColor colorWithRed:0.008 green:0.020 blue:0.038 alpha:1.0];
+        self.textColor = [UIColor colorWithRed:0.82 green:0.91 blue:0.97 alpha:1.0];
+    } else if (CYUsesMinecraftInterfaceStyle()) {
+        self.backgroundColor = [UIColor colorWithRed:0.020 green:0.030 blue:0.018 alpha:1.0];
+        self.textColor = [UIColor colorWithRed:0.83 green:0.88 blue:0.72 alpha:1.0];
+    } else {
+        self.backgroundColor = [UIColor colorWithRed:0.028 green:0.017 blue:0.021 alpha:1.0];
+        self.textColor = [UIColor colorWithRed:0.92 green:0.86 blue:0.87 alpha:1.0];
+    }
     self.textContainerInset = UIEdgeInsetsMake(14, 16, 24, 16);
     self.contentInsetAdjustmentBehavior = UIScrollViewContentInsetAdjustmentAlways;
     _followTail = YES;

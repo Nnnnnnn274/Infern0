@@ -9,6 +9,7 @@
 #import "SettingsViewController.h"
 #import "DSKeepAlive.h"
 #import "LogTextView.h"
+#import "installer/CYIconBadge.h"
 #import <signal.h>
 #import <sys/stat.h>
 #import <sys/utsname.h>
@@ -103,6 +104,11 @@ static dispatch_source_t g_sigterm_source;
     [tab configureWithDefaultBackground];
     UITabBar.appearance.standardAppearance = tab;
     UITabBar.appearance.scrollEdgeAppearance = tab;
+
+    UISwitch.appearance.onTintColor = CYAccentColor();
+    UISlider.appearance.minimumTrackTintColor = CYAccentColor();
+    UIProgressView.appearance.progressTintColor = CYAccentColor();
+    UISegmentedControl.appearance.selectedSegmentTintColor = CYAccentColor();
 }
 
 

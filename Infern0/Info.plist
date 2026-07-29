@@ -56,6 +56,33 @@
 				<key>UIPrerenderedIcon</key>
 				<false/>
 			</dict>
+			<key>Midnight</key>
+			<dict>
+				<key>CFBundleIconFiles</key>
+				<array>
+					<string>infern0-Midnight</string>
+				</array>
+				<key>UIPrerenderedIcon</key>
+				<false/>
+			</dict>
+			<key>Fr0st</key>
+			<dict>
+				<key>CFBundleIconFiles</key>
+				<array>
+					<string>infern0-Fr0st</string>
+				</array>
+				<key>UIPrerenderedIcon</key>
+				<false/>
+			</dict>
+			<key>Minecraft</key>
+			<dict>
+				<key>CFBundleIconFiles</key>
+				<array>
+					<string>infern0-Minecraft</string>
+				</array>
+				<key>UIPrerenderedIcon</key>
+				<false/>
+			</dict>
 		</dict>
 	</dict>
 	<key>CFBundleIcons~ipad</key>
@@ -67,6 +94,33 @@
 				<key>CFBundleIconFiles</key>
 				<array>
 					<string>infern0-Classic</string>
+				</array>
+				<key>UIPrerenderedIcon</key>
+				<false/>
+			</dict>
+			<key>Midnight</key>
+			<dict>
+				<key>CFBundleIconFiles</key>
+				<array>
+					<string>infern0-Midnight</string>
+				</array>
+				<key>UIPrerenderedIcon</key>
+				<false/>
+			</dict>
+			<key>Fr0st</key>
+			<dict>
+				<key>CFBundleIconFiles</key>
+				<array>
+					<string>infern0-Fr0st</string>
+				</array>
+				<key>UIPrerenderedIcon</key>
+				<false/>
+			</dict>
+			<key>Minecraft</key>
+			<dict>
+				<key>CFBundleIconFiles</key>
+				<array>
+					<string>infern0-Minecraft</string>
 				</array>
 				<key>UIPrerenderedIcon</key>
 				<false/>

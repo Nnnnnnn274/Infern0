@@ -8,6 +8,7 @@
 #import "PackageCatalog.h"
 #import "PackageQueue.h"
 #import "CYIconBadge.h"
+#import "MainTabBarController.h"
 #import "../SettingsViewController.h"
 #import <unistd.h>
 #import <fcntl.h>
@@ -26,9 +27,13 @@ static const CGFloat kMargin = 20.0;
 @property (nonatomic, strong) UIStackView *stack;
 @property (nonatomic, weak) UIView *heroView;
 @property (nonatomic, weak) CAGradientLayer *heroGrad;
+@property (nonatomic, strong) CAGradientLayer *canvasGrad;
+@property (nonatomic, strong) CAGradientLayer *heroGlow;
 @property (nonatomic, strong) UITextView *logView;
 @property (nonatomic, strong) NSPipe *logPipe;
 @property (nonatomic, strong) UIView *statusView;
+- (void)refreshPalette;
+- (UIView *)buildClassicHero;
 @end
 
 @implementation HomeViewController
@@ -43,9 +48,18 @@ static const CGFloat kMargin = 20.0;
     self.navigationController.navigationBar.prefersLargeTitles = YES;
     self.navigationItem.title = @"infern0";
 
+    self.canvasGrad = [CAGradientLayer layer];
+    self.canvasGrad.startPoint = CGPointMake(0.0, 0.0);
+    self.canvasGrad.endPoint = CGPointMake(1.0, 1.0);
+    self.canvasGrad.locations = @[@0.0, @0.42, @1.0];
+    [self.view.layer insertSublayer:self.canvasGrad atIndex:0];
+    [self refreshPalette];
+
     self.scrollView = [[UIScrollView alloc] init];
     self.scrollView.translatesAutoresizingMaskIntoConstraints = NO;
     self.scrollView.alwaysBounceVertical = YES;
+    self.scrollView.contentInsetAdjustmentBehavior = UIScrollViewContentInsetAdjustmentAutomatic;
+    self.scrollView.verticalScrollIndicatorInsets = UIEdgeInsetsMake(0.0, 0.0, 0.0, -2.0);
     [self.view addSubview:self.scrollView];
 
     self.stack = [[UIStackView alloc] init];
@@ -68,6 +82,10 @@ static const CGFloat kMargin = 20.0;
     ]];
 
     [self.stack addArrangedSubview:[self buildHero]];
+    if (!CYUsesClassicInterfaceStyle()) {
+        [self.stack setCustomSpacing:22.0 afterView:self.stack.arrangedSubviews.lastObject];
+        [self.stack addArrangedSubview:[self sectionHeader:@"At a Glance"]];
+    }
     self.statusView = [self buildQuickActions];
     [self.stack addArrangedSubview:self.statusView];
     [self.stack addArrangedSubview:[self buildWhatsNew]];
@@ -80,6 +98,36 @@ static const CGFloat kMargin = 20.0;
     // Set crash log path for direct writes (bypasses pipe, survives panic)
     NSString *logPath = [self crashLogPath];
     strncpy(g_crash_log_path, [logPath UTF8String], sizeof(g_crash_log_path) - 1);
+}
+
+- (void)traitCollectionDidChange:(UITraitCollection *)previousTraitCollection
+{
+    [super traitCollectionDidChange:previousTraitCollection];
+    if (!previousTraitCollection ||
+        [self.traitCollection hasDifferentColorAppearanceComparedToTraitCollection:previousTraitCollection]) {
+        [self refreshPalette];
+    }
+}
+
+- (void)refreshPalette
+{
+    UIColor *canvas = [CYCanvasColor() resolvedColorWithTraitCollection:self.traitCollection];
+    if (CYUsesClassicInterfaceStyle()) {
+        self.canvasGrad.colors = @[
+            (id)canvas.CGColor,
+            (id)canvas.CGColor,
+            (id)canvas.CGColor,
+        ];
+        return;
+    }
+    UIColor *ember = [[CYAccentColor() colorWithAlphaComponent:
+        self.traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark ? 0.12 : 0.065]
+        resolvedColorWithTraitCollection:self.traitCollection];
+    self.canvasGrad.colors = @[
+        (id)ember.CGColor,
+        (id)[canvas colorWithAlphaComponent:0.0].CGColor,
+        (id)canvas.CGColor,
+    ];
 }
 
 - (void)viewWillAppear:(BOOL)animated
@@ -98,21 +146,48 @@ static const CGFloat kMargin = 20.0;
 
 - (UIView *)buildHero
 {
+    if (CYUsesClassicInterfaceStyle()) return [self buildClassicHero];
+
     UIView *hero = [[UIView alloc] init];
-    hero.layer.cornerRadius = 20.0;
+    hero.layer.cornerRadius = 26.0;
     hero.layer.cornerCurve = kCACornerCurveContinuous;
     hero.clipsToBounds = YES;
     hero.layer.borderWidth = 1.0 / UIScreen.mainScreen.scale;
-    hero.layer.borderColor = [UIColor.whiteColor colorWithAlphaComponent:0.18].CGColor;
+    hero.layer.borderColor = [UIColor.whiteColor colorWithAlphaComponent:0.20].CGColor;
 
     CAGradientLayer *grad = [CAGradientLayer layer];
-    grad.colors = @[
-        (id)[UIColor colorWithRed:1.0 green:0.34 blue:0.12 alpha:1.0].CGColor,
-        (id)[UIColor colorWithRed:0.82 green:0.08 blue:0.12 alpha:1.0].CGColor,
-    ];
+    grad.colors = CYHeroGradientLayerColors();
     grad.startPoint = CGPointMake(0.0, 0.0);
     grad.endPoint = CGPointMake(1.0, 1.0);
     [hero.layer insertSublayer:grad atIndex:0];
+
+    CAGradientLayer *glow = [CAGradientLayer layer];
+    glow.type = kCAGradientLayerRadial;
+    glow.colors = @[
+        (id)[UIColor colorWithWhite:1.0 alpha:0.22].CGColor,
+        (id)[UIColor colorWithWhite:1.0 alpha:0.0].CGColor,
+    ];
+    glow.startPoint = CGPointMake(0.5, 0.5);
+    glow.endPoint = CGPointMake(1.0, 1.0);
+    [hero.layer insertSublayer:glow above:grad];
+
+    UIView *orb = [[UIView alloc] init];
+    orb.translatesAutoresizingMaskIntoConstraints = NO;
+    orb.backgroundColor = [UIColor.whiteColor colorWithAlphaComponent:0.08];
+    orb.layer.cornerRadius = 61.0;
+    orb.layer.borderWidth = 1.0;
+    orb.layer.borderColor = [UIColor.whiteColor colorWithAlphaComponent:0.13].CGColor;
+    orb.userInteractionEnabled = NO;
+    [hero addSubview:orb];
+
+    UIImageView *spark = [[UIImageView alloc] initWithImage:
+        [UIImage systemImageNamed:@"flame.fill"
+               withConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:48.0
+                                                                                  weight:UIImageSymbolWeightSemibold]]];
+    spark.translatesAutoresizingMaskIntoConstraints = NO;
+    spark.tintColor = [UIColor.whiteColor colorWithAlphaComponent:0.18];
+    spark.contentMode = UIViewContentModeScaleAspectFit;
+    [orb addSubview:spark];
 
     UIImageView *icon = [[UIImageView alloc] init];
     icon.translatesAutoresizingMaskIntoConstraints = NO;
@@ -120,6 +195,138 @@ static const CGFloat kMargin = 20.0;
     if (!appIcon) {
         NSString *f = [[[NSBundle mainBundle] infoDictionary][@"CFBundleIcons"][@"CFBundlePrimaryIcon"][@"CFBundleIconFiles"] lastObject];
         appIcon = f ? [UIImage imageNamed:f] : nil;
+    }
+    icon.image = appIcon;
+    icon.layer.cornerRadius = 12.0;
+    icon.layer.cornerCurve = kCACornerCurveContinuous;
+    icon.clipsToBounds = YES;
+    icon.contentMode = UIViewContentModeScaleAspectFit;
+    icon.layer.borderWidth = 1.0;
+    icon.layer.borderColor = [UIColor colorWithWhite:1.0 alpha:0.25].CGColor;
+    [hero addSubview:icon];
+
+    NSString *ver = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleShortVersionString"] ?: @"";
+
+    UILabel *brand = [[UILabel alloc] init];
+    brand.translatesAutoresizingMaskIntoConstraints = NO;
+    brand.text = [NSString stringWithFormat:@"INFERN0  •  %@", ver.length ? [@"V" stringByAppendingString:ver] : @"PREVIEW"];
+    brand.font = [UIFont systemFontOfSize:11.0 weight:UIFontWeightHeavy];
+    brand.textColor = [UIColor.whiteColor colorWithAlphaComponent:0.76];
+    [hero addSubview:brand];
+
+    UILabel *title = [[UILabel alloc] init];
+    title.translatesAutoresizingMaskIntoConstraints = NO;
+    title.text = @"Make iOS yours.";
+    title.font = [UIFont systemFontOfSize:29.0 weight:UIFontWeightBold];
+    title.adjustsFontForContentSizeCategory = YES;
+    title.textColor = UIColor.whiteColor;
+    title.minimumScaleFactor = 0.82;
+    title.adjustsFontSizeToFitWidth = YES;
+    [hero addSubview:title];
+
+    UILabel *sub = [[UILabel alloc] init];
+    sub.translatesAutoresizingMaskIntoConstraints = NO;
+    sub.text = @"Focused SpringBoard tweaks for stock iOS.\nNo jailbreak required.";
+    sub.font = [UIFont systemFontOfSize:14.0 weight:UIFontWeightMedium];
+    sub.textColor = [UIColor colorWithWhite:1.0 alpha:0.72];
+    sub.numberOfLines = 2;
+    [hero addSubview:sub];
+
+    UIView *readyPill = [[UIView alloc] init];
+    readyPill.translatesAutoresizingMaskIntoConstraints = NO;
+    readyPill.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.13];
+    readyPill.layer.cornerRadius = 13.0;
+    readyPill.layer.cornerCurve = kCACornerCurveContinuous;
+    [hero addSubview:readyPill];
+
+    UIView *readyDot = [[UIView alloc] init];
+    readyDot.translatesAutoresizingMaskIntoConstraints = NO;
+    readyDot.backgroundColor = settings_device_supported() ? UIColor.systemGreenColor : UIColor.systemOrangeColor;
+    readyDot.layer.cornerRadius = 3.5;
+    [readyPill addSubview:readyDot];
+
+    UILabel *readyLabel = [[UILabel alloc] init];
+    readyLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    readyLabel.text = settings_device_supported() ? @"DEVICE READY" : @"CHECK COMPATIBILITY";
+    readyLabel.font = [UIFont systemFontOfSize:10.0 weight:UIFontWeightBold];
+    readyLabel.textColor = [UIColor.whiteColor colorWithAlphaComponent:0.86];
+    [readyPill addSubview:readyLabel];
+
+    [NSLayoutConstraint activateConstraints:@[
+        [hero.heightAnchor constraintGreaterThanOrEqualToConstant:216.0],
+
+        [orb.trailingAnchor constraintEqualToAnchor:hero.trailingAnchor constant:42.0],
+        [orb.centerYAnchor constraintEqualToAnchor:hero.centerYAnchor constant:-5.0],
+        [orb.widthAnchor constraintEqualToConstant:122.0],
+        [orb.heightAnchor constraintEqualToConstant:122.0],
+        [spark.centerXAnchor constraintEqualToAnchor:orb.centerXAnchor],
+        [spark.centerYAnchor constraintEqualToAnchor:orb.centerYAnchor],
+
+        [icon.leadingAnchor constraintEqualToAnchor:hero.leadingAnchor constant:20.0],
+        [icon.topAnchor constraintEqualToAnchor:hero.topAnchor constant:20.0],
+        [icon.widthAnchor constraintEqualToConstant:38.0],
+        [icon.heightAnchor constraintEqualToConstant:38.0],
+
+        [brand.leadingAnchor constraintEqualToAnchor:icon.trailingAnchor constant:10.0],
+        [brand.centerYAnchor constraintEqualToAnchor:icon.centerYAnchor],
+        [brand.trailingAnchor constraintLessThanOrEqualToAnchor:hero.trailingAnchor constant:-18.0],
+
+        [title.leadingAnchor constraintEqualToAnchor:hero.leadingAnchor constant:20.0],
+        [title.trailingAnchor constraintEqualToAnchor:hero.trailingAnchor constant:-64.0],
+        [title.topAnchor constraintEqualToAnchor:icon.bottomAnchor constant:18.0],
+
+        [sub.leadingAnchor constraintEqualToAnchor:title.leadingAnchor],
+        [sub.trailingAnchor constraintEqualToAnchor:hero.trailingAnchor constant:-70.0],
+        [sub.topAnchor constraintEqualToAnchor:title.bottomAnchor constant:6.0],
+
+        [readyPill.leadingAnchor constraintEqualToAnchor:title.leadingAnchor],
+        [readyPill.topAnchor constraintEqualToAnchor:sub.bottomAnchor constant:14.0],
+        [readyPill.bottomAnchor constraintEqualToAnchor:hero.bottomAnchor constant:-18.0],
+        [readyPill.heightAnchor constraintEqualToConstant:26.0],
+
+        [readyDot.leadingAnchor constraintEqualToAnchor:readyPill.leadingAnchor constant:10.0],
+        [readyDot.centerYAnchor constraintEqualToAnchor:readyPill.centerYAnchor],
+        [readyDot.widthAnchor constraintEqualToConstant:7.0],
+        [readyDot.heightAnchor constraintEqualToConstant:7.0],
+        [readyLabel.leadingAnchor constraintEqualToAnchor:readyDot.trailingAnchor constant:7.0],
+        [readyLabel.trailingAnchor constraintEqualToAnchor:readyPill.trailingAnchor constant:-11.0],
+        [readyLabel.centerYAnchor constraintEqualToAnchor:readyPill.centerYAnchor],
+    ]];
+
+    self.heroGrad = grad;
+    self.heroGlow = glow;
+    self.heroView = hero;
+    hero.isAccessibilityElement = YES;
+    hero.accessibilityLabel = [NSString stringWithFormat:@"infern0 %@. Make iOS yours. %@",
+                               ver,
+                               settings_device_supported() ? @"Device ready." : @"Check compatibility."];
+    return hero;
+}
+
+- (UIView *)buildClassicHero
+{
+    UIView *hero = [[UIView alloc] init];
+    hero.layer.cornerRadius = 20.0;
+    hero.layer.cornerCurve = kCACornerCurveContinuous;
+    hero.clipsToBounds = YES;
+    hero.layer.borderWidth = 1.0 / UIScreen.mainScreen.scale;
+    hero.layer.borderColor = [UIColor.whiteColor colorWithAlphaComponent:0.18].CGColor;
+
+    CAGradientLayer *gradient = [CAGradientLayer layer];
+    gradient.colors = @[
+        (id)[UIColor colorWithRed:1.0 green:0.34 blue:0.12 alpha:1.0].CGColor,
+        (id)[UIColor colorWithRed:0.82 green:0.08 blue:0.12 alpha:1.0].CGColor,
+    ];
+    gradient.startPoint = CGPointMake(0.0, 0.0);
+    gradient.endPoint = CGPointMake(1.0, 1.0);
+    [hero.layer insertSublayer:gradient atIndex:0];
+
+    UIImageView *icon = [[UIImageView alloc] init];
+    icon.translatesAutoresizingMaskIntoConstraints = NO;
+    UIImage *appIcon = [UIImage imageNamed:@"AppIcon60x60"];
+    if (!appIcon) {
+        NSString *filename = [[[NSBundle mainBundle] infoDictionary][@"CFBundleIcons"][@"CFBundlePrimaryIcon"][@"CFBundleIconFiles"] lastObject];
+        appIcon = filename.length ? [UIImage imageNamed:filename] : nil;
     }
     icon.image = appIcon;
     icon.layer.cornerRadius = 14.0;
@@ -130,8 +337,6 @@ static const CGFloat kMargin = 20.0;
     icon.layer.borderColor = [UIColor colorWithWhite:1.0 alpha:0.25].CGColor;
     [hero addSubview:icon];
 
-    NSString *ver = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleShortVersionString"] ?: @"";
-
     UILabel *tagline = [[UILabel alloc] init];
     tagline.translatesAutoresizingMaskIntoConstraints = NO;
     tagline.text = @"SpringBoard tweaks for stock iOS";
@@ -140,29 +345,28 @@ static const CGFloat kMargin = 20.0;
     tagline.textAlignment = NSTextAlignmentCenter;
     [hero addSubview:tagline];
 
-    UILabel *sub = [[UILabel alloc] init];
-    sub.translatesAutoresizingMaskIntoConstraints = NO;
-    sub.text = [NSString stringWithFormat:@"No jailbreak required · v%@", ver];
-    sub.font = [UIFont systemFontOfSize:13.0 weight:UIFontWeightMedium];
-    sub.textColor = [UIColor colorWithWhite:1.0 alpha:0.65];
-    sub.textAlignment = NSTextAlignmentCenter;
-    [hero addSubview:sub];
+    NSString *version = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleShortVersionString"] ?: @"";
+    UILabel *subtitle = [[UILabel alloc] init];
+    subtitle.translatesAutoresizingMaskIntoConstraints = NO;
+    subtitle.text = [NSString stringWithFormat:@"No jailbreak required  •  v%@", version];
+    subtitle.font = [UIFont systemFontOfSize:13.0 weight:UIFontWeightMedium];
+    subtitle.textColor = [UIColor colorWithWhite:1.0 alpha:0.65];
+    subtitle.textAlignment = NSTextAlignmentCenter;
+    [hero addSubview:subtitle];
 
     [NSLayoutConstraint activateConstraints:@[
-        [icon.centerXAnchor  constraintEqualToAnchor:hero.centerXAnchor],
-        [icon.topAnchor      constraintEqualToAnchor:hero.topAnchor constant:20.0],
-        [icon.widthAnchor    constraintEqualToConstant:48.0],
-        [icon.heightAnchor   constraintEqualToConstant:48.0],
-
-        [tagline.centerXAnchor  constraintEqualToAnchor:hero.centerXAnchor],
-        [tagline.topAnchor      constraintEqualToAnchor:icon.bottomAnchor constant:10.0],
-
-        [sub.centerXAnchor  constraintEqualToAnchor:hero.centerXAnchor],
-        [sub.topAnchor      constraintEqualToAnchor:tagline.bottomAnchor constant:4.0],
-        [sub.bottomAnchor   constraintEqualToAnchor:hero.bottomAnchor constant:-18.0],
+        [icon.centerXAnchor constraintEqualToAnchor:hero.centerXAnchor],
+        [icon.topAnchor constraintEqualToAnchor:hero.topAnchor constant:20.0],
+        [icon.widthAnchor constraintEqualToConstant:48.0],
+        [icon.heightAnchor constraintEqualToConstant:48.0],
+        [tagline.centerXAnchor constraintEqualToAnchor:hero.centerXAnchor],
+        [tagline.topAnchor constraintEqualToAnchor:icon.bottomAnchor constant:10.0],
+        [subtitle.centerXAnchor constraintEqualToAnchor:hero.centerXAnchor],
+        [subtitle.topAnchor constraintEqualToAnchor:tagline.bottomAnchor constant:4.0],
+        [subtitle.bottomAnchor constraintEqualToAnchor:hero.bottomAnchor constant:-18.0],
     ]];
 
-    self.heroGrad = grad;
+    self.heroGrad = gradient;
     self.heroView = hero;
     return hero;
 }
@@ -170,8 +374,13 @@ static const CGFloat kMargin = 20.0;
 - (void)viewDidLayoutSubviews
 {
     [super viewDidLayoutSubviews];
+    self.canvasGrad.frame = self.view.bounds;
     if (self.heroGrad && self.heroView) {
         self.heroGrad.frame = self.heroView.bounds;
+        self.heroGlow.frame = CGRectMake(CGRectGetWidth(self.heroView.bounds) * 0.42,
+                                         -CGRectGetHeight(self.heroView.bounds) * 0.30,
+                                         CGRectGetWidth(self.heroView.bounds) * 0.90,
+                                         CGRectGetHeight(self.heroView.bounds) * 1.35);
     }
 }
 
@@ -207,13 +416,18 @@ static const CGFloat kMargin = 20.0;
 {
     UIView *card = [[UIView alloc] init];
     CYApplyCardStyle(card, 18.0);
+    UIView *accent = [[UIView alloc] init];
+    accent.translatesAutoresizingMaskIntoConstraints = NO;
+    accent.backgroundColor = color;
+    accent.layer.cornerRadius = 1.5;
+    [card addSubview:accent];
     UIImageView *image = [[UIImageView alloc] initWithImage:[UIImage systemImageNamed:icon]];
     image.translatesAutoresizingMaskIntoConstraints = NO;
     image.tintColor = color;
     UILabel *valueLabel = [[UILabel alloc] init];
     valueLabel.translatesAutoresizingMaskIntoConstraints = NO;
     valueLabel.text = value;
-    valueLabel.font = [UIFont preferredFontForTextStyle:UIFontTextStyleHeadline];
+    valueLabel.font = [UIFont monospacedDigitSystemFontOfSize:18.0 weight:UIFontWeightBold];
     valueLabel.adjustsFontForContentSizeCategory = YES;
     valueLabel.textAlignment = NSTextAlignmentCenter;
     UILabel *titleLabel = [[UILabel alloc] init];
@@ -224,8 +438,12 @@ static const CGFloat kMargin = 20.0;
     titleLabel.textAlignment = NSTextAlignmentCenter;
     [card addSubview:image]; [card addSubview:valueLabel]; [card addSubview:titleLabel];
     [NSLayoutConstraint activateConstraints:@[
-        [card.heightAnchor constraintEqualToConstant:96.0],
-        [image.topAnchor constraintEqualToAnchor:card.topAnchor constant:12.0],
+        [card.heightAnchor constraintEqualToConstant:100.0],
+        [accent.topAnchor constraintEqualToAnchor:card.topAnchor constant:10.0],
+        [accent.centerXAnchor constraintEqualToAnchor:card.centerXAnchor],
+        [accent.widthAnchor constraintEqualToConstant:24.0],
+        [accent.heightAnchor constraintEqualToConstant:3.0],
+        [image.topAnchor constraintEqualToAnchor:accent.bottomAnchor constant:9.0],
         [image.centerXAnchor constraintEqualToAnchor:card.centerXAnchor],
         [valueLabel.topAnchor constraintEqualToAnchor:image.bottomAnchor constant:5.0],
         [valueLabel.leadingAnchor constraintEqualToAnchor:card.leadingAnchor constant:4.0],
@@ -314,13 +532,13 @@ static const CGFloat kMargin = 20.0;
     UIView *card = [self card];
     UIStackView *s = [self vstackInCard:card spacing:14.0];
 
-    UILabel *header = [self sectionHeader:@"What's New"];
+    UILabel *header = [self sectionHeader:@"Built for Confidence"];
     [s addArrangedSubview:header];
 
     [s addArrangedSubview:[self compactRow:@"Focused catalog of retained, testable tweaks"
                                      icon:@"checkmark.shield.fill" color:UIColor.systemGreenColor]];
-    [s addArrangedSubview:[self compactRow:@"Session cleanup and detailed activity logs"
-                                     icon:@"waveform.path.ecg" color:UIColor.systemOrangeColor]];
+    [s addArrangedSubview:[self compactRow:@"Safe session cleanup and detailed activity logs"
+                                     icon:@"waveform.path.ecg" color:CYAccentColor()]];
 
     return card;
 }
@@ -335,9 +553,9 @@ static const CGFloat kMargin = 20.0;
     [s addArrangedSubview:[self sectionHeader:@"Get Started"]];
 
     [s addArrangedSubview:[self bigActionButton:@"Browse Packages"
-                                          sub:@"Choose from the cleaned retained catalog"
+                                         sub:@"Explore the curated tweak catalog"
                                          icon:@"shippingbox.fill"
-                                        color:UIColor.systemOrangeColor
+                                        color:CYAccentColor()
                                           sel:@selector(openPackagesTab)]];
     return card;
 }
@@ -345,13 +563,16 @@ static const CGFloat kMargin = 20.0;
 - (UIView *)bigActionButton:(NSString *)title sub:(NSString *)sub icon:(NSString *)iconName color:(UIColor *)color sel:(SEL)sel
 {
     UIView *btn = [[UIView alloc] init];
-    btn.backgroundColor = [color colorWithAlphaComponent:0.08];
+    BOOL prominent = sel == @selector(openPackagesTab);
+    btn.backgroundColor = [color colorWithAlphaComponent:prominent ? 0.14 : 0.08];
     btn.layer.cornerRadius = 14.0;
     btn.layer.cornerCurve = kCACornerCurveContinuous;
+    btn.layer.borderWidth = 1.0 / UIScreen.mainScreen.scale;
+    btn.layer.borderColor = [color colorWithAlphaComponent:prominent ? 0.26 : 0.12].CGColor;
 
     UIView *dot = [[UIView alloc] init];
     dot.translatesAutoresizingMaskIntoConstraints = NO;
-    dot.backgroundColor = [color colorWithAlphaComponent:0.18];
+    dot.backgroundColor = [color colorWithAlphaComponent:prominent ? 0.24 : 0.18];
     dot.layer.cornerRadius = 18.0;
     [btn addSubview:dot];
 
@@ -381,7 +602,7 @@ static const CGFloat kMargin = 20.0;
         [UIImage systemImageNamed:@"chevron.right"
                withConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:12.0 weight:UIImageSymbolWeightBold]]];
     chev.translatesAutoresizingMaskIntoConstraints = NO;
-    chev.tintColor = [color colorWithAlphaComponent:0.6];
+    chev.tintColor = [color colorWithAlphaComponent:prominent ? 0.9 : 0.6];
     [btn addSubview:chev];
 
     [NSLayoutConstraint activateConstraints:@[
@@ -606,7 +827,7 @@ static BOOL g_running_flag = NO;
     [s addArrangedSubview:headerWrap];
 
     [s addArrangedSubview:[self linkCell:@"Community Roadmap" icon:@"person.3.fill"
-                                  color:UIColor.systemOrangeColor url:kCommunityURL sep:YES]];
+                                  color:CYAccentColor() url:kCommunityURL sep:YES]];
     [s addArrangedSubview:[self linkCell:@"Report a Bug" icon:@"exclamationmark.bubble.fill"
                                   color:UIColor.systemRedColor url:kGitHubIssuesURL sep:YES]];
     [s addArrangedSubview:[self linkCell:@"GitHub" icon:@"chevron.left.forwardslash.chevron.right"
@@ -778,14 +999,8 @@ static BOOL g_running_flag = NO;
 
 - (void)openPackagesTab
 {
-    UITabBarController *tab = self.tabBarController;
-    if (!tab) return;
-    for (NSUInteger i = 0; i < tab.viewControllers.count; i++) {
-        if ([tab.viewControllers[i].tabBarItem.title isEqualToString:@"Packages"]) {
-            tab.selectedIndex = i;
-            return;
-        }
-    }
+    MainTabBarController *tabs = (MainTabBarController *)self.tabBarController;
+    [tabs selectTab:CYMainTabDestinationPackages];
 }
 
 @end

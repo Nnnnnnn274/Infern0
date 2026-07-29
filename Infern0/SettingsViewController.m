@@ -27,6 +27,8 @@
 #import "tweaks/appswitchergrid.h"
 #import "tweaks/hide_home_bar.h"
 #import "tweaks/QuickLoader.h"
+#import "installer/MainTabBarController.h"
+#import "installer/SourcesViewController.h"
 #import <CoreMotion/CoreMotion.h>
 
 #import <objc/runtime.h>
@@ -2323,37 +2325,44 @@ static BOOL settings_fastlockx_lite_install_allowed(void)
 
 static BOOL settings_velvet_install_allowed(void)
 {
-    return cyanide_experimental_tweaks_available() && settings_experimental_tweaks_enabled();
+    return NO;
 }
 
-static BOOL settings_cleannc_install_allowed(void) { return cyanide_experimental_tweaks_available(); }
-static BOOL settings_undertime_install_allowed(void) { return cyanide_experimental_tweaks_available(); }
-static BOOL settings_zeppelinlite_install_allowed(void) { return cyanide_experimental_tweaks_available(); }
-static BOOL settings_cleanhomescreen_install_allowed(void) { return cyanide_experimental_tweaks_available(); }
-static BOOL settings_realcc_install_allowed(void) { return cyanide_experimental_tweaks_available(); }
-static BOOL settings_cleancc_install_allowed(void) { return cyanide_experimental_tweaks_available(); }
-static BOOL settings_fugap_install_allowed(void) { return cyanide_experimental_tweaks_available(); }
-static BOOL settings_modulespacing_install_allowed(void) { return cyanide_experimental_tweaks_available(); }
-static BOOL settings_sugarcane_install_allowed(void) { return cyanide_experimental_tweaks_available(); }
-static BOOL settings_betterccxi_install_allowed(void) { return cyanide_experimental_tweaks_available(); }
+// These ports were physically removed during the stability cleanup. Their
+// symbols remain in retired_tweak_compat.m only so defaults saved by an older
+// build can be loaded and cleaned without a linker or launch failure. Never
+// expose or schedule a compatibility stub as an installed tweak.
+static BOOL settings_cleannc_install_allowed(void) { return NO; }
+static BOOL settings_undertime_install_allowed(void) { return NO; }
+static BOOL settings_zeppelinlite_install_allowed(void) { return NO; }
+static BOOL settings_cleanhomescreen_install_allowed(void) { return NO; }
+static BOOL settings_realcc_install_allowed(void) { return NO; }
+static BOOL settings_cleancc_install_allowed(void) { return NO; }
+static BOOL settings_fugap_install_allowed(void) { return NO; }
+static BOOL settings_modulespacing_install_allowed(void) { return NO; }
+static BOOL settings_sugarcane_install_allowed(void) { return NO; }
+static BOOL settings_betterccxi_install_allowed(void) { return NO; }
 // Magma is retired: keep the symbols available for exact cleanup of an older
 // active session, but never expose or schedule a new application.
 static BOOL settings_magma_install_allowed(void) { return NO; }
-static BOOL settings_betterccicons_install_allowed(void) { return cyanide_experimental_tweaks_available(); }
-static BOOL settings_ccnoplatterdim_install_allowed(void) { return cyanide_experimental_tweaks_available(); }
-static BOOL settings_ccstatus_install_allowed(void) { return cyanide_experimental_tweaks_available(); }
-static BOOL settings_hapticcc_install_allowed(void) { return cyanide_experimental_tweaks_available(); }
-static BOOL settings_securecc_install_allowed(void) { return cyanide_experimental_tweaks_available(); }
-static BOOL settings_hidellabels_install_allowed(void) { return cyanide_experimental_tweaks_available(); }
-static BOOL settings_fakeclockup_install_allowed(void) { return cyanide_experimental_tweaks_available(); }
-static BOOL settings_pancake_install_allowed(void) { return cyanide_experimental_tweaks_available(); }
+static BOOL settings_betterccicons_install_allowed(void) { return NO; }
+static BOOL settings_ccnoplatterdim_install_allowed(void) { return NO; }
+static BOOL settings_ccstatus_install_allowed(void) { return NO; }
+static BOOL settings_hapticcc_install_allowed(void) { return NO; }
+static BOOL settings_securecc_install_allowed(void) { return NO; }
+static BOOL settings_hidellabels_install_allowed(void) { return NO; }
+static BOOL settings_fakeclockup_install_allowed(void) { return NO; }
+static BOOL settings_pancake_install_allowed(void) { return NO; }
 static BOOL settings_cylinderlite_install_allowed(void) { return cyanide_experimental_tweaks_available(); }
 static BOOL settings_barmoji_install_allowed(void) { return cyanide_experimental_tweaks_available(); }
-static BOOL settings_blurrybadges_install_allowed(void) { return cyanide_experimental_tweaks_available(); }
-static BOOL settings_snapper_install_allowed(void) { return cyanide_experimental_tweaks_available(); }
+static BOOL settings_blurrybadges_install_allowed(void) { return NO; }
+static BOOL settings_snapper_install_allowed(void) { return NO; }
 static BOOL settings_pullover_install_allowed(void) { return cyanide_experimental_tweaks_available(); }
-static BOOL settings_alkaline_install_allowed(void) { return cyanide_experimental_tweaks_available(); }
-static BOOL settings_tweakloader_install_allowed(void) { return cyanide_experimental_tweaks_available(); }
+static BOOL settings_alkaline_install_allowed(void) { return NO; }
+static BOOL settings_tweakloader_install_allowed(void) { return NO; }
+static BOOL settings_roundedicons_install_allowed(void) { return NO; }
+static BOOL settings_freeplacement_install_allowed(void) { return NO; }
+static BOOL settings_applibrarystudio_install_allowed(void) { return NO; }
 
 static NSString *settings_legacy_access_label(void)
 {
@@ -6051,28 +6060,12 @@ static void settings_start_velvet_live_loop(void)
 
 static BOOL settings_visual_refresh_enabled(NSUserDefaults *d)
 {
-    return [d boolForKey:kSettingsCleanCCEnabled] ||
-           [d boolForKey:kSettingsCleanHomeScreenEnabled] ||
-           [d boolForKey:kSettingsHideLabelsEnabled] ||
-           [d boolForKey:kSettingsLayoutExtrasEnabled] ||
-           [d boolForKey:kSettingsFUGapEnabled] ||
-           [d boolForKey:kSettingsModuleSpacingEnabled] ||
-           [d boolForKey:kSettingsSugarCaneEnabled] ||
-           [d boolForKey:kSettingsBetterCCXIEnabled] ||
-           [d boolForKey:kSettingsBetterCCIconsEnabled] ||
-           [d boolForKey:kSettingsCCNoPlatterDimEnabled] ||
-           [d boolForKey:kSettingsCCStatusEnabled] ||
-           [d boolForKey:kSettingsHapticCCEnabled] ||
-           [d boolForKey:kSettingsSecureCCEnabled] ||
-           [d boolForKey:kSettingsCylinderLiteEnabled] ||
-           [d boolForKey:kSettingsBlurryBadgesEnabled] ||
-           [d boolForKey:kSettingsAlkalineEnabled] ||
-           [d boolForKey:kSettingsRoundedIconsEnabled] ||
+    return [d boolForKey:kSettingsLayoutExtrasEnabled] ||
+           (settings_cylinderlite_install_allowed() &&
+            [d boolForKey:kSettingsCylinderLiteEnabled]) ||
            [d boolForKey:kSettingsWatchLayoutEnabled] ||
-           [d boolForKey:kSettingsAppLibraryStudioEnabled] ||
            [d boolForKey:kSettingsLockCustomizerEnabled] ||
-           [d boolForKey:kSettingsLockScreenOverlayEnabled] ||
-           [d boolForKey:kSettingsFreePlacementEnabled];
+           [d boolForKey:kSettingsLockScreenOverlayEnabled];
 }
 
 static void settings_visual_refresh_mark_if_ready(NSString *key, bool ready)
@@ -6087,91 +6080,33 @@ static BOOL settings_visual_refresh_tick(NSUserDefaults *d, BOOL advanceHeavySca
     // into partial failures across unrelated tweaks. Refresh a bounded group
     // per cycle; initial Apply still runs every requested tweak immediately.
     static NSUInteger heavyScanCursor = 0;
-    NSUInteger slot = advanceHeavyScan ? (heavyScanCursor++ % 7) : NSNotFound;
-    BOOL attempted = [d boolForKey:kSettingsCylinderLiteEnabled];
+    NSUInteger slot = advanceHeavyScan ? (heavyScanCursor++ % 3) : NSNotFound;
+    BOOL attempted = settings_cylinderlite_install_allowed() &&
+                     [d boolForKey:kSettingsCylinderLiteEnabled];
     if (advanceHeavyScan) {
-        attempted = attempted || [d boolForKey:kSettingsSugarCaneEnabled] ||
-                    [d boolForKey:kSettingsHapticCCEnabled];
         switch (slot) {
-            case 0: attempted = attempted || [d boolForKey:kSettingsLayoutExtrasEnabled] ||
-                                [d boolForKey:kSettingsRoundedIconsEnabled] ||
-                                [d boolForKey:kSettingsCleanHomeScreenEnabled] ||
-                                [d boolForKey:kSettingsHideLabelsEnabled]; break;
-            case 1: attempted = attempted || [d boolForKey:kSettingsCleanCCEnabled] ||
-                                [d boolForKey:kSettingsFUGapEnabled] ||
-                                [d boolForKey:kSettingsModuleSpacingEnabled]; break;
-            case 2: attempted = attempted || [d boolForKey:kSettingsBetterCCXIEnabled] ||
-                                [d boolForKey:kSettingsBetterCCIconsEnabled]; break;
-            case 3: attempted = attempted || [d boolForKey:kSettingsCCNoPlatterDimEnabled] ||
-                                [d boolForKey:kSettingsCCStatusEnabled] ||
-                                [d boolForKey:kSettingsBlurryBadgesEnabled]; break;
-            case 4: attempted = attempted || [d boolForKey:kSettingsWatchLayoutEnabled] ||
-                                [d boolForKey:kSettingsFreePlacementEnabled] ||
-                                [d boolForKey:kSettingsAppLibraryStudioEnabled]; break;
-            case 5: attempted = attempted || [d boolForKey:kSettingsLockCustomizerEnabled] ||
-                                [d boolForKey:kSettingsLockScreenOverlayEnabled] ||
-                                [d boolForKey:kSettingsAlkalineEnabled] ||
-                                [d boolForKey:kSettingsSecureCCEnabled]; break;
+            case 0: attempted = attempted ||
+                                [d boolForKey:kSettingsLayoutExtrasEnabled]; break;
+            case 1: attempted = attempted ||
+                                [d boolForKey:kSettingsWatchLayoutEnabled]; break;
+            case 2: attempted = attempted ||
+                                [d boolForKey:kSettingsLockCustomizerEnabled] ||
+                                [d boolForKey:kSettingsLockScreenOverlayEnabled]; break;
             default: break;
         }
     }
     if (slot == 0 && [d boolForKey:kSettingsLayoutExtrasEnabled])
         settings_visual_refresh_mark_if_ready(kSettingsLayoutExtrasEnabled,
                                               settings_apply_layout_extras_from_defaults_locked(d));
-    if (slot == 0 && [d boolForKey:kSettingsRoundedIconsEnabled])
-        settings_visual_refresh_mark_if_ready(kSettingsRoundedIconsEnabled, roundedicons_apply_in_session());
-    if (slot == 0 && [d boolForKey:kSettingsCleanHomeScreenEnabled])
-        settings_visual_refresh_mark_if_ready(
-            kSettingsCleanHomeScreenEnabled,
-            cleanhomescreen_apply_in_session(
-                [d boolForKey:kSettingsCleanHomeScreenHideBadges],
-                [d boolForKey:kSettingsCleanHomeScreenHidePageDots],
-                [d boolForKey:kSettingsCleanHomeScreenHideLabels]));
-    if (slot == 0 && [d boolForKey:kSettingsHideLabelsEnabled])
-        settings_visual_refresh_mark_if_ready(kSettingsHideLabelsEnabled,
-                                              hidellabels_apply_in_session());
-
-    if (slot == 1 && [d boolForKey:kSettingsCleanCCEnabled])
-        settings_visual_refresh_mark_if_ready(kSettingsCleanCCEnabled, cleancc_apply_in_session());
-    if (slot == 1 && [d boolForKey:kSettingsFUGapEnabled])
-        settings_visual_refresh_mark_if_ready(kSettingsFUGapEnabled, fugap_apply_in_session());
-    if (slot == 1 && [d boolForKey:kSettingsModuleSpacingEnabled])
-        settings_visual_refresh_mark_if_ready(kSettingsModuleSpacingEnabled, modulespacing_apply_in_session());
-
-    if (slot == 2 && [d boolForKey:kSettingsBetterCCXIEnabled])
-        settings_visual_refresh_mark_if_ready(kSettingsBetterCCXIEnabled, betterccxi_apply_in_session());
-    if (slot == 2 && [d boolForKey:kSettingsBetterCCIconsEnabled])
-        settings_visual_refresh_mark_if_ready(kSettingsBetterCCIconsEnabled, betterccicons_apply_in_session());
-
-    if (slot == 3 && [d boolForKey:kSettingsCCNoPlatterDimEnabled])
-        settings_visual_refresh_mark_if_ready(kSettingsCCNoPlatterDimEnabled, ccnoplatterdim_apply_in_session());
-    if (slot == 3 && [d boolForKey:kSettingsCCStatusEnabled])
-        settings_visual_refresh_mark_if_ready(kSettingsCCStatusEnabled, ccstatus_apply_in_session());
-    if (slot == 3 && [d boolForKey:kSettingsBlurryBadgesEnabled])
-        settings_visual_refresh_mark_if_ready(kSettingsBlurryBadgesEnabled, blurrybadges_apply_in_session());
-
-    if (slot == 4 && [d boolForKey:kSettingsWatchLayoutEnabled])
+    if (slot == 1 && [d boolForKey:kSettingsWatchLayoutEnabled])
         settings_visual_refresh_mark_if_ready(kSettingsWatchLayoutEnabled, watchlayout_apply_in_session());
-    if (slot == 4 && [d boolForKey:kSettingsFreePlacementEnabled])
-        settings_visual_refresh_mark_if_ready(kSettingsFreePlacementEnabled, freeplacement_apply_in_session());
-    if (slot == 4 && [d boolForKey:kSettingsAppLibraryStudioEnabled])
-        settings_visual_refresh_mark_if_ready(kSettingsAppLibraryStudioEnabled, applibrarystudio_apply_in_session());
 
-    if (slot == 5 && [d boolForKey:kSettingsLockCustomizerEnabled])
+    if (slot == 2 && [d boolForKey:kSettingsLockCustomizerEnabled])
         settings_visual_refresh_mark_if_ready(kSettingsLockCustomizerEnabled, lockcustomizer_apply_in_session());
-    if (slot == 5 && [d boolForKey:kSettingsLockScreenOverlayEnabled])
+    if (slot == 2 && [d boolForKey:kSettingsLockScreenOverlayEnabled])
         settings_visual_refresh_mark_if_ready(kSettingsLockScreenOverlayEnabled, lockscreenoverlay_apply_in_session());
-    if (slot == 5 && [d boolForKey:kSettingsAlkalineEnabled])
-        settings_visual_refresh_mark_if_ready(kSettingsAlkalineEnabled, alkaline_apply_in_session());
-    if (slot == 5 && [d boolForKey:kSettingsSecureCCEnabled])
-        settings_visual_refresh_mark_if_ready(kSettingsSecureCCEnabled, securecc_apply_in_session());
-
-    // These are lightweight state updates and remain responsive every tick.
-    if (advanceHeavyScan && [d boolForKey:kSettingsSugarCaneEnabled])
-        settings_visual_refresh_mark_if_ready(kSettingsSugarCaneEnabled, sugarcane_apply_in_session());
-    if (advanceHeavyScan && [d boolForKey:kSettingsHapticCCEnabled])
-        settings_visual_refresh_mark_if_ready(kSettingsHapticCCEnabled, hapticcc_apply_in_session());
-    if ([d boolForKey:kSettingsCylinderLiteEnabled])
+    if (settings_cylinderlite_install_allowed() &&
+        [d boolForKey:kSettingsCylinderLiteEnabled])
         settings_visual_refresh_mark_if_ready(kSettingsCylinderLiteEnabled,
                                               cylinderlite_tick_in_session());
     return attempted;
@@ -7932,6 +7867,43 @@ static BOOL settings_key_affects_package_state(NSString *key)
     return [settings_rc_backed_tweak_keys() containsObject:key];
 }
 
+static NSSet<NSString *> *settings_removed_tweak_keys(void)
+{
+    static NSSet<NSString *> *keys;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        keys = [NSSet setWithArray:@[
+            kSettingsVelvetEnabled,
+            kSettingsCleanNCEnabled,
+            kSettingsUnderTimeEnabled,
+            kSettingsZeppelinLiteEnabled,
+            kSettingsCleanHomeScreenEnabled,
+            kSettingsRealCCEnabled,
+            kSettingsCleanCCEnabled,
+            kSettingsFUGapEnabled,
+            kSettingsModuleSpacingEnabled,
+            kSettingsSugarCaneEnabled,
+            kSettingsBetterCCXIEnabled,
+            kSettingsBetterCCIconsEnabled,
+            kSettingsCCNoPlatterDimEnabled,
+            kSettingsCCStatusEnabled,
+            kSettingsHapticCCEnabled,
+            kSettingsSecureCCEnabled,
+            kSettingsHideLabelsEnabled,
+            kSettingsFakeClockUpEnabled,
+            kSettingsPancakeEnabled,
+            kSettingsRoundedIconsEnabled,
+            kSettingsFreePlacementEnabled,
+            kSettingsAppLibraryStudioEnabled,
+            kSettingsBlurryBadgesEnabled,
+            kSettingsSnapperEnabled,
+            kSettingsAlkalineEnabled,
+            kSettingsTweakLoaderEnabled,
+        ]];
+    });
+    return keys;
+}
+
 // Free Placement was retired during the catalog cleanup. Clear its old
 // preference so an upgrade cannot silently disable the rewritten Watch
 // overlay or keep scheduling a deleted implementation.
@@ -7952,6 +7924,20 @@ static void settings_retire_magma_preference(NSUserDefaults *d)
     [d setBool:NO forKey:kSettingsMagmaEnabled];
     [d synchronize];
     log_user("[MIGRATION] Disabled retired Magma; cleanup will restore any color properties still owned by its previous live session.\n");
+}
+
+static void settings_retire_removed_tweak_preferences(NSUserDefaults *d)
+{
+    NSUInteger disabled = 0;
+    for (NSString *key in settings_removed_tweak_keys()) {
+        if (![d boolForKey:key]) continue;
+        [d setBool:NO forKey:key];
+        disabled++;
+    }
+    if (disabled == 0) return;
+    [d synchronize];
+    log_user("[MIGRATION] Disabled %lu retired tweak preference(s); compatibility stubs will no longer be scheduled.\n",
+             (unsigned long)disabled);
 }
 
 static NSArray<NSString *> *settings_resolve_statusbar_conflicts(NSUserDefaults *d, NSString *preferredKey)
@@ -7990,6 +7976,19 @@ static void settings_schedule_live_apply_for_key(NSString *key)
     }
 
     NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
+    NSString *requestedMasterKey = settings_split_tweak_master_key_for_key(key);
+    if ([settings_removed_tweak_keys() containsObject:requestedMasterKey ?: key]) {
+        NSString *retiredKey = requestedMasterKey ?: key;
+        if ([d boolForKey:retiredKey]) {
+            [d setBool:NO forKey:retiredKey];
+            [d synchronize];
+        }
+        settings_mark_tweak_applied(retiredKey, NO);
+        settings_notify_package_queue_changed_async();
+        log_user("[MIGRATION] Ignored live apply for retired tweak key %s and restored it to Off.\n",
+                 retiredKey.UTF8String);
+        return;
+    }
     NSString *layoutKeyToStop = nil;
     if (([key isEqualToString:kSettingsWatchLayoutEnabled] ||
          [key isEqualToString:kSettingsFreePlacementEnabled]) && [d boolForKey:key]) {
@@ -9174,6 +9173,7 @@ void settings_register_defaults(void)
 {
     NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
     [defaults registerDefaults:@{
+        CYInterfaceStyleDefaultsKey:  @0,
         kSettingsAutoRunKexploit:    @NO,
         kSettingsRunSandboxEscape:   @YES,
         kSettingsRunPatchSandboxExt: @NO,
@@ -9661,8 +9661,7 @@ static void settings_run_actions_internal(BOOL pendingOnly)
         BOOL runHadBlockingFailure = NO;
         NSString *runCompletionMessage = @"Run failed. Check the log for details.";
         @try {
-            // Remove the retired Free Placement preference left by older builds.
-            settings_resolve_icon_layout_conflict(d, kSettingsWatchLayoutEnabled);
+            settings_retire_removed_tweak_preferences(d);
             settings_retire_magma_preference(d);
             settings_resolve_statusbar_conflicts(d, nil);
             BOOL patchSandboxExt = [d boolForKey:kSettingsRunPatchSandboxExt];
@@ -9730,9 +9729,11 @@ static void settings_run_actions_internal(BOOL pendingOnly)
             BOOL runMacaronLite = settings_enabled_tweak_should_run(d, kSettingsMacaronLiteEnabled, springBoardPendingOnly);
             BOOL runFloatingDock = settings_enabled_tweak_should_run(d, kSettingsFloatingDockEnabled, springBoardPendingOnly);
             BOOL runBarmoji = settings_barmoji_install_allowed() && settings_enabled_tweak_should_run(d, kSettingsBarmojiEnabled, springBoardPendingOnly);
-            BOOL runRoundedIcons = settings_enabled_tweak_should_run(d, kSettingsRoundedIconsEnabled, springBoardPendingOnly);
+            BOOL runRoundedIcons = settings_roundedicons_install_allowed() &&
+                                   settings_enabled_tweak_should_run(d, kSettingsRoundedIconsEnabled, springBoardPendingOnly);
             BOOL runWatchLayout = settings_enabled_tweak_should_run(d, kSettingsWatchLayoutEnabled, springBoardPendingOnly);
-            BOOL runAppLibraryStudio = settings_enabled_tweak_should_run(d, kSettingsAppLibraryStudioEnabled, springBoardPendingOnly);
+            BOOL runAppLibraryStudio = settings_applibrarystudio_install_allowed() &&
+                                       settings_enabled_tweak_should_run(d, kSettingsAppLibraryStudioEnabled, springBoardPendingOnly);
             BOOL runLockCustomizer = settings_enabled_tweak_should_run(d, kSettingsLockCustomizerEnabled, springBoardPendingOnly);
             BOOL runLockScreenOverlay = settings_enabled_tweak_should_run(d, kSettingsLockScreenOverlayEnabled, springBoardPendingOnly);
             if ([d boolForKey:kSettingsLockScreenOverlayEnabled] &&
@@ -9743,7 +9744,8 @@ static void settings_run_actions_internal(BOOL pendingOnly)
                 settings_mark_tweak_applied(kSettingsLockCustomizerEnabled, NO);
                 log_user("[LOCKOVERLAY][CONFLICT] Disabled the retired Lock Screen Customizer so both engines cannot own the same stock clock views.\n");
             }
-            BOOL runFreePlacement = settings_enabled_tweak_should_run(d, kSettingsFreePlacementEnabled, springBoardPendingOnly);
+            BOOL runFreePlacement = settings_freeplacement_install_allowed() &&
+                                    settings_enabled_tweak_should_run(d, kSettingsFreePlacementEnabled, springBoardPendingOnly);
             BOOL runBlurryBadges = settings_blurrybadges_install_allowed() && settings_enabled_tweak_should_run(d, kSettingsBlurryBadgesEnabled, springBoardPendingOnly);
             BOOL runSnapper = settings_snapper_install_allowed() && settings_enabled_tweak_should_run(d, kSettingsSnapperEnabled, springBoardPendingOnly);
             BOOL runPullOver = settings_pullover_install_allowed() && settings_enabled_tweak_should_run(d, kSettingsPullOverEnabled, springBoardPendingOnly);
@@ -10999,6 +11001,8 @@ static NSString *settings_pretty_date_for_iso(NSString *iso)
 @property (nonatomic, copy) NSString *settingsSearchText;
 @property (nonatomic, copy) NSString *detailSearchText;
 @property (nonatomic, strong) UIView *tweakDetailHeader;
+- (void)buildSettingsRootHeader;
+- (void)showInterfaceStylePicker;
 @end
 
 // Singleton delegate so MFMailCompose's host VC doesn't need to conform. Lives
@@ -11453,6 +11457,7 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
     // Mirrors the same flow used by the Clean Up alert: prepare → present the
     // existing WKWebView-based respring payload.
     if (!self.detailMode) {
+        if (!CYUsesClassicInterfaceStyle()) [self buildSettingsRootHeader];
         UIImage *icon = [UIImage systemImageNamed:@"arrow.clockwise.circle"];
         UIBarButtonItem *respringItem = [[UIBarButtonItem alloc] initWithImage:icon
                                                                           style:UIBarButtonItemStylePlain
@@ -11483,6 +11488,21 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
 - (void)viewDidLayoutSubviews
 {
     [super viewDidLayoutSubviews];
+    UIView *rootHeader = self.tableView.tableHeaderView;
+    if (!self.detailMode && rootHeader.tag == 4200) {
+        CGFloat rootWidth = self.tableView.bounds.size.width;
+        UIView *rootCard = [rootHeader viewWithTag:4201];
+        if (rootWidth > 0.0 &&
+            (fabs(rootHeader.frame.size.width - rootWidth) >= 0.5 || rootCard.bounds.size.width <= 0.0)) {
+            rootHeader.frame = CGRectMake(0.0, 0.0, rootWidth, 158.0);
+            rootCard.frame = CGRectMake(16.0, 10.0, rootWidth - 32.0, 132.0);
+            [rootCard viewWithTag:4202].frame = CGRectMake(18.0, 22.0, 56.0, 56.0);
+            [rootCard viewWithTag:4203].frame = CGRectMake(90.0, 21.0, rootCard.bounds.size.width - 108.0, 16.0);
+            [rootCard viewWithTag:4204].frame = CGRectMake(90.0, 39.0, rootCard.bounds.size.width - 108.0, 29.0);
+            [rootCard viewWithTag:4205].frame = CGRectMake(90.0, 70.0, rootCard.bounds.size.width - 108.0, 38.0);
+            self.tableView.tableHeaderView = rootHeader;
+        }
+    }
     if (!self.tweakDetailHeader) return;
     CGFloat width = self.tableView.bounds.size.width;
     UIView *card = [self.tweakDetailHeader viewWithTag:4100];
@@ -11494,6 +11514,68 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
     [card viewWithTag:4103].frame = CGRectMake(76.0, 35.0, card.bounds.size.width - 94.0, 27.0);
     [card viewWithTag:4104].frame = CGRectMake(18.0, 78.0, card.bounds.size.width - 36.0, 28.0);
     self.tableView.tableHeaderView = self.tweakDetailHeader;
+}
+
+- (void)buildSettingsRootHeader
+{
+    UIView *header = [[UIView alloc] initWithFrame:CGRectMake(0.0, 0.0, self.tableView.bounds.size.width, 158.0)];
+    header.tag = 4200;
+
+    UIView *card = [[UIView alloc] init];
+    card.tag = 4201;
+    CYApplyCardStyle(card, 24.0);
+    card.clipsToBounds = YES;
+    [header addSubview:card];
+
+    CAGradientLayer *gradient = [CAGradientLayer layer];
+    gradient.frame = CGRectMake(0.0, 0.0, 900.0, 132.0);
+    gradient.colors = CYHeroGradientLayerColors();
+    gradient.startPoint = CGPointMake(0.0, 0.0);
+    gradient.endPoint = CGPointMake(1.0, 1.0);
+    [card.layer insertSublayer:gradient atIndex:0];
+
+    UIImage *appIcon = [UIImage imageNamed:@"AppIcon60x60"];
+    if (!appIcon) {
+        NSString *filename = [[[NSBundle mainBundle] infoDictionary][@"CFBundleIcons"][@"CFBundlePrimaryIcon"][@"CFBundleIconFiles"] lastObject];
+        appIcon = filename.length ? [UIImage imageNamed:filename] : nil;
+    }
+    UIImageView *icon = [[UIImageView alloc] initWithImage:appIcon];
+    icon.tag = 4202;
+    icon.contentMode = UIViewContentModeScaleAspectFill;
+    icon.layer.cornerRadius = 16.0;
+    icon.layer.cornerCurve = kCACornerCurveContinuous;
+    icon.clipsToBounds = YES;
+    icon.layer.borderWidth = 1.0;
+    icon.layer.borderColor = [UIColor.whiteColor colorWithAlphaComponent:0.20].CGColor;
+    [card addSubview:icon];
+
+    UILabel *eyebrow = [[UILabel alloc] init];
+    eyebrow.tag = 4203;
+    eyebrow.text = @"CONTROL CENTER";
+    eyebrow.font = [UIFont systemFontOfSize:11.0 weight:UIFontWeightHeavy];
+    eyebrow.textColor = [UIColor.whiteColor colorWithAlphaComponent:0.72];
+    [card addSubview:eyebrow];
+
+    UILabel *title = [[UILabel alloc] init];
+    title.tag = 4204;
+    title.text = @"Tune every detail";
+    title.font = [UIFont systemFontOfSize:22.0 weight:UIFontWeightBold];
+    title.textColor = UIColor.whiteColor;
+    title.adjustsFontSizeToFitWidth = YES;
+    title.minimumScaleFactor = 0.76;
+    [card addSubview:title];
+
+    UILabel *subtitle = [[UILabel alloc] init];
+    subtitle.tag = 4205;
+    subtitle.text = @"Browse focused controls by the part of iOS they transform.";
+    subtitle.font = [UIFont systemFontOfSize:13.0 weight:UIFontWeightMedium];
+    subtitle.textColor = [UIColor.whiteColor colorWithAlphaComponent:0.68];
+    subtitle.numberOfLines = 2;
+    [card addSubview:subtitle];
+
+    self.tableView.tableHeaderView = header;
+    [self viewDidLayoutSubviews];
+    CYAnimateEntrance(card);
 }
 
 - (void)updateTweakDetailHeaderSummary
@@ -11719,34 +11801,17 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
 
 - (void)returnToInstaller
 {
-    UITabBarController *tab = self.tabBarController;
-    UINavigationController *settingsNav = self.navigationController;
-    NSUInteger installerIdx = NSNotFound;
-    for (NSUInteger i = 0; i < tab.viewControllers.count; i++) {
-        UIViewController *vc = tab.viewControllers[i];
-        if ([vc.tabBarItem.title isEqualToString:@"Packages"] ||
-            [vc.tabBarItem.title isEqualToString:@"Installer"]) {
-            installerIdx = i;
-            break;
-        }
-    }
-    [settingsNav popToRootViewControllerAnimated:NO];
-    if (installerIdx != NSNotFound) {
-        tab.selectedIndex = installerIdx;
-    }
+    MainTabBarController *tabs = (MainTabBarController *)self.tabBarController;
+    [self.navigationController popToRootViewControllerAnimated:NO];
+    [tabs selectTab:CYMainTabDestinationPackages];
 }
 
-- (void)selectBottomTabNamed:(NSString *)title
+- (void)openSourcesBrowser
 {
-    UITabBarController *tab = self.tabBarController;
-    if (![tab isKindOfClass:UITabBarController.class]) return;
-    for (NSUInteger i = 0; i < tab.viewControllers.count; i++) {
-        UIViewController *vc = tab.viewControllers[i];
-        if ([vc.tabBarItem.title isEqualToString:title]) {
-            tab.selectedIndex = i;
-            return;
-        }
-    }
+    SourcesViewController *sources = [[SourcesViewController alloc]
+        initWithStyle:UITableViewStyleInsetGrouped];
+    MainTabBarController *tabs = (MainTabBarController *)self.tabBarController;
+    [tabs showViewController:sources inTab:CYMainTabDestinationPackages animated:NO];
 }
 
 - (void)dealloc
@@ -13374,12 +13439,12 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
         case SectionStageStrip: return self.stageStripRows;
         case SectionCallRecordingSound: return self.callRecordingSoundRows;
         case SectionHideHomeBar: return self.hideHomeBarRows;
-        case SectionRoundedIcons: return self.roundedIconsRows;
+        case SectionRoundedIcons: return settings_roundedicons_install_allowed() ? self.roundedIconsRows : @[];
         case SectionWatchLayout: return self.watchLayoutRows;
         case SectionLockCustomizer: return cyanide_experimental_tweaks_available() ? self.lockCustomizerRows : @[];
-        case SectionFreePlacement: return cyanide_experimental_tweaks_available() ? self.freePlacementRows : @[];
+        case SectionFreePlacement: return settings_freeplacement_install_allowed() ? self.freePlacementRows : @[];
         case SectionCopypastaLite: return self.copypastaLiteRows;
-        case SectionAppLibraryStudio: return cyanide_experimental_tweaks_available() ? self.appLibraryStudioRows : @[];
+        case SectionAppLibraryStudio: return settings_applibrarystudio_install_allowed() ? self.appLibraryStudioRows : @[];
         case SectionAMFIBypass: return self.amfiBypassRows;
         case SectionLockScreenOverlay: return self.lockScreenOverlayRows;
         case SectionMagsafe: return self.magsafeRows;
@@ -13570,7 +13635,7 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
         case RootSectionUtilities:
         case RootSectionSystem:
             return (NSInteger)[self bundleRowsForRootSection:(RootSection)section].count;
-        case RootSectionAbout:          return searching ? 0 : 6;
+        case RootSectionAbout:          return searching ? 0 : 7;
         case RootSectionWarning:        return 0;
         case RootSectionCount:          return 0;
     }
@@ -14169,13 +14234,34 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
         case 2:
             cell.imageView.image = [SettingsViewController iconBadgeWithSymbol:@"app.fill" color:UIColor.systemTealColor size:29.0];
             cell.textLabel.text = @"App Icon";
-            cell.detailTextLabel.text = [[self currentAppIconStyle] isEqualToString:@"classic"] ? @"Classic" : @"Modern";
+            if ([[self currentAppIconStyle] isEqualToString:@"classic"]) {
+                cell.detailTextLabel.text = @"Classic";
+            } else if ([[self currentAppIconStyle] isEqualToString:@"midnight"]) {
+                cell.detailTextLabel.text = @"Midnight Rose";
+            } else if ([[self currentAppIconStyle] isEqualToString:@"fr0st"]) {
+                cell.detailTextLabel.text = @"fr0st";
+            } else if ([[self currentAppIconStyle] isEqualToString:@"minecraft"]) {
+                cell.detailTextLabel.text = @"Minecraft";
+            } else {
+                cell.detailTextLabel.text = @"Modern";
+            }
             break;
         case 3:
+            cell.imageView.image = [SettingsViewController iconBadgeWithSymbol:@"paintpalette.fill" color:CYAccentColor() size:29.0];
+            cell.textLabel.text = @"Interface Style";
+            cell.detailTextLabel.text = CYUsesClassicInterfaceStyle()
+                ? @"Classic Ember"
+                : (CYUsesMidnightInterfaceStyle()
+                    ? @"Midnight Rose"
+                    : (CYUsesFr0stInterfaceStyle()
+                        ? @"fr0st"
+                        : (CYUsesMinecraftInterfaceStyle() ? @"Minecraft" : @"Calm Crimson")));
+            break;
+        case 4:
             cell.imageView.image = [SettingsViewController iconBadgeWithSymbol:@"doc.text.magnifyingglass" color:UIColor.systemGrayColor size:29.0];
             cell.textLabel.text = @"View Log";
             break;
-        case 4:
+        case 5:
             cell.imageView.image = [SettingsViewController iconBadgeWithSymbol:@"square.and.arrow.up" color:UIColor.systemGreenColor size:29.0];
             cell.textLabel.text = @"Share Log";
             break;
@@ -15484,12 +15570,92 @@ didPickDocumentsAtURLs:(NSArray<NSURL *> *)urls
     [self reloadSectionOrAll:SectionLiveWP];
 }
 
-// "Classic" alternate icon is registered in Info.plist with CFBundleIconFiles
-// pointing to infern0-Classic@{2,3}x.png at the bundle root. Modern is the
-// asset-catalog primary, selected by passing nil to setAlternateIconName:.
+- (void)selectInterfaceStyle:(NSInteger)style
+{
+    NSInteger current = [NSUserDefaults.standardUserDefaults integerForKey:CYInterfaceStyleDefaultsKey];
+    if (current == style) return;
+
+    NSUserDefaults *defaults = NSUserDefaults.standardUserDefaults;
+    [defaults setInteger:style forKey:CYInterfaceStyleDefaultsKey];
+    [defaults synchronize];
+    [self.tableView reloadSections:[NSIndexSet indexSetWithIndex:RootSectionAbout]
+                  withRowAnimation:UITableViewRowAnimationNone];
+
+    NSString *name = style == 1
+        ? @"Classic Ember"
+        : (style == 2
+            ? @"Midnight Rose"
+            : (style == 3 ? @"fr0st" : (style == 4 ? @"Minecraft" : @"Calm Crimson")));
+    UIAlertController *saved = [UIAlertController
+        alertControllerWithTitle:[NSString stringWithFormat:@"%@ Selected", name]
+                         message:@"Your interface choice is saved. Reopen infern0 to refresh every tab, card, control, and navigation surface."
+                  preferredStyle:UIAlertControllerStyleAlert];
+    [saved addAction:[UIAlertAction actionWithTitle:@"OK"
+                                               style:UIAlertActionStyleDefault
+                                             handler:nil]];
+    [self presentViewController:saved animated:YES completion:nil];
+}
+
+- (void)showInterfaceStylePicker
+{
+    NSInteger current = [NSUserDefaults.standardUserDefaults integerForKey:CYInterfaceStyleDefaultsKey];
+    UIAlertController *picker = [UIAlertController
+        alertControllerWithTitle:@"Interface Style"
+                         message:@"Choose the visual design used throughout infern0. The selected style fully applies the next time the app opens."
+                  preferredStyle:UIAlertControllerStyleActionSheet];
+    [picker addAction:[UIAlertAction
+        actionWithTitle:current == 0 ? @"Calm Crimson ✓" : @"Calm Crimson"
+                    style:UIAlertActionStyleDefault
+                  handler:^(UIAlertAction *action) {
+        (void)action;
+        [self selectInterfaceStyle:0];
+    }]];
+    [picker addAction:[UIAlertAction
+        actionWithTitle:current == 1 ? @"Classic Ember ✓" : @"Classic Ember"
+                    style:UIAlertActionStyleDefault
+                  handler:^(UIAlertAction *action) {
+        (void)action;
+        [self selectInterfaceStyle:1];
+    }]];
+    [picker addAction:[UIAlertAction
+        actionWithTitle:current == 2 ? @"Midnight Rose ✓" : @"Midnight Rose"
+                    style:UIAlertActionStyleDefault
+                  handler:^(UIAlertAction *action) {
+        (void)action;
+        [self selectInterfaceStyle:2];
+    }]];
+    [picker addAction:[UIAlertAction
+        actionWithTitle:current == 3 ? @"fr0st ✓" : @"fr0st"
+                    style:UIAlertActionStyleDefault
+                  handler:^(UIAlertAction *action) {
+        (void)action;
+        [self selectInterfaceStyle:3];
+    }]];
+    [picker addAction:[UIAlertAction
+        actionWithTitle:current == 4 ? @"Minecraft ✓" : @"Minecraft"
+                    style:UIAlertActionStyleDefault
+                  handler:^(UIAlertAction *action) {
+        (void)action;
+        [self selectInterfaceStyle:4];
+    }]];
+    [picker addAction:[UIAlertAction actionWithTitle:@"Cancel"
+                                               style:UIAlertActionStyleCancel
+                                             handler:nil]];
+    picker.popoverPresentationController.sourceView = self.view;
+    picker.popoverPresentationController.sourceRect =
+        CGRectMake(CGRectGetMidX(self.view.bounds), CGRectGetMidY(self.view.bounds), 1.0, 1.0);
+    [self presentViewController:picker animated:YES completion:nil];
+}
+
+// Alternate icons are registered in Info.plist with CFBundleIconFiles.
+// Modern is the asset-catalog primary, selected by passing nil.
 + (UIImage *)appIconPreviewForStyle:(NSString *)style
 {
-    NSString *name = [style isEqualToString:@"classic"] ? @"preview-classic" : @"preview-modern";
+    NSString *name = @"preview-modern";
+    if ([style isEqualToString:@"classic"]) name = @"preview-classic";
+    if ([style isEqualToString:@"midnight"]) name = @"preview-midnight";
+    if ([style isEqualToString:@"fr0st"]) name = @"preview-fr0st";
+    if ([style isEqualToString:@"minecraft"]) name = @"preview-minecraft";
     UIImage *raw = [UIImage imageNamed:name];
     if (!raw) return nil;
     // Render with iOS home-screen corner radius (≈22% of side) so the thumb
@@ -15510,7 +15676,11 @@ didPickDocumentsAtURLs:(NSArray<NSURL *> *)urls
 - (NSString *)currentAppIconStyle
 {
     NSString *alt = [UIApplication sharedApplication].alternateIconName;
-    return [alt isEqualToString:@"Classic"] ? @"classic" : @"modern";
+    if ([alt isEqualToString:@"Classic"]) return @"classic";
+    if ([alt isEqualToString:@"Midnight"]) return @"midnight";
+    if ([alt isEqualToString:@"Fr0st"]) return @"fr0st";
+    if ([alt isEqualToString:@"Minecraft"]) return @"minecraft";
+    return @"modern";
 }
 
 - (UITableViewCell *)buildAppIconCellAtRow:(NSInteger)row tableView:(UITableView *)tableView
@@ -15526,15 +15696,28 @@ didPickDocumentsAtURLs:(NSArray<NSURL *> *)urls
     cell.detailTextLabel.textColor = UIColor.secondaryLabelColor;
     cell.selectionStyle = UITableViewCellSelectionStyleDefault;
 
-    NSString *style = (row == 0) ? @"modern" : @"classic";
+    NSString *style = row == 0
+        ? @"modern"
+        : (row == 1
+            ? @"classic"
+            : (row == 2 ? @"midnight" : (row == 3 ? @"fr0st" : @"minecraft")));
     cell.imageView.image = [SettingsViewController appIconPreviewForStyle:style];
 
     if (row == 0) {
         cell.textLabel.text = @"Modern";
         cell.detailTextLabel.text = @"Default — refreshed v2 mark.";
-    } else {
+    } else if (row == 1) {
         cell.textLabel.text = @"Classic";
         cell.detailTextLabel.text = @"Original release artwork.";
+    } else if (row == 2) {
+        cell.textLabel.text = @"Midnight Rose";
+        cell.detailTextLabel.text = @"Low-glare plum and smoky rose.";
+    } else if (row == 3) {
+        cell.textLabel.text = @"fr0st";
+        cell.detailTextLabel.text = @"Deep navy with an icy blue mark.";
+    } else {
+        cell.textLabel.text = @"Minecraft";
+        cell.detailTextLabel.text = @"Original voxel grass, dirt, and stone artwork.";
     }
 
     BOOL selected = [[self currentAppIconStyle] isEqualToString:style];
@@ -15544,7 +15727,11 @@ didPickDocumentsAtURLs:(NSArray<NSURL *> *)urls
 
 - (void)selectAppIconAtRow:(NSInteger)row inTableView:(UITableView *)tableView
 {
-    NSString *style = (row == 0) ? @"modern" : @"classic";
+    NSString *style = row == 0
+        ? @"modern"
+        : (row == 1
+            ? @"classic"
+            : (row == 2 ? @"midnight" : (row == 3 ? @"fr0st" : @"minecraft")));
     if ([[self currentAppIconStyle] isEqualToString:style]) return;
 
     if (![UIApplication sharedApplication].supportsAlternateIcons) {
@@ -15557,7 +15744,11 @@ didPickDocumentsAtURLs:(NSArray<NSURL *> *)urls
         return;
     }
 
-    NSString *altName = [style isEqualToString:@"classic"] ? @"Classic" : nil;
+    NSString *altName = nil;
+    if ([style isEqualToString:@"classic"]) altName = @"Classic";
+    if ([style isEqualToString:@"midnight"]) altName = @"Midnight";
+    if ([style isEqualToString:@"fr0st"]) altName = @"Fr0st";
+    if ([style isEqualToString:@"minecraft"]) altName = @"Minecraft";
     [[UIApplication sharedApplication] setAlternateIconName:altName completionHandler:^(NSError * _Nullable error) {
         if (error) {
             printf("[SETTINGS] app icon switch to '%s' failed: %s\n",
@@ -15591,11 +15782,23 @@ didPickDocumentsAtURLs:(NSArray<NSURL *> *)urls
                   preferredStyle:UIAlertControllerStyleActionSheet];
     NSString *modernTitle = [current isEqualToString:@"modern"] ? @"Modern ✓" : @"Modern";
     NSString *classicTitle = [current isEqualToString:@"classic"] ? @"Classic ✓" : @"Classic";
+    NSString *midnightTitle = [current isEqualToString:@"midnight"] ? @"Midnight Rose ✓" : @"Midnight Rose";
+    NSString *fr0stTitle = [current isEqualToString:@"fr0st"] ? @"fr0st ✓" : @"fr0st";
+    NSString *minecraftTitle = [current isEqualToString:@"minecraft"] ? @"Minecraft ✓" : @"Minecraft";
     [ac addAction:[UIAlertAction actionWithTitle:modernTitle style:UIAlertActionStyleDefault handler:^(UIAlertAction *_) {
         [self selectAppIconAtRow:0 inTableView:self.tableView];
     }]];
     [ac addAction:[UIAlertAction actionWithTitle:classicTitle style:UIAlertActionStyleDefault handler:^(UIAlertAction *_) {
         [self selectAppIconAtRow:1 inTableView:self.tableView];
+    }]];
+    [ac addAction:[UIAlertAction actionWithTitle:midnightTitle style:UIAlertActionStyleDefault handler:^(UIAlertAction *_) {
+        [self selectAppIconAtRow:2 inTableView:self.tableView];
+    }]];
+    [ac addAction:[UIAlertAction actionWithTitle:fr0stTitle style:UIAlertActionStyleDefault handler:^(UIAlertAction *_) {
+        [self selectAppIconAtRow:3 inTableView:self.tableView];
+    }]];
+    [ac addAction:[UIAlertAction actionWithTitle:minecraftTitle style:UIAlertActionStyleDefault handler:^(UIAlertAction *_) {
+        [self selectAppIconAtRow:4 inTableView:self.tableView];
     }]];
     [ac addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
     ac.popoverPresentationController.sourceView = self.view;
@@ -17850,9 +18053,10 @@ void cyanide_present_contact(UIViewController *host)
                         break;
                     }
                     case 2: [self showAppIconPicker]; break;
-                    case 3: [self openViewLog]; break;
-                    case 4: [self openShareLog]; break;
-                    // Row 5: Auto-Upload — UISwitch handles it
+                    case 3: [self showInterfaceStylePicker]; break;
+                    case 4: [self openViewLog]; break;
+                    case 5: [self openShareLog]; break;
+                    // Row 6: Auto-Upload — UISwitch handles it
                 }
                 return;
             }
@@ -18668,7 +18872,7 @@ void cyanide_present_contact(UIViewController *host)
             [self presentViewController:dp animated:YES completion:nil];
             return;
         } else if ([action isEqualToString:@"quickloader-open-sources"]) {
-            [self selectBottomTabNamed:@"Sources"];
+            [self openSourcesBrowser];
             return;
         } else if ([action isEqualToString:@"quickloader-clear"]) {
             NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
@@ -18719,7 +18923,7 @@ void cyanide_present_contact(UIViewController *host)
         NSString *action = row[@"action"];
 
         if ([action isEqualToString:@"repotweaks-open-manager"]) {
-            [self selectBottomTabNamed:@"Sources"];
+            [self openSourcesBrowser];
         }
         return;
     }

@@ -333,20 +333,9 @@ static void sources_clear_repo_defaults(NSString *url)
 
 - (void)openQuickLoader
 {
-    UITabBarController *tab = self.tabBarController;
-    if (!tab) return;
-    for (NSUInteger i = 0; i < tab.viewControllers.count; i++) {
-        UIViewController *vc = tab.viewControllers[i];
-        if ([vc.tabBarItem.title isEqualToString:@"Settings"]) {
-            UINavigationController *nav = [vc isKindOfClass:UINavigationController.class] ? (UINavigationController *)vc : nil;
-            if (!nav) return;
-            [nav popToRootViewControllerAnimated:NO];
-            SettingsViewController *ql = [SettingsViewController quickLoaderSettingsController];
-            [nav pushViewController:ql animated:NO];
-            tab.selectedIndex = i;
-            return;
-        }
-    }
+    SettingsViewController *quickLoader = [SettingsViewController quickLoaderSettingsController];
+    MainTabBarController *tabs = (MainTabBarController *)self.tabBarController;
+    [tabs showViewController:quickLoader inTab:CYMainTabDestinationSettings animated:NO];
 }
 
 - (void)pullToRefresh

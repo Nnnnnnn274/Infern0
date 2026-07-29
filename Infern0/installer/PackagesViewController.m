@@ -9,6 +9,7 @@
 #import "PackageCatalog.h"
 #import "PackageDetailViewController.h"
 #import "PackageQueue.h"
+#import "SourcesViewController.h"
 #import "../SettingsViewController.h"
 #import "../tweaks/retired_tweak_compat.h"
 #import "MainTabBarController.h"
@@ -85,6 +86,7 @@ static UILabel *packages_stat_label(void)
 
 @property (nonatomic, strong) UIView *libraryHeader;
 @property (nonatomic, strong) UIView *summaryCard;
+@property (nonatomic, strong) CAGradientLayer *summaryGradient;
 @property (nonatomic, strong) UILabel *libraryTitleLabel;
 @property (nonatomic, strong) UILabel *librarySubtitleLabel;
 @property (nonatomic, copy) NSArray<UILabel *> *statLabels;
@@ -109,6 +111,13 @@ static UILabel *packages_stat_label(void)
         target:self
         action:@selector(openCommunityVotes)];
     votesItem.accessibilityLabel = @"Community votes";
+    UIBarButtonItem *sourcesItem = [[UIBarButtonItem alloc]
+        initWithImage:[UIImage systemImageNamed:@"tray.full.fill"]
+        style:UIBarButtonItemStylePlain
+        target:self
+        action:@selector(openSources)];
+    sourcesItem.accessibilityLabel = @"Package sources";
+    self.navigationItem.leftBarButtonItem = sourcesItem;
 
     UIButtonConfiguration *applyConfig = [UIButtonConfiguration filledButtonConfiguration];
     applyConfig.title = @"Apply";
@@ -190,17 +199,31 @@ static UILabel *packages_stat_label(void)
     UIView *header = [[UIView alloc] initWithFrame:CGRectMake(0, 0, self.tableView.bounds.size.width, 194.0)];
     UIView *card = [[UIView alloc] initWithFrame:CGRectZero];
     CYApplyCardStyle(card, 24.0);
+    CAGradientLayer *gradient = nil;
+    if (!CYUsesClassicInterfaceStyle()) {
+        card.clipsToBounds = YES;
+        card.layer.borderColor = [UIColor.whiteColor colorWithAlphaComponent:0.14].CGColor;
+        gradient = [CAGradientLayer layer];
+        gradient.colors = CYHeroGradientLayerColors();
+        gradient.startPoint = CGPointMake(0.0, 0.0);
+        gradient.endPoint = CGPointMake(1.0, 1.0);
+        [card.layer insertSublayer:gradient atIndex:0];
+    }
     [header addSubview:card];
 
     UILabel *title = [[UILabel alloc] initWithFrame:CGRectZero];
     title.text = @"TWEAK LIBRARY";
     title.font = [UIFont systemFontOfSize:12.0 weight:UIFontWeightHeavy];
-    title.textColor = CYAccentColor();
+    title.textColor = CYUsesClassicInterfaceStyle()
+        ? CYAccentColor()
+        : [UIColor.whiteColor colorWithAlphaComponent:0.78];
     [card addSubview:title];
 
     UILabel *subtitle = [[UILabel alloc] initWithFrame:CGRectZero];
     subtitle.font = [UIFont systemFontOfSize:13.0 weight:UIFontWeightMedium];
-    subtitle.textColor = UIColor.secondaryLabelColor;
+    subtitle.textColor = CYUsesClassicInterfaceStyle()
+        ? UIColor.secondaryLabelColor
+        : [UIColor.whiteColor colorWithAlphaComponent:0.68];
     subtitle.numberOfLines = 1;
     [card addSubview:subtitle];
 
@@ -213,15 +236,13 @@ static UILabel *packages_stat_label(void)
 
     UISegmentedControl *scope = [[UISegmentedControl alloc] initWithItems:@[@"Library", @"Active", @"Updates", @"New"]];
     scope.selectedSegmentIndex = PackagesScopeAll;
-    scope.selectedSegmentTintColor = CYAccentColor();
-    [scope setTitleTextAttributes:@{NSForegroundColorAttributeName: UIColor.whiteColor,
-                                    NSFontAttributeName: [UIFont systemFontOfSize:12.0 weight:UIFontWeightBold]}
-                         forState:UIControlStateSelected];
+    CYConfigureSegmentedControl(scope);
     [scope addTarget:self action:@selector(scopeDidChange:) forControlEvents:UIControlEventValueChanged];
     [header addSubview:scope];
 
     self.libraryHeader = header;
     self.summaryCard = card;
+    self.summaryGradient = gradient;
     self.libraryTitleLabel = title;
     self.librarySubtitleLabel = subtitle;
     self.statLabels = stats;
@@ -243,6 +264,7 @@ static UILabel *packages_stat_label(void)
 
     CGFloat inset = 16.0;
     self.summaryCard.frame = CGRectMake(inset, 8.0, width - inset * 2.0, 128.0);
+    self.summaryGradient.frame = self.summaryCard.bounds;
     self.libraryTitleLabel.frame = CGRectMake(18.0, 14.0, self.summaryCard.bounds.size.width - 36.0, 17.0);
     self.librarySubtitleLabel.frame = CGRectMake(18.0, 32.0, self.summaryCard.bounds.size.width - 36.0, 19.0);
 
@@ -279,13 +301,23 @@ static UILabel *packages_stat_label(void)
         [NSString stringWithFormat:@"%ld\nUpdates", (long)updates],
         [NSString stringWithFormat:@"%ld\nNew", (long)self.recentPackages.count],
     ];
-    NSArray<UIColor *> *colors = @[UIColor.labelColor, UIColor.systemGreenColor,
-                                   UIColor.systemRedColor, UIColor.systemOrangeColor];
     for (NSInteger i = 0; i < (NSInteger)self.statLabels.count; i++) {
         UILabel *label = self.statLabels[i];
         label.text = values[i];
         label.font = [UIFont systemFontOfSize:13.0 weight:UIFontWeightBold];
-        label.textColor = colors[i];
+        if (CYUsesClassicInterfaceStyle()) {
+            NSArray<UIColor *> *classicColors = @[
+                UIColor.labelColor,
+                UIColor.systemGreenColor,
+                UIColor.systemRedColor,
+                UIColor.systemOrangeColor,
+            ];
+            label.textColor = classicColors[i];
+        } else {
+            label.textColor = i == 0
+                ? UIColor.whiteColor
+                : [UIColor.whiteColor colorWithAlphaComponent:0.78];
+        }
     }
 }
 
@@ -356,6 +388,13 @@ static UILabel *packages_stat_label(void)
     CommunityVotesViewController *votes = [[CommunityVotesViewController alloc]
         initWithStyle:UITableViewStyleInsetGrouped];
     [self.navigationController pushViewController:votes animated:YES];
+}
+
+- (void)openSources
+{
+    SourcesViewController *sources = [[SourcesViewController alloc]
+        initWithStyle:UITableViewStyleInsetGrouped];
+    [self.navigationController pushViewController:sources animated:YES];
 }
 
 - (void)openApplyQueue

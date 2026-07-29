@@ -64,10 +64,12 @@ static const CGFloat kPopupPadding = 2.0;
 {
     NSMutableArray<UIViewController *> *controllers = [self.viewControllers mutableCopy];
     if (controllers.count == 0) return;
+    BOOL classicStyle = CYUsesClassicInterfaceStyle();
 
     UIViewController *packages = controllers.firstObject;
     packages.tabBarItem.title = @"Packages";
-    packages.tabBarItem.image = [UIImage systemImageNamed:@"shippingbox.fill"];
+    packages.tabBarItem.image = [UIImage systemImageNamed:(classicStyle ? @"shippingbox.fill" : @"shippingbox")];
+    packages.tabBarItem.selectedImage = [UIImage systemImageNamed:@"shippingbox.fill"];
     if ([packages isKindOfClass:UINavigationController.class]) {
         UINavigationController *nav = (UINavigationController *)packages;
         nav.tabBarItem.title = @"Packages";
@@ -84,8 +86,9 @@ static const CGFloat kPopupPadding = 2.0;
         HomeViewController *home = [[HomeViewController alloc] init];
         UINavigationController *homeNav = [[UINavigationController alloc] initWithRootViewController:home];
         homeNav.tabBarItem = [[UITabBarItem alloc] initWithTitle:@"Home"
-                                                           image:[UIImage systemImageNamed:@"house.fill"]
+                                                           image:[UIImage systemImageNamed:(classicStyle ? @"house.fill" : @"house")]
                                                              tag:0];
+        homeNav.tabBarItem.selectedImage = [UIImage systemImageNamed:@"house.fill"];
         [controllers insertObject:homeNav atIndex:0];
     }
 
@@ -97,8 +100,9 @@ static const CGFloat kPopupPadding = 2.0;
         ToolsViewController *tools = [[ToolsViewController alloc] initWithStyle:UITableViewStyleInsetGrouped];
         UINavigationController *toolsNav = [[UINavigationController alloc] initWithRootViewController:tools];
         toolsNav.tabBarItem = [[UITabBarItem alloc] initWithTitle:@"Tools"
-                                                            image:[UIImage systemImageNamed:@"wrench.and.screwdriver.fill"]
+                                                            image:[UIImage systemImageNamed:(classicStyle ? @"wrench.and.screwdriver.fill" : @"wrench.and.screwdriver")]
                                                               tag:0];
+        toolsNav.tabBarItem.selectedImage = [UIImage systemImageNamed:@"wrench.and.screwdriver.fill"];
         NSUInteger packagesIndex = [controllers indexOfObject:packages];
         NSUInteger insertionIndex = packagesIndex == NSNotFound ? MIN((NSUInteger)2, controllers.count) : packagesIndex + 1;
         [controllers insertObject:toolsNav atIndex:insertionIndex];
@@ -106,12 +110,26 @@ static const CGFloat kPopupPadding = 2.0;
 
 
     for (UIViewController *vc in controllers) {
+        if ([vc.tabBarItem.title isEqualToString:@"Settings"]) {
+            vc.tabBarItem.image = [UIImage systemImageNamed:(classicStyle ? @"gear" : @"gearshape")];
+            vc.tabBarItem.selectedImage = [UIImage systemImageNamed:@"gearshape.fill"];
+        }
         if ([vc.tabBarItem.title isEqualToString:@"Log"]) {
             vc.tabBarItem.title = @"Activity";
             vc.tabBarItem.image = [UIImage systemImageNamed:@"waveform.path.ecg"];
+            vc.tabBarItem.selectedImage = [UIImage systemImageNamed:@"waveform.path.ecg.rectangle.fill"];
             UINavigationController *nav = [vc isKindOfClass:UINavigationController.class] ? (UINavigationController *)vc : nil;
             nav.topViewController.title = @"Activity";
         }
+    }
+
+    for (UIViewController *vc in controllers) {
+        NSString *title = vc.tabBarItem.title;
+        if ([title isEqualToString:@"Home"]) vc.tabBarItem.tag = CYMainTabDestinationHome;
+        else if ([title isEqualToString:@"Packages"]) vc.tabBarItem.tag = CYMainTabDestinationPackages;
+        else if ([title isEqualToString:@"Tools"]) vc.tabBarItem.tag = CYMainTabDestinationTools;
+        else if ([title isEqualToString:@"Activity"]) vc.tabBarItem.tag = CYMainTabDestinationActivity;
+        else if ([title isEqualToString:@"Settings"]) vc.tabBarItem.tag = CYMainTabDestinationSettings;
     }
 
     [self setViewControllers:controllers animated:NO];
@@ -121,6 +139,43 @@ static const CGFloat kPopupPadding = 2.0;
         }
     }
     self.selectedIndex = 0;
+}
+
+- (NSInteger)indexOfTab:(CYMainTabDestination)destination
+{
+    for (NSInteger index = 0; index < (NSInteger)self.viewControllers.count; index++) {
+        if (self.viewControllers[index].tabBarItem.tag == destination) return index;
+    }
+    return NSNotFound;
+}
+
+- (BOOL)selectTab:(CYMainTabDestination)destination
+{
+    NSInteger index = [self indexOfTab:destination];
+    if (index == NSNotFound) return NO;
+    self.selectedIndex = index;
+    return YES;
+}
+
+- (BOOL)showViewController:(UIViewController *)viewController
+                     inTab:(CYMainTabDestination)destination
+                  animated:(BOOL)animated
+{
+    if (!viewController) return NO;
+    NSInteger index = [self indexOfTab:destination];
+    if (index == NSNotFound) return NO;
+
+    UIViewController *root = self.viewControllers[index];
+    UINavigationController *navigation = [root isKindOfClass:UINavigationController.class]
+        ? (UINavigationController *)root
+        : root.navigationController;
+    if (!navigation) return NO;
+
+    BOOL alreadySelected = self.selectedIndex == index;
+    [navigation popToRootViewControllerAnimated:NO];
+    [navigation pushViewController:viewController animated:(alreadySelected && animated)];
+    self.selectedIndex = index;
+    return YES;
 }
 
 - (void)viewDidLayoutSubviews

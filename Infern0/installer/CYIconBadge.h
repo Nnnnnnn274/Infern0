@@ -7,6 +7,12 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
+extern NSString * const CYInterfaceStyleDefaultsKey;
+BOOL CYUsesClassicInterfaceStyle(void);
+BOOL CYUsesMidnightInterfaceStyle(void);
+BOOL CYUsesFr0stInterfaceStyle(void);
+BOOL CYUsesMinecraftInterfaceStyle(void);
+NSArray *CYHeroGradientLayerColors(void);
 UIImage *CYIconBadgeImage(NSString *sfSymbol, UIColor *color, CGFloat size);
 UIColor *CYSpectrumColor(NSUInteger index);
 UIView *CYSectionHeaderView(NSString *title);
@@ -16,6 +22,7 @@ UIColor *CYSurfaceColor(void);
 UIColor *CYSurfaceBorderColor(void);
 void CYApplyCardStyle(UIView *view, CGFloat cornerRadius);
 void CYConfigureTableView(UITableView *tableView);
+void CYConfigureSegmentedControl(UISegmentedControl *control);
 void CYApplyNavigationStyle(UINavigationController *navigationController);
 void CYApplyTabBarStyle(UITabBar *tabBar);
 void CYPolishButton(UIButton *button);

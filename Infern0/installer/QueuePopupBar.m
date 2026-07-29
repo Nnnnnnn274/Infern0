@@ -30,22 +30,25 @@
 
 - (void)buildSubviews
 {
+    BOOL classicStyle = CYUsesClassicInterfaceStyle();
     self.backgroundColor = UIColor.clearColor;
-    self.layer.cornerRadius = 16.0;
+    self.layer.cornerRadius = classicStyle ? 16.0 : 18.0;
     self.layer.cornerCurve = kCACornerCurveContinuous;
     self.layer.masksToBounds = NO;
     self.layer.borderWidth = 0.5;
-    self.layer.borderColor = [UIColor.separatorColor colorWithAlphaComponent:0.5].CGColor;
+    self.layer.borderColor = classicStyle
+        ? [UIColor.separatorColor colorWithAlphaComponent:0.5].CGColor
+        : CYSurfaceBorderColor().CGColor;
     self.layer.shadowColor = UIColor.blackColor.CGColor;
-    self.layer.shadowOpacity = 0.12;
-    self.layer.shadowRadius = 12.0;
-    self.layer.shadowOffset = CGSizeMake(0, 4);
+    self.layer.shadowOpacity = classicStyle ? 0.12 : 0.18;
+    self.layer.shadowRadius = classicStyle ? 12.0 : 18.0;
+    self.layer.shadowOffset = classicStyle ? CGSizeMake(0, 4) : CGSizeMake(0, 8);
 
     UIBlurEffect *blur = [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemMaterial];
     UIVisualEffectView *blurView = [[UIVisualEffectView alloc] initWithEffect:blur];
     blurView.translatesAutoresizingMaskIntoConstraints = NO;
     blurView.userInteractionEnabled = NO;
-    blurView.layer.cornerRadius = 16.0;
+    blurView.layer.cornerRadius = classicStyle ? 16.0 : 18.0;
     blurView.layer.cornerCurve = kCACornerCurveContinuous;
     blurView.clipsToBounds = YES;
     [self addSubview:blurView];
@@ -55,7 +58,7 @@
     iconView.translatesAutoresizingMaskIntoConstraints = NO;
     iconView.image = [UIImage systemImageNamed:@"shippingbox.fill"
                               withConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:18.0 weight:UIImageSymbolWeightSemibold]];
-    iconView.tintColor = self.tintColor;
+    iconView.tintColor = CYAccentColor();
     iconView.contentMode = UIViewContentModeScaleAspectFit;
     [self addSubview:iconView];
     self.iconView = iconView;
@@ -130,7 +133,7 @@
 - (void)tintColorDidChange
 {
     [super tintColorDidChange];
-    self.iconView.tintColor = self.tintColor;
+    self.iconView.tintColor = CYAccentColor();
 }
 
 - (void)didTap

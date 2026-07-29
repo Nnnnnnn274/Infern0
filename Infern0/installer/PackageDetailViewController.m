@@ -5,6 +5,7 @@
 
 #import "PackageDetailViewController.h"
 #import "CYIconBadge.h"
+#import "MainTabBarController.h"
 #import "PackageQueue.h"
 #import "../LogTextView.h"
 #import "../SettingsViewController.h"
@@ -1337,27 +1338,11 @@ static UIViewController *pkgdetail_lara_tool_controller(NSString *identifier)
         return;
     }
 
-    UITabBarController *tab = self.tabBarController;
-    NSUInteger settingsIndex = NSNotFound;
-    UINavigationController *settingsNav = nil;
-    for (NSUInteger i = 0; i < tab.viewControllers.count; i++) {
-        UIViewController *vc = tab.viewControllers[i];
-        if ([vc.tabBarItem.title isEqualToString:@"Settings"]) {
-            settingsIndex = i;
-            if ([vc isKindOfClass:UINavigationController.class]) {
-                settingsNav = (UINavigationController *)vc;
-            }
-            break;
-        }
-    }
-    if (settingsIndex == NSNotFound || !settingsNav) return;
-
-    [settingsNav popToRootViewControllerAnimated:NO];
     SettingsViewController *bundle = [[SettingsViewController alloc] initWithUnderlyingSection:self.package.settingsSection
                                                                                    bundleTitle:self.package.name];
     bundle.installerReturnPackageName = self.package.name;
-    [settingsNav pushViewController:bundle animated:NO];
-    tab.selectedIndex = settingsIndex;
+    MainTabBarController *tabs = (MainTabBarController *)self.tabBarController;
+    [tabs showViewController:bundle inTab:CYMainTabDestinationSettings animated:NO];
 }
 
 @end
