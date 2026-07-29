@@ -27,6 +27,7 @@ static const CGFloat kMargin = 20.0;
 @property (nonatomic, strong) UIStackView *stack;
 @property (nonatomic, weak) UIView *heroView;
 @property (nonatomic, weak) CAGradientLayer *heroGrad;
+@property (nonatomic, weak) UIImageView *heroIconView;
 @property (nonatomic, strong) CAGradientLayer *canvasGrad;
 @property (nonatomic, strong) CAGradientLayer *heroGlow;
 @property (nonatomic, strong) UITextView *logView;
@@ -133,6 +134,7 @@ static const CGFloat kMargin = 20.0;
 - (void)viewWillAppear:(BOOL)animated
 {
     [super viewWillAppear:animated];
+    self.heroIconView.image = CYCurrentAppIconImage();
     if (!self.statusView || !self.stack) return;
     NSUInteger index = [self.stack.arrangedSubviews indexOfObject:self.statusView];
     if (index == NSNotFound) return;
@@ -191,12 +193,8 @@ static const CGFloat kMargin = 20.0;
 
     UIImageView *icon = [[UIImageView alloc] init];
     icon.translatesAutoresizingMaskIntoConstraints = NO;
-    UIImage *appIcon = [UIImage imageNamed:@"AppIcon60x60"];
-    if (!appIcon) {
-        NSString *f = [[[NSBundle mainBundle] infoDictionary][@"CFBundleIcons"][@"CFBundlePrimaryIcon"][@"CFBundleIconFiles"] lastObject];
-        appIcon = f ? [UIImage imageNamed:f] : nil;
-    }
-    icon.image = appIcon;
+    icon.image = CYCurrentAppIconImage();
+    self.heroIconView = icon;
     icon.layer.cornerRadius = 12.0;
     icon.layer.cornerCurve = kCACornerCurveContinuous;
     icon.clipsToBounds = YES;
@@ -323,12 +321,8 @@ static const CGFloat kMargin = 20.0;
 
     UIImageView *icon = [[UIImageView alloc] init];
     icon.translatesAutoresizingMaskIntoConstraints = NO;
-    UIImage *appIcon = [UIImage imageNamed:@"AppIcon60x60"];
-    if (!appIcon) {
-        NSString *filename = [[[NSBundle mainBundle] infoDictionary][@"CFBundleIcons"][@"CFBundlePrimaryIcon"][@"CFBundleIconFiles"] lastObject];
-        appIcon = filename.length ? [UIImage imageNamed:filename] : nil;
-    }
-    icon.image = appIcon;
+    icon.image = CYCurrentAppIconImage();
+    self.heroIconView = icon;
     icon.layer.cornerRadius = 14.0;
     icon.layer.cornerCurve = kCACornerCurveContinuous;
     icon.clipsToBounds = YES;

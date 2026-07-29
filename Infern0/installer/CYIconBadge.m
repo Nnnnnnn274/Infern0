@@ -49,6 +49,27 @@ static const void *kCYEntranceAnimatedKey = &kCYEntranceAnimatedKey;
 
 NSString * const CYInterfaceStyleDefaultsKey = @"CYInterfaceStyle";
 
+UIImage *CYCurrentAppIconImage(void)
+{
+    NSString *alternate = UIApplication.sharedApplication.alternateIconName;
+    NSDictionary<NSString *, NSString *> *previews = @{
+        @"Classic": @"preview-classic",
+        @"Midnight": @"preview-midnight",
+        @"Fr0st": @"preview-fr0st",
+        @"Minecraft": @"preview-minecraft",
+    };
+    NSString *previewName = alternate.length ? previews[alternate] : @"preview-modern";
+    UIImage *image = previewName.length ? [UIImage imageNamed:previewName] : nil;
+    if (image) return image;
+
+    image = [UIImage imageNamed:@"AppIcon60x60"];
+    if (image) return image;
+    NSDictionary *icons = NSBundle.mainBundle.infoDictionary[@"CFBundleIcons"];
+    NSDictionary *primary = icons[@"CFBundlePrimaryIcon"];
+    NSString *filename = [primary[@"CFBundleIconFiles"] lastObject];
+    return filename.length ? [UIImage imageNamed:filename] : nil;
+}
+
 BOOL CYUsesClassicInterfaceStyle(void)
 {
     return [[NSUserDefaults standardUserDefaults] integerForKey:CYInterfaceStyleDefaultsKey] == 1;

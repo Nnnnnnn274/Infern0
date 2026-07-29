@@ -13,6 +13,7 @@ BOOL CYUsesMidnightInterfaceStyle(void);
 BOOL CYUsesFr0stInterfaceStyle(void);
 BOOL CYUsesMinecraftInterfaceStyle(void);
 NSArray *CYHeroGradientLayerColors(void);
+UIImage * _Nullable CYCurrentAppIconImage(void);
 UIImage *CYIconBadgeImage(NSString *sfSymbol, UIColor *color, CGFloat size);
 UIColor *CYSpectrumColor(NSUInteger index);
 UIView *CYSectionHeaderView(NSString *title);
