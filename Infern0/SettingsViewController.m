@@ -1068,6 +1068,10 @@ static NSString * const kSettingsMacaronLitePrimaryHex = @"MacaronLitePrimaryHex
 static NSString * const kSettingsMacaronLiteSecondaryHex = @"MacaronLiteSecondaryHex";
 static NSString * const kSettingsMacaronLiteOpacityPct = @"MacaronLiteOpacityPct";
 static NSString * const kSettingsMacaronLiteKeepBlur = @"MacaronLiteKeepBlur";
+static NSString * const kSettingsMacaronLiteStyleDock = @"MacaronLiteStyleDock";
+static NSString * const kSettingsMacaronLiteStyleFolders = @"MacaronLiteStyleFolders";
+static NSString * const kSettingsMacaronLiteStylePageDots = @"MacaronLiteStylePageDots";
+static NSString * const kSettingsMacaronLiteStyleSearchPill = @"MacaronLiteStyleSearchPill";
 static NSString * const kSettingsMacaronLitePhotoPath = @"MacaronLitePhotoPath";
 NSString * const kSettingsBarmojiEnabled = @"BarmojiEnabled";
 static NSString * const kSettingsBarmojiYOffset = @"BarmojiYOffset";
@@ -6889,6 +6893,10 @@ static BOOL settings_key_is_macaronlite(NSString *key)
            [key isEqualToString:kSettingsMacaronLiteSecondaryHex] ||
            [key isEqualToString:kSettingsMacaronLiteOpacityPct] ||
            [key isEqualToString:kSettingsMacaronLiteKeepBlur] ||
+           [key isEqualToString:kSettingsMacaronLiteStyleDock] ||
+           [key isEqualToString:kSettingsMacaronLiteStyleFolders] ||
+           [key isEqualToString:kSettingsMacaronLiteStylePageDots] ||
+           [key isEqualToString:kSettingsMacaronLiteStyleSearchPill] ||
            [key isEqualToString:kSettingsMacaronLitePhotoPath];
 }
 
@@ -6919,6 +6927,10 @@ static void settings_configure_macaronlite(NSUserDefaults *d)
     macaronlite_configure((MacaronLiteMode)[d integerForKey:kSettingsMacaronLiteMode],
                           (int)[d integerForKey:kSettingsMacaronLiteOpacityPct],
                           [d boolForKey:kSettingsMacaronLiteKeepBlur],
+                          [d boolForKey:kSettingsMacaronLiteStyleDock],
+                          [d boolForKey:kSettingsMacaronLiteStyleFolders],
+                          [d boolForKey:kSettingsMacaronLiteStylePageDots],
+                          [d boolForKey:kSettingsMacaronLiteStyleSearchPill],
                           ([d stringForKey:kSettingsMacaronLitePrimaryHex] ?: @"#6E5AE6").UTF8String,
                           ([d stringForKey:kSettingsMacaronLiteSecondaryHex] ?: @"#34C8FF").UTF8String,
                           photo.UTF8String);
@@ -6928,10 +6940,14 @@ static bool settings_apply_macaronlite_from_defaults_locked(NSUserDefaults *d)
 {
     if (![d boolForKey:kSettingsMacaronLiteEnabled]) return false;
     settings_configure_macaronlite(d);
-    log_user("[MACARON][SETTINGS] Applying mode=%s opacity=%ld%% blur=%d photo=%s.\n",
+    log_user("[MACARON][SETTINGS] Applying mode=%s opacity=%ld%% blur=%d surfaces={dock:%d folders:%d dots:%d search:%d} photo=%s.\n",
              settings_macaronlite_mode_name([d integerForKey:kSettingsMacaronLiteMode]).UTF8String,
              (long)[d integerForKey:kSettingsMacaronLiteOpacityPct],
              [d boolForKey:kSettingsMacaronLiteKeepBlur],
+             [d boolForKey:kSettingsMacaronLiteStyleDock],
+             [d boolForKey:kSettingsMacaronLiteStyleFolders],
+             [d boolForKey:kSettingsMacaronLiteStylePageDots],
+             [d boolForKey:kSettingsMacaronLiteStyleSearchPill],
              settings_macaronlite_absolute_photo_path(d).length ? "selected" : "none");
     return macaronlite_apply_in_session();
 }
@@ -9266,6 +9282,10 @@ void settings_register_defaults(void)
         kSettingsMacaronLiteSecondaryHex: @"#34C8FF",
         kSettingsMacaronLiteOpacityPct: @82,
         kSettingsMacaronLiteKeepBlur: @YES,
+        kSettingsMacaronLiteStyleDock: @YES,
+        kSettingsMacaronLiteStyleFolders: @YES,
+        kSettingsMacaronLiteStylePageDots: @YES,
+        kSettingsMacaronLiteStyleSearchPill: @YES,
         kSettingsMacaronLitePhotoPath: @"",
         kSettingsBarmojiEnabled: @NO,
         kSettingsBarmojiYOffset: @92,
@@ -9513,7 +9533,7 @@ static void settings_log_tweak_plan_details(NSUserDefaults *d, BOOL pendingOnly)
         { kSettingsFakeClockUpEnabled, "Animation Speed Lite", "changes active SpringBoard window-layer animation speed within a safe range" },
         { kSettingsPancakeEnabled, "Pancake Lite", "configures SpringBoard's current native interactive edge-back gesture" },
         { kSettingsCylinderLiteEnabled, "Cylinder Lite", "animates loaded home-screen pages through a live cylindrical swipe transform" },
-        { kSettingsMacaronLiteEnabled, "Macaron Lite", "styles only the existing Dock background with a reversible color, gradient, photo, or transparent pattern" },
+        { kSettingsMacaronLiteEnabled, "Macaron Lite", "styles selected Dock, folder, page-indicator, and Search surfaces with reversible colors or Dock artwork" },
         { kSettingsBarmojiEnabled, "Clipboard Bar Lite", "adds pressable emoji and clipboard buttons to SpringBoard; it is not injected into app keyboard processes" },
         { kSettingsRoundedIconsEnabled, "Rounded Icons", "applies a continuous corner mask to every discovered Home Screen icon" },
         { kSettingsWatchLayoutEnabled, "Watch Layout", "builds one scrolling Apple Watch-style honeycomb of pressable circular app icons" },
@@ -10378,18 +10398,18 @@ static void settings_run_actions_internal(BOOL pendingOnly)
                     }
 
                     if (runMacaronLite) {
-                        settings_progress(&step, total, "Styling the Dock with Macaron Lite");
+                        settings_progress(&step, total, "Styling Home Screen chrome with Macaron Lite");
                         bool ok = settings_apply_macaronlite_from_defaults_locked(d);
                         settings_mark_tweak_applied(kSettingsMacaronLiteEnabled,
                                                     ok && [d boolForKey:kSettingsMacaronLiteEnabled]);
                         printf("[SETTINGS] Macaron Lite result=%d\n", ok);
                         log_user("%s Macaron Lite %s.\n",
                                  ok ? "[OK]" : "[WARN]",
-                                 ok ? "styled the Dock" : "did not find a safe Dock background");
+                                 ok ? "styled the selected Home Screen surfaces" : "did not find a safe selected surface");
                         cyanide_upload_log_milestone(ok ? @"macaronlite-applied" : @"macaronlite-failed");
                         if (!ok) {
                             runHadBlockingFailure = YES;
-                            runCompletionMessage = @"Macaron Lite could not safely locate the Dock background.";
+                            runCompletionMessage = @"Macaron Lite could not safely locate any selected Home Screen surface.";
                         }
                     } else if (!macaronLiteEnabled &&
                                settings_tweak_is_applied(kSettingsMacaronLiteEnabled)) {
@@ -12236,13 +12256,21 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
     NSInteger mode = [d integerForKey:kSettingsMacaronLiteMode];
     NSMutableArray<NSDictionary *> *rows = [@[
         @{ @"kind": @"toggle", @"key": kSettingsMacaronLiteEnabled, @"title": @"Enable Macaron Lite" },
+        @{ @"kind": @"info", @"title": @"Surfaces",
+           @"subtitle": @"Choose exactly which Home Screen chrome receives the style. Every surface is captured and restored independently." },
+        @{ @"kind": @"toggle", @"key": kSettingsMacaronLiteStyleDock, @"title": @"Color Dock" },
+        @{ @"kind": @"toggle", @"key": kSettingsMacaronLiteStyleFolders, @"title": @"Color Folder Backgrounds" },
+        @{ @"kind": @"toggle", @"key": kSettingsMacaronLiteStylePageDots, @"title": @"Color Page Indicators" },
+        @{ @"kind": @"toggle", @"key": kSettingsMacaronLiteStyleSearchPill, @"title": @"Color Search Pill" },
         @{ @"kind": @"button",
            @"title": [NSString stringWithFormat:@"Style: %@", settings_macaronlite_mode_name(mode)],
            @"action": @"macaron-mode" },
     ] mutableCopy];
-    if (mode == MacaronLiteModeSolid || mode == MacaronLiteModeGradient) {
+    if (mode != MacaronLiteModeTransparent) {
         [rows addObject:@{ @"kind": @"button",
-                           @"title": [NSString stringWithFormat:@"Primary Color: %@", [d stringForKey:kSettingsMacaronLitePrimaryHex] ?: @"#6E5AE6"],
+                           @"title": [NSString stringWithFormat:@"%@ Color: %@",
+                                      mode == MacaronLiteModePhoto ? @"Accent" : @"Primary",
+                                      [d stringForKey:kSettingsMacaronLitePrimaryHex] ?: @"#6E5AE6"],
                            @"action": @"macaron-primary" }];
     }
     if (mode == MacaronLiteModeGradient) {
@@ -12266,11 +12294,11 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
                            @"title": @"Background opacity", @"min": @10, @"max": @100,
                            @"step": @5, @"unit": @"%", @"default": @82 }];
         [rows addObject:@{ @"kind": @"toggle", @"key": kSettingsMacaronLiteKeepBlur,
-                           @"title": @"Keep stock Dock blur" }];
+                           @"title": @"Keep Stock Material Blur" }];
     }
     [rows addObjectsFromArray:@[
-        @{ @"kind": @"info", @"title": @"Stable Dock-only styling",
-           @"subtitle": @"Changes only existing Dock background/material views. App icons, touches, page layouts, and system files are untouched. Clean Up restores every captured color and blur visibility value." },
+        @{ @"kind": @"info", @"title": @"Safe Home Screen chrome styling",
+           @"subtitle": @"Dock supports the full selected style. Folders, page indicators, and Search use the chosen accent colors for predictable sizing. App icons, touches, page layouts, and system files remain untouched. Clean Up restores every captured color and blur visibility value." },
         @{ @"kind": @"button", @"title": @"View Detailed Activity Log", @"action": @"view-log" },
     ]];
     return rows;
@@ -13610,7 +13638,7 @@ static _CyanideMailDelegate *_cyanide_mail_delegate(void) {
         return @"The complete Cylinder Lite page-animation implementation from hxhlb/cyanide, with all 17 upstream effects and its original RemoteCall behavior.";
     }
     if (s == SectionMacaronLite) {
-        return @"Community-inspired Dock styling with solid color, gradient, photo, blur, opacity, and transparent modes. It changes existing Dock background views only and restores their exact captured colors and material visibility during Clean Up.";
+        return @"Community-inspired Home Screen chrome styling. Dock supports color, gradient, photo, blur, opacity, and transparency; optional folder backgrounds, page indicators, and Search use matching accent colors. Each captured property is restored during Clean Up.";
     }
     if (s == SectionBarmoji) {
         return @"Adds eight real emoji buttons and three clipboard slots near the bottom of SpringBoard. Pressing one copies its text to the system pasteboard; app-keyboard injection is intentionally outside this Lite port.";

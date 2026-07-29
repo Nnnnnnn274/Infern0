@@ -802,8 +802,8 @@ static const NSInteger kSecDarkSwordTweaks  = 13;
 
         Package *macaronLite = [[Package alloc] initWithIdentifier:@"com.infern0.macaronlite"
                                            name:@"Macaron Lite"
-                               shortDescription:@"Color, gradient, photo, or transparent Dock backgrounds"
-                                longDescription:@"Community-inspired port of Macaron's Dock customization idea. It styles only the existing normal or floating Dock background using a solid color, horizontal gradient, selected photo, optional stock blur, opacity control, or a fully transparent appearance. App icons and gesture recognizers are never replaced. Every discovered Dock class and changed background is logged, and Clean Up restores the exact captured colors and material visibility."
+                               shortDescription:@"Color the Dock, folders, page indicators, and Search"
+                                longDescription:@"Community-inspired expansion of Macaron's visual customization idea. The normal or floating Dock supports a solid color, horizontal gradient, selected photo, optional stock blur, opacity control, or transparency. Folder backgrounds, Home Screen page indicators, and the Search pill use the selected accent colors for predictable rendering on compact surfaces. Every surface has its own toggle; app icons, layout, and gesture recognizers are never replaced. Detailed logs record discovery and changes, while Clean Up restores every captured color and material visibility value."
                                         version:version
                                          author:@"Infern0 Team (inspired by Macaron)"
                                        category:@"Home Screen"

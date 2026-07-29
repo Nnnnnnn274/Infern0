@@ -2,7 +2,7 @@
 //  macaronlite.h
 //  infern0
 //
-//  Session-only Dock background customizer inspired by Macaron.
+//  Session-only Home Screen chrome customizer inspired by Macaron.
 //
 
 #ifndef macaronlite_h
@@ -20,6 +20,10 @@ typedef enum {
 void macaronlite_configure(MacaronLiteMode mode,
                            int opacityPct,
                            bool keepBlur,
+                           bool styleDock,
+                           bool styleFolders,
+                           bool stylePageDots,
+                           bool styleSearchPill,
                            const char *primaryHex,
                            const char *secondaryHex,
                            const char *photoPath);
