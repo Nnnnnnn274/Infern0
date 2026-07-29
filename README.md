@@ -5,158 +5,169 @@
 <h1 align="center">infern0</h1>
 
 <p align="center">
-  A new chapter for the Cyanide project.<br>
-  Explore, configure, and run iOS tweaks from one open-source app.
+  The Cyanide project, rebuilt as a focused iOS tweak runner and system toolbox.
 </p>
 
 <p align="center">
-  <a href="https://github.com/Nnnnnnn274/Infern0/releases/latest">
-    <img alt="Latest release" src="https://img.shields.io/github/v/release/Nnnnnnn274/Infern0?style=flat-square&color=ef4444">
+  <a href="https://github.com/Nnnnnnn274/Infern0/releases">
+    <img alt="Latest release" src="https://img.shields.io/github/v/release/Nnnnnnn274/Infern0?include_prereleases&style=flat-square&color=c74343">
   </a>
   <img alt="Platform" src="https://img.shields.io/badge/platform-iOS%20%7C%20iPadOS-111827?style=flat-square">
-  <img alt="Version" src="https://img.shields.io/badge/current%20line-2.0-f97316?style=flat-square">
+  <img alt="Version" src="https://img.shields.io/badge/current%20line-4.0.0-3b82f6?style=flat-square">
   <a href="LICENSE">
     <img alt="License" src="https://img.shields.io/badge/license-AGPL--3.0-2563eb?style=flat-square">
   </a>
 </p>
 
 <p align="center">
-  <a href="https://github.com/Nnnnnnn274/Infern0/releases/latest"><strong>Download</strong></a>
-  ·
+  <a href="https://github.com/Nnnnnnn274/Infern0/releases"><strong>Download</strong></a>
+  &middot;
   <a href="https://github.com/Nnnnnnn274/Infern0/issues/new?template=bug_report.yml">Report a bug</a>
-  ·
+  &middot;
   <a href="https://github.com/Nnnnnnn274/Infern0/issues/new?template=feature_request.yml">Request a feature</a>
-  ·
+  &middot;
   <a href="https://discord.gg/fx3xvuUyj">Discord</a>
 </p>
 
 ---
 
-## A fresh start
+## About
 
 **infern0** is the active continuation of Cyanide, maintained by
-[@Nnnnnnn274](https://github.com/Nnnnnnn274). The goal is simple: preserve the
-research and creativity behind the original project, finish its incomplete
-ideas, and build a cleaner and more dependable tweak-running experience.
+[@Nnnnnnn274](https://github.com/Nnnnnnn274). It uses the DarkSword kernel
+read/write foundation and RemoteCall to configure and run supported tweaks from
+a sideloaded app.
 
-This is not a traditional jailbreak. infern0 uses the DarkSword kernel
-read/write foundation and RemoteCall to apply supported changes from a
-sideloaded app. Many visual tweaks live only for the active session; a smaller
-set intentionally modifies persistent files and is clearly marked in the app.
+infern0 is not a traditional jailbreak. Most visual changes are live,
+session-scoped SpringBoard patches. Some tools deliberately modify persistent
+files; those tools are marked with stronger warnings and restoration guidance
+inside the app.
 
 > [!IMPORTANT]
 > infern0 is experimental system software. A tweak can crash SpringBoard,
-> disturb the Home Screen layout, partially apply, or stop working after an iOS
-> update. Read each package warning, keep backups, and test responsibly.
+> disturb a layout, partially apply, or stop working after an iOS update. Read
+> the package warning, keep backups, and test responsibly.
 
-## What we are building
+## What's new in 4.0.0
 
-| Area | Highlights |
+Version 4 reorganizes the app around five purpose-built tabs:
+
+| Tab | Purpose |
 | --- | --- |
-| **Home Screen** | SBCustomizer with an iPad-style Dock and App Library access, Gravity Lite, Cylinder Lite, Rounded Icons, Watch Layout, App Library Studio, labels, badges, and layout controls |
-| **Status Bar** | StatBar, NSBar, NiceBar Lite, Signal Readouts, carrier text, and live system information |
-| **Control Center** | Magma Evo Lite colors, BetterCCXI / Prysm Lite scale and depth, spacing, status, haptics, and security experiments |
-| **Theming** | Cyanide Themer, SnowBoard Lite imports, icon styles, LiveWP video, and Mood Wallpaper image sets |
-| **System tools** | Powercuff, OTA controls, Watch pairing overrides, location simulation, IPA tools, and carefully labeled persistent changes |
-| **Extensibility** | QuickLoader for local JavaScript tweaks and source repositories for installable community tweaks |
+| **Home** | Current exploit and package status, quick actions, release information, and shortcuts |
+| **Packages** | Browse, search, configure, queue, install, refresh, or remove tweaks; manage Sources from the tray button |
+| **Tools** | Direct utilities that run without behaving like installed packages |
+| **Activity** | A shareable record of exploit, apply, cleanup, and tool output |
+| **Settings** | Tweak controls, grouped configuration, interface choices, quick actions, and project information |
 
-### Recent tweak work
+The interface is now consistent across the Home screen, package browser,
+sources, queue, tools, activity log, settings, dialogs, controls, and tab bar.
+Five complete interface styles are included:
 
-- **Organized Settings** now groups packages by Home Screen, Lock Screen and
-  Notifications, Control Center, Status Bar, Multitasking, Themes, Utilities,
-  and System instead of presenting one long tweak list.
-- **Rounded Icons** applies smooth, configurable corners to every discovered
-  Home Screen icon without requiring a theme.
-- **Watch Layout** creates an actual Apple Watch-style beehive: circular,
-  pressable icons arranged with hex-ratio vertical spacing and alternating
-  half-slot row offsets on every Home Screen page. Dock and App Library icons
-  remain untouched, and all stock frames are restored on uninstall. It is
-  mutually exclusive with Free Placement so the two modes cannot corrupt each
-  other's saved frames.
-- **Free Placement Lite** adds configurable staggered icon offsets while keeping
-  every live icon pressable and restoring saved stock frames on uninstall.
-- **App Library Studio** adds independent App Library icon size and horizontal/
-  vertical spacing controls, optional label hiding, and a Disable Today View
-  switch. It changes live icon views so apps stay pressable and removes Today
-  View at SpringBoard's leading-page controller instead of leaving a blank page.
-- **Badge Studio** combines BlurryBadges tinting with notification-count-based
-  Growing Badges+ scaling.
-- **Lock Screen Customizer** moves and scales the live clock and can hide quick
-  actions or page dots. Metal Lock Light adds configurable ice, violet, or gold
-  edge lighting, with stock-state cleanup and detailed activity logs.
-- **MilkyWay Lite / Dynamic Stage** hosts one or two resizable floating app
-  windows and can explicitly include Safari, Photos, and Camera in its picker.
-- **Mood Wallpaper** crossfades and gently tilts through up to eight selected
-  images on the Home Screen or Lock Screen session layer.
-- **IPA Decryptor (Beta)** probes FairPlay metadata and exports only executables
-  verified as already unencrypted. Encrypted targets stop safely until proper
-  in-memory dumping is available; the tool never labels copied encrypted bytes
-  as a successful decryption.
-- **Copypasta Lite** stores editable snippets, captures the current text
-  clipboard into any slot, and writes snippets back to the system pasteboard
-  for normal Paste in any app, without keyboard-host injection.
-- **Velvet + TinyBanners** adds banner colors, borders, corners, compact size,
-  opacity, live refresh, and geometry cleanup. **Edge / Notchification Lite**
-  adds a configurable full-screen or top-only notification glow without
-  intercepting touches.
-- **Kumquat Lite** is included in Lock Screen Customizer as compact live media
-  controls with optional artwork hiding.
+- **Calm Crimson** - the new softer red default;
+- **Classic Ember** - the original infern0 interface for users who prefer it;
+- **Midnight Rose** - a dark rose variant;
+- **fr0st** - a cool blue style;
+- **Minecraft** - a block-inspired green and earth-tone style.
 
-### Earlier port-list coverage
+Modern, Classic, Midnight Rose, fr0st, and Minecraft app icons are included.
+The selected icon is also used by the Home banner, so the app's identity stays
+in sync with the chosen style.
 
-- Atria Lite → SBCustomizer and Home Layout Extras controls.
-- Growing Badges+ → Badge Studio.
-- [Griddy](https://github.com/miki-fp/griddy) → Free Placement Lite provides
-  the safe global-offset foundation. Griddy's per-icon drag/drop and
-  orientation-specific persistence still require direct SpringBoard callbacks.
-- [Kayoko](https://github.com/camieeh/Kayoko) → Copypasta Lite now supports
-  capture, editable slots, and normal system Paste. Background clipboard
-  history and a keyboard-host panel remain deferred.
-- Dress-style Lock Screen controls → Lock Screen Customizer covers live clock
-  placement, opacity, quick actions, page dots, and cleanup. Text replacement
-  and Face ID lock controls need more verified iOS 17+ class coverage.
-- [Kumquat](https://github.com/Galactic-Dev/Kumquat) → Kumquat Lite provides
-  media-container scaling and optional artwork hiding inside Lock Screen
-  Customizer.
-- [Eneko](https://github.com/camieeh/Eneko) → LiveWP provides session-only
-  video layers for Home and Lock Screen windows. Mood Wallpaper extends the
-  same cleanup path to up to eight crossfading, tilting images.
-- WeatherGround-style custom backgrounds → LiveWP provides the safe
-  selected-video foundation; automatic weather-linked scene switching is not
-  claimed yet.
-- Nugget-style device tools → the existing System Tools packages; infern0 does
-  not duplicate Nugget's separate pairing-file workflow.
-- Radial Folders and MobileGoose remain deferred because their long-press,
-  dragging, and continuous callback behavior cannot yet be installed safely by
-  the app-driven RemoteCall session.
-- NoCameraSound region bypass is not shipped: infern0 has no verified
-  session-only camera-process audio hook, and a persistent region-property edit
-  would be misleading and unsafe without device-specific restoration support.
-- **Gravity Lite** uses live, pressable icon views on its iOS 26 per-icon path. Each Home Screen page has its own overlay, animator, collision bounds, and restore state, so icons stay on their original page while swiping instead of merging or disappearing.
-  Older fallback paths still use non-interactive snapshots and are labeled as
-  such in the package's known issues.
-- **Cylinder Lite** applies perspective depth across the Home Screen while
-  preserving normal icon taps.
-- **Barmoji** now presents real pressable emoji buttons with highlight and
-  selection feedback. Its enabled preference survives reboot and the overlay is
-  recreated with the next infern0 SpringBoard session. Cross-process text
-  insertion into arbitrary app keyboards is still a work in progress.
+Other 4.0 improvements include:
 
-## Project status
+- a package queue with visible install, refresh, removal, and cleanup progress;
+- user-managed Sources for community package feeds;
+- reorganized settings sections instead of one long tweak list;
+- clearer installed, configured, pending, and session-applied states;
+- dedicated tool and activity views;
+- safer cleanup paths and stronger warnings around persistent changes;
+- an Experimental Tweaks switch that gates selected early-beta runtime paths.
 
-infern0 2.0 is an active reboot, not a promise that every experiment is
-finished. Work is currently focused on:
+## Current package catalog
 
-- making existing tweaks configurable and easier to restore;
-- keeping icons and controls interactive after visual transformations;
-- applying Home Screen tweaks consistently across all discovered pages;
-- producing useful activity logs for setup, apply, refresh, and cleanup;
-- finishing older Cyanide experiments without hiding their limitations;
-- improving exploit and RemoteCall reliability across supported targets.
+This list reflects the packages retained by the current 4.0 catalog. Packages
+from user-added Sources can appear alongside them when their metadata and
+requirements are supported.
 
-The AMFI, CoreTrust, and kPAC paths remain research-heavy and may be incomplete
-or unreliable on some devices. Their presence in the source tree should not be
-read as a universal compatibility guarantee.
+### Home Screen and SpringBoard
+
+| Package | What it does |
+| --- | --- |
+| **SBCustomizer** | Configures the Home Screen grid, labels, dock icon count, and supported iPad-style Dock behavior |
+| **Home Layout Extras** | Adds layout padding and per-icon scaling controls |
+| **Gravity Lite** | Adds a gravity-style Home Screen icon effect |
+| **App Switcher Grid** | Rearranges the app switcher into a grid |
+| **QuickLoader** | Loads local JavaScript tweaks and exposes generated settings for their parameters |
+| **Disable App Library** | Removes the App Library page |
+| **Disable Icon Fly-In** | Skips the icon entrance animation |
+| **Zero Wake Animation** | Removes the display wake fade |
+| **Zero Backlight Fade** | Removes the lock and unlock backlight fade |
+| **Double-Tap to Lock** | Locks the device when the empty wallpaper is double-tapped |
+| **Drag Coefficient** | Changes the SpringBoard UIKit animation-speed multiplier |
+| **Hide Home Bar** | Hides or restores the Home indicator using a persistent system-asset change |
+
+### Status Bar and notifications
+
+| Package | What it does |
+| --- | --- |
+| **StatBar** | Shows battery temperature and free RAM in a live status-bar overlay |
+| **NSBar** | Shows real-time download and upload speeds |
+| **NiceBar Lite** | Adds configurable text, date, network, battery, storage, and system-information labels |
+| **Axon Lite** | Groups visible Notification Center requests by app |
+
+### Themes and wallpapers
+
+| Package | What it does |
+| --- | --- |
+| **Infern0 Themer** | Applies infern0's built-in icon-theming controls |
+| **SnowBoard Lite** | Imports and applies local SnowBoard/IconBundles-style themes |
+| **LiveWP** | Runs a video wallpaper or an up-to-eight-image Mood Wallpaper session |
+| **Lara Font Manager** | Browses, imports, previews, applies, and manages supported fonts and emoji packs |
+
+### System tools
+
+| Package | What it does |
+| --- | --- |
+| **Powercuff** | Applies synthetic thermal pressure to underclock the CPU and GPU until reboot |
+| **Location Simulator** | Sets or restores a static CoreLocation simulation point through Apple Maps |
+| **Watch Pairing Override** | Edits the local watchOS pairing compatibility range, with a backup |
+| **Call Recording Sound** | Replaces or restores CallServices disclosure audio files; users are responsible for applicable consent laws |
+| **OTA Updates** | Disables or re-enables OTA-related launchd jobs |
+| **AMFI Bypass Test** | Tests and verifies the existing process-scoped AMFI patch |
+| **Lara VFS File Manager** | Provides VFS, sandbox, and hybrid file browsing plus advanced file operations |
+| **Lara Settings** | Manages Lara offsets, VFS preferences, logs, and integration information |
+
+## Beta and compatibility-sensitive packages
+
+These packages are also in the current catalog, but depend heavily on private
+iOS behavior or are intentionally limited in scope. The first three require
+**Settings > Experimental Tweaks** before their runtime path can be applied.
+Availability does not guarantee that a package works on every supported device
+or OS build.
+
+| Package | Current scope | Access |
+| --- | --- | --- |
+| **Signal Readouts** | Numeric cellular RSRP and Wi-Fi signal readouts | Experimental Tweaks required |
+| **TypeBanner** | iMessage typing banner below the Dynamic Island | Experimental Tweaks required |
+| **Notification Island** | Mirrors incoming banners into a Dynamic Island Live Activity | Experimental Tweaks required |
+| **IPA Decryptor (Beta)** | Detects FairPlay encryption and exports only executables already verified as unencrypted | Available; encrypted apps are not decrypted yet |
+| **MilkyWay Lite / Dynamic Stage** | Hosts one or two apps in floating, resizable windows | Available beta |
+| **FastLockX Lite** | Experimental fast-lock behavior | Available beta |
+| **Cylinder Lite** | Home Screen page-transition effects | Available; iOS compatibility varies |
+| **Macaron Lite** | Colors the Dock, folders, page indicators, and Search | Available; session visual tweak |
+| **FloatingDock XVI Lite** | Uses supported native iPad-style floating Dock behavior on iPhone | Available; private-class compatibility varies |
+| **Barmoji** | Adds a pressable emoji button strip to SpringBoard | Available beta; it does not inject into app keyboards |
+| **Watch Layout** | Arranges native Home Screen icons in a watch-style layout | Available; session layout |
+| **Lock Screen Overlay** | Replaces the stock clock area with a noninteractive glass overlay | Available beta |
+| **Vesta Lite** | Adds a right-edge app drawer | Available; session overlay |
+| **MagSafe Enabler** | Shows a charging-ring overlay when iOS reports charging | Available; all charging sources can trigger it |
+| **Upside Down** | Enables supported upside-down SpringBoard rotation behavior | Available experimental session patch |
+
+The older **Lock Screen Customizer** catalog entry is retired in favor of Lock
+Screen Overlay. Several older Control Center and Home Screen experiments were
+also retired because their current implementations were incomplete or unsafe.
+They are intentionally no longer advertised as working packages.
 
 ## Compatibility
 
@@ -165,65 +176,66 @@ The app currently gates tweak execution to:
 - iOS/iPadOS **17.0 through 18.7.1**
 - iOS/iPadOS **26.0 through 26.0.1**
 
-The kernel issues used by this project, <code>CVE-2025-43510</code> and
-<code>CVE-2025-43520</code>, were fixed in iOS/iPadOS 18.7.2 and 26.1. Later
-releases are outside the current exploit window. A19 and M5 devices are not
-supported.
+The kernel issues used by this project, `CVE-2025-43510` and
+`CVE-2025-43520`, were fixed in iOS/iPadOS 18.7.2 and 26.1. Later releases are
+outside the current exploit window. A19 and M5 devices are not supported.
 
-Compatibility inside those ranges can still vary by device and tweak. Check
-the package description and activity log before assuming a feature is safe for
-your setup.
+Compatibility can still vary by device and package inside those ranges. Check
+the package description, warnings, and Activity tab before assuming a feature
+is safe for a particular setup.
 
 ## Install
 
-1. Open the [latest release](https://github.com/Nnnnnnn274/Infern0/releases/latest).
-2. Download the current <code>.ipa</code>.
+1. Open the [releases page](https://github.com/Nnnnnnn274/Infern0/releases).
+2. Download the current `.ipa` from the desired release.
 3. Install it with a normal IPA sideloading or signing tool.
-4. Launch infern0, review the compatibility warning, and configure tweaks before
-   adding them to the queue.
+4. Launch infern0 and review the compatibility warning.
+5. Configure packages before adding them to the queue.
 
-Do **not** run infern0 through LiveContainer. The exploit and process behavior
-expect a normally installed application.
+The 4.0.0 prerelease line is for testing. Expect beta packages and some
+device-specific behavior to need further work.
 
-## How tweak state works
+## State and cleanup
 
-infern0 deliberately separates different kinds of changes:
+infern0 distinguishes between three kinds of changes:
 
-- **Live session tweaks** run through RemoteCall and generally need infern0's
-  SpringBoard session to remain active. A respring restores stock behavior.
+- **Live session tweaks** run through RemoteCall and usually need infern0's
+  SpringBoard session to remain active. A respring normally restores stock
+  behavior.
 - **Saved preferences** survive app relaunches and reboots, then control what
   infern0 recreates during a later session.
-- **Persistent changes** write system-accessible files and remain until their
-  documented restore action is used. These packages carry stronger warnings.
+- **Persistent changes** write system-accessible files and remain until the
+  package's documented restore action is used.
 
-The Settings screen exposes per-tweak controls, current intent/applied state,
-cleanup behavior, and a detailed activity log. If something behaves
-unexpectedly, save that log before restarting the app.
+The Activity tab records what infern0 attempted and whether each stage
+completed. Save or share that log before restarting the app when reporting a
+problem.
 
 ## Build from source
 
 Requirements:
 
 - macOS with a compatible Xcode and iPhoneOS SDK;
-- command-line build tools;
-- <code>xcbeautify</code> is optional—the build script falls back to raw
-  <code>xcodebuild</code> output.
+- Xcode command-line tools;
+- `xcbeautify` is optional; the script falls back to raw `xcodebuild` output.
 
 Build an unsigned IPA:
 
-~~~sh
+```sh
 ./scripts/build.sh
-~~~
+```
 
-The default build uses the <code>Infern0</code> scheme and writes:
+The script builds the `Infern0` scheme and writes a versioned artifact:
 
-~~~text
-build/Infern0.ipa
-~~~
+```text
+build/Infern0-4.0.0.ipa
+```
 
-Equivalent manual build:
+It also maintains `build/Infern0.ipa` as a link to the latest local build.
 
-~~~sh
+Equivalent unsigned Xcode build:
+
+```sh
 xcodebuild \
   -project Infern0.xcodeproj \
   -scheme Infern0 \
@@ -231,29 +243,30 @@ xcodebuild \
   -configuration Debug \
   CODE_SIGNING_ALLOWED=NO \
   build
-~~~
+```
 
-Release notes for completed and upcoming work live in
+Pushes to `main` and `testing` also run the GitHub Actions build and release
+workflow. Release history and detailed changes live in
 [RELEASE_NOTES.md](RELEASE_NOTES.md).
 
 ## Contributing
 
-Bug reports, test results, documentation fixes, and focused tweak improvements
-are welcome.
+Bug reports, device testing, documentation fixes, and focused package
+improvements are welcome.
 
 Before opening an issue:
 
 1. confirm that the device and OS are in the supported range;
 2. reproduce with as few enabled tweaks as possible;
-3. restore the affected tweak and try once more;
-4. attach the infern0 activity log and exact device/iOS information;
-5. explain whether the problem happens on Apply, refresh, cleanup, respring, or
-   reboot.
+3. use the affected package's cleanup or restore action and try again;
+4. attach the Activity log and exact device and iOS information;
+5. explain whether the problem happened during apply, refresh, cleanup,
+   respring, or reboot.
 
 Use the repository templates to
-[report a bug](https://github.com/Nnnnnnn274/Infern0/issues/new?template=bug_report.yml)
-or
-[propose a feature](https://github.com/Nnnnnnn274/Infern0/issues/new?template=feature_request.yml).
+[report a bug](https://github.com/Nnnnnnn274/Infern0/issues/new?template=bug_report.yml),
+[request a feature](https://github.com/Nnnnnnn274/Infern0/issues/new?template=feature_request.yml),
+or [vote for a tweak](https://github.com/Nnnnnnn274/Infern0/issues/new?template=tweak_vote.yml).
 
 ## Community
 
@@ -263,18 +276,19 @@ or
 
 ## Project lineage and credits
 
-infern0 stands on substantial work from the iOS research and tweak communities:
+infern0 stands on substantial work from the iOS research and tweak
+communities:
 
-- [zeroxjf](https://github.com/zeroxjf) created Cyanide and its
-  Installer/Settings direction.
+- [zeroxjf](https://github.com/zeroxjf) created Cyanide and its original
+  Installer and Settings direction.
 - [opa334](https://github.com/opa334) created
   [darksword-kexploit](https://github.com/opa334/darksword-kexploit), ChOma,
   and XPF.
 - [wh1te4ever](https://github.com/wh1te4ever) created
   [darksword-kexploit-fun](https://github.com/wh1te4ever/darksword-kexploit-fun)
   and the RemoteCall foundation used by this project.
-- [rooootdev](https://github.com/rooootdev) contributed exploit behavior used
-  while stabilizing the fork.
+- [rooootdev](https://github.com/rooootdev) contributed exploit behavior and
+  Lara.
 - [kolbicz](https://github.com/kolbicz) contributed DarkSword tweaks, OTA work,
   and the original RemoteCall location-simulation prototype.
 - [rpetrich](https://github.com/rpetrich) created Powercuff.
@@ -285,10 +299,9 @@ infern0 stands on substantial work from the iOS research and tweak communities:
   ports in this tree.
 - [tomt000](https://github.com/tomt000) created Dynamic Stage, whose
   scene-hosting design inspired Dynamic Stage Lite.
-- <code>ezzuldinSt</code>, <code>YangJiiii</code>,
-  <code>@Little_34306</code>, <code>neonmodder123</code>, and the many testers
-  and contributors credited in package descriptions helped shape individual
-  tools and ports.
+- `ezzuldinSt`, `YangJiiii`, `@Little_34306`, `neonmodder123`, and the many
+  testers and contributors credited in package descriptions helped shape
+  individual tools and ports.
 
 The interface also takes inspiration from classic
 [Installer.app](https://github.com/AppTapp/Installer-3) and
@@ -305,5 +318,5 @@ license. This project is provided without warranty.
 ---
 
 <p align="center">
-  <strong>infern0 is where Cyanide continues—cleaner, more open, and moving forward.</strong>
+  <strong>infern0 is where Cyanide continues: cleaner, calmer, and moving forward.</strong>
 </p>
