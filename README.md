@@ -34,7 +34,7 @@
 ## About
 
 **infern0** is the active continuation of Cyanide, maintained by
-[@Nnnnnnn274](https://github.com/Nnnnnnn274). It uses the DarkSword kernel
+[@Nnnnnnn274] using ai to code (https://github.com/Nnnnnnn274). It uses the DarkSword kernel
 read/write foundation and RemoteCall to configure and run supported tweaks from
 a sideloaded app.
 
